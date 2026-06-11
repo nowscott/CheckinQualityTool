@@ -24,7 +24,7 @@ body {
   background-size: 28px 28px;
 }
 
-.shell { width: min(1120px, calc(100% - 40px)); margin: 0 auto; padding: 68px 0 80px; }
+.shell { width: min(1080px, calc(100% - 40px)); margin: 0 auto; padding: 58px 0 72px; }
 header { max-width: 780px; margin-bottom: 34px; }
 .eyebrow { margin: 0 0 14px; color: var(--accent); font: 700 12px/1.2 ui-monospace, monospace; letter-spacing: .18em; }
 h1 { margin: 0; font-family: "Songti SC", "STSong", serif; font-size: clamp(42px, 6vw, 70px); line-height: 1.08; letter-spacing: -.04em; }
@@ -35,26 +35,73 @@ h1 { margin: 0; font-family: "Songti SC", "STSong", serif; font-size: clamp(42px
   background: rgba(255, 254, 249, .94);
   box-shadow: 0 20px 60px rgba(35, 48, 48, .08);
 }
-.card { padding: 30px; }
-.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+.card { padding: 24px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.grid > * { min-width: 0; }
 .upload {
-  position: relative; min-height: 210px; padding: 24px;
-  display: flex; flex-direction: column; align-items: flex-start;
-  border: 1px dashed #aeb9b8; cursor: pointer; transition: .2s ease;
+  position: relative;
+  min-width: 0;
+  min-height: 176px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  border: 1px dashed #aeb9b8;
+  background: rgba(250, 249, 244, .68);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color .2s ease, background-color .2s ease, transform .2s ease;
 }
-.upload:hover { border-color: var(--accent); transform: translateY(-2px); }
+.upload:hover { border-color: var(--accent); background: #fffdf7; transform: translateY(-2px); }
+.upload.has-file { border-style: solid; border-color: #91afa6; background: #fbfdfb; }
 .upload input { position: absolute; opacity: 0; pointer-events: none; }
+.upload-top { display: flex; align-items: center; justify-content: space-between; }
 .step { color: var(--accent); font: 700 12px ui-monospace, monospace; letter-spacing: .12em; }
-.upload strong { margin-top: 28px; font-size: 20px; }
-.upload small { margin-top: 8px; color: var(--muted); line-height: 1.6; }
+.file-type {
+  padding: 4px 7px;
+  color: #7c898d;
+  border: 1px solid #d5dcda;
+  font: 700 10px/1 ui-monospace, monospace;
+  letter-spacing: .08em;
+}
+.upload-copy { display: block; margin-top: 20px; min-width: 0; }
+.upload-copy strong { display: block; font-size: 19px; line-height: 1.35; }
+.upload-copy small { display: block; margin-top: 6px; color: var(--muted); line-height: 1.55; }
 .file-name {
-  margin-top: auto; max-width: 100%; padding: 8px 12px;
-  color: var(--green); background: #e7f0ec; font-size: 13px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  width: 100%;
+  min-width: 0;
+  margin-top: auto;
+  padding: 9px 10px 9px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #667377;
+  border: 1px solid #dce3e1;
+  background: #f2f5f3;
+  font-size: 12px;
+}
+.file-name-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-action {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-weight: 700;
+}
+.has-file .file-name {
+  color: var(--green);
+  border-color: #c5d9d2;
+  background: #e9f2ee;
+}
+.has-file .file-action::before {
+  content: "✓ ";
 }
 
-.options { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
-.options > label { min-height: 88px; padding: 16px 18px; border: 1px solid var(--line); }
+.options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.options > label { min-width: 0; min-height: 82px; padding: 15px 17px; border: 1px solid var(--line); background: rgba(255, 255, 255, .3); }
 .options span { display: block; font-size: 14px; }
 .options input[type="text"] {
   width: 100%; margin-top: 12px; padding: 9px 0; border: 0; border-bottom: 1px solid #9ea9a8;
@@ -63,7 +110,7 @@ h1 { margin: 0; font-family: "Songti SC", "STSong", serif; font-size: clamp(42px
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .switch-row small { display: block; margin-top: 6px; color: var(--muted); line-height: 1.4; }
 .switch-row input { width: 46px; height: 24px; accent-color: var(--accent); }
-.rules { display: flex; align-items: center; gap: 10px; margin: 22px 0; color: var(--muted); font-size: 13px; }
+.rules { display: flex; align-items: center; gap: 8px; margin: 20px 0; color: var(--muted); font-size: 12px; }
 .rules span { margin-right: 5px; color: var(--ink); font-weight: 700; }
 .rules b { padding: 5px 9px; color: var(--green); border: 1px solid #b9cbc5; font-weight: 500; }
 
@@ -90,16 +137,17 @@ button small { opacity: .78; }
 .spinner.error::after { content: "!"; font-size: 27px; font-weight: 800; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.output-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 24px; }
-.output-grid article { min-height: 170px; padding: 20px; box-shadow: none; }
+.output-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
+.output-grid article { min-width: 0; min-height: 150px; padding: 18px; box-shadow: none; }
 .output-grid span { color: var(--accent); font: 700 11px ui-monospace, monospace; letter-spacing: .1em; }
-.output-grid strong { display: block; margin-top: 30px; font-size: 17px; }
+.output-grid strong { display: block; margin-top: 24px; font-size: 17px; }
 .output-grid p { margin: 9px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 
 @media (max-width: 760px) {
   .shell { width: min(100% - 24px, 1120px); padding-top: 36px; }
   .card { padding: 16px; }
   .grid, .options, .output-grid { grid-template-columns: 1fr; }
+  .upload { min-height: 168px; }
   .rules { flex-wrap: wrap; }
   button { align-items: flex-start; flex-direction: column; gap: 6px; }
 }

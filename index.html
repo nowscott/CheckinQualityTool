@@ -18,18 +18,34 @@
       <form id="process-form">
         <div class="grid">
           <label class="upload">
-            <span class="step">01</span>
-            <strong>课堂反馈质检名单</strong>
-            <small>包含老师姓名、学员姓名、老师邮箱和课次信息</small>
+            <span class="upload-top">
+              <span class="step">01</span>
+              <span class="file-type">XLSX</span>
+            </span>
+            <span class="upload-copy">
+              <strong>课堂反馈质检名单</strong>
+              <small>老师、学员、教师邮箱及课次信息</small>
+            </span>
             <input id="list-file" name="list_file" type="file" accept=".xlsx" required>
-            <span class="file-name" id="list-name">选择 Excel 文件</span>
+            <span class="file-name" id="list-name">
+              <span class="file-name-text">选择 Excel 文件</span>
+              <span class="file-action">浏览</span>
+            </span>
           </label>
           <label class="upload">
-            <span class="step">02</span>
-            <strong>聊天质检明细</strong>
-            <small>包含聊天类型、发送方、邮箱、群名和聊天内容</small>
+            <span class="upload-top">
+              <span class="step">02</span>
+              <span class="file-type">XLSX</span>
+            </span>
+            <span class="upload-copy">
+              <strong>聊天质检明细</strong>
+              <small>聊天类型、发送方、邮箱、群名及聊天内容</small>
+            </span>
             <input id="chat-file" name="chat_file" type="file" accept=".xlsx" required>
-            <span class="file-name" id="chat-name">选择 Excel 文件</span>
+            <span class="file-name" id="chat-name">
+              <span class="file-name-text">选择 Excel 文件</span>
+              <span class="file-action">浏览</span>
+            </span>
           </label>
         </div>
 

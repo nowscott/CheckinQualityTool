@@ -13,9 +13,14 @@ const progressBar = document.querySelector("#progress-bar");
 let worker;
 
 function bindFileName(input, output) {
+  const label = input.closest(".upload");
+  const nameText = output.querySelector(".file-name-text");
   input.addEventListener("change", () => {
     const file = input.files[0];
-    output.textContent = file ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB` : "选择 Excel 文件";
+    const displayName = file ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB` : "选择 Excel 文件";
+    nameText.textContent = displayName;
+    nameText.title = file?.name || "";
+    label.classList.toggle("has-file", Boolean(file));
   });
 }
 
