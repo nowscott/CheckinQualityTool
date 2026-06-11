@@ -4,3 +4,5 @@ node_modules/
 部署包/
 .vercel/
 .DS_Store
+.vercel
+.env*

@@ -1,0 +1,6 @@
+*.xlsx
+.~*
+.env*
+.git/
+.vercel/
+node_modules/
