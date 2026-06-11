@@ -26,7 +26,14 @@ body {
 
 .shell { width: min(1080px, calc(100% - 40px)); margin: 0 auto; padding: 58px 0 72px; }
 header { max-width: 780px; margin-bottom: 34px; }
-.eyebrow { margin: 0 0 14px; color: var(--accent); font: 700 12px/1.2 ui-monospace, monospace; letter-spacing: .18em; }
+.brand-line { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.brand-icon {
+  width: 42px;
+  height: 42px;
+  display: block;
+  object-fit: contain;
+}
+.eyebrow { margin: 0; color: var(--accent); font: 700 12px/1.2 ui-monospace, monospace; letter-spacing: .18em; }
 h1 { margin: 0; font-family: "Songti SC", "STSong", serif; font-size: clamp(42px, 6vw, 70px); line-height: 1.08; letter-spacing: -.04em; }
 .subtitle { max-width: 700px; margin: 20px 0 0; color: var(--muted); font-size: 17px; line-height: 1.8; }
 
@@ -145,6 +152,8 @@ button small { opacity: .78; }
 
 @media (max-width: 760px) {
   .shell { width: min(100% - 24px, 1120px); padding-top: 36px; }
+  .brand-line { gap: 10px; margin-bottom: 12px; }
+  .brand-icon { width: 36px; height: 36px; }
   .card { padding: 16px; }
   .grid, .options, .output-grid { grid-template-columns: 1fr; }
   .upload { min-height: 168px; }
