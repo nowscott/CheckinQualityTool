@@ -17,8 +17,11 @@
         <p class="eyebrow">LOCAL QUALITY CHECK</p>
       </div>
       <h1>打卡质检数据生成</h1>
-      <p class="subtitle">上传课堂反馈名单与聊天导出数据，在浏览器本地完成清洗、匹配并生成可追溯的多 Sheet Excel。文件不会上传服务器。</p>
-      <button class="version-button" id="version-button" type="button">v1.2.0</button>
+      <p class="subtitle">
+        上传课堂反馈名单与聊天导出数据，在浏览器本地完成清洗、匹配并生成可追溯的多 Sheet Excel。文件不会上传服务器。
+        <button class="logic-button" id="logic-button" type="button">查看匹配规则</button>
+      </p>
+      <button class="version-button" id="version-button" type="button">v1.3.0</button>
     </header>
 
     <section class="card">
@@ -108,42 +111,7 @@
     </section>
   </main>
 
-  <dialog class="changelog-dialog" id="changelog-dialog" tabindex="-1">
-    <div class="changelog-head">
-      <div>
-        <span>CHANGELOG</span>
-        <h2>版本更新记录</h2>
-      </div>
-      <button class="dialog-close" id="changelog-close" type="button" aria-label="关闭">
-        <span aria-hidden="true"></span>
-      </button>
-    </div>
-    <section>
-      <strong>v1.2.0</strong>
-      <time datetime="2026-06-11">2026-06-11</time>
-      <ul>
-        <li>白名单区分彻底免检和学员别名，别名仍需真实聊天命中。</li>
-        <li>从历史白名单整理8条长期别名关系并关联学员号。</li>
-        <li>Worker拆分为白名单、匹配和流程模块，降低后续维护成本。</li>
-      </ul>
-    </section>
-    <section>
-      <strong>v1.1.0</strong>
-      <time datetime="2026-06-11">2026-06-11</time>
-      <ul>
-        <li>教师统一通过邮箱匹配，不受姓名数字后缀或企微昵称影响。</li>
-        <li>英文姓名及英文聊天内容匹配忽略大小写。</li>
-        <li>四字中文姓名末尾“一”自动清理，单字姓名自动使用弱匹配。</li>
-        <li>新增项目内置 CSV 白名单，区分彻底免检与学员别名。</li>
-        <li>打卡结果删除 B、C 空白列，核心字段连续排列。</li>
-      </ul>
-    </section>
-    <section>
-      <strong>v1.0.0</strong>
-      <time datetime="2026-06-10">2026-06-10</time>
-      <p>上线纯前端打卡质检、聊天清洗、匹配明细和 Excel 导出。</p>
-    </section>
-  </dialog>
-  <script src="./app.js"></script>
+  <div id="modal-root"></div>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>

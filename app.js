@@ -1,3 +1,7 @@
+import { mountModalComponents } from "./modules/modal.js";
+
+mountModalComponents(document.querySelector("#modal-root"));
+
 const form = document.querySelector("#process-form");
 const listFile = document.querySelector("#list-file");
 const chatFile = document.querySelector("#chat-file");
@@ -11,33 +15,9 @@ const spinner = document.querySelector("#spinner");
 const progressBar = document.querySelector("#progress-bar");
 const weekSelect = document.querySelector("#week-label");
 const weekHint = document.querySelector("#week-hint");
-const versionButton = document.querySelector("#version-button");
-const changelogDialog = document.querySelector("#changelog-dialog");
-const changelogClose = document.querySelector("#changelog-close");
 
 let worker;
 let whitelistCsvPromise;
-let dialogScrollY = 0;
-
-function openChangelog() {
-  dialogScrollY = window.scrollY;
-  const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-  document.body.style.top = `-${dialogScrollY}px`;
-  document.body.style.paddingRight = `${scrollbarWidth}px`;
-  document.documentElement.classList.add("dialog-open");
-  document.body.classList.add("dialog-open");
-  changelogDialog.showModal();
-  changelogDialog.focus({ preventScroll: true });
-}
-
-function unlockPageScroll() {
-  if (!document.body.classList.contains("dialog-open")) return;
-  document.documentElement.classList.remove("dialog-open");
-  document.body.classList.remove("dialog-open");
-  document.body.style.top = "";
-  document.body.style.paddingRight = "";
-  window.scrollTo(0, dialogScrollY);
-}
 
 function loadWhitelistCsv() {
   whitelistCsvPromise ||= fetch("./data/whitelist.csv", { cache: "no-store" }).then((response) => {
@@ -116,12 +96,6 @@ function downloadResult(buffer, filename) {
 bindFileName(listFile, listName, updateWeekHint);
 bindFileName(chatFile, chatName);
 weekSelect.addEventListener("change", updateWeekHint);
-versionButton.addEventListener("click", openChangelog);
-changelogClose.addEventListener("click", () => changelogDialog.close());
-changelogDialog.addEventListener("click", (event) => {
-  if (event.target === changelogDialog) changelogDialog.close();
-});
-changelogDialog.addEventListener("close", unlockPageScroll);
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();

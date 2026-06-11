@@ -57,6 +57,22 @@ header { position: relative; margin-bottom: 34px; }
 .version-button:hover { color: white; background: var(--green); }
 h1 { margin: 0; font-family: "Songti SC", "STSong", serif; font-size: clamp(42px, 6vw, 70px); line-height: 1.08; letter-spacing: -.04em; }
 .subtitle { max-width: 700px; margin: 20px 0 0; color: var(--muted); font-size: 17px; line-height: 1.8; }
+.logic-button {
+  width: auto;
+  min-height: 28px;
+  margin-left: 6px;
+  padding: 4px 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: 1px;
+  color: var(--green);
+  border: 1px solid #b9cbc5;
+  background: rgba(255, 254, 249, .7);
+  font: 600 12px/1.3 "PingFang SC", "Microsoft YaHei", sans-serif;
+  white-space: nowrap;
+}
+.logic-button:hover { color: white; border-color: var(--green); background: var(--green); }
 .version-button {
   position: absolute;
   right: 0;
@@ -268,6 +284,70 @@ button small { opacity: .78; }
 .changelog-dialog ul { margin: 14px 0 0; padding-left: 20px; color: var(--muted); line-height: 1.8; }
 .changelog-dialog p { margin: 12px 0 0; color: var(--muted); line-height: 1.7; }
 
+.rules-dialog { width: min(820px, calc(100% - 28px)); }
+.logic-intro {
+  margin: 24px 26px 6px;
+  padding: 20px;
+  border-left: 4px solid var(--accent);
+  background: #f8f2eb;
+}
+.logic-intro strong { font-size: 18px; }
+.logic-intro p { margin-top: 8px; }
+.logic-intro code {
+  margin-top: 14px;
+  padding: 9px 12px;
+  display: block;
+  overflow-x: auto;
+  color: var(--green);
+  border: 1px solid #cad9d4;
+  background: rgba(255, 254, 249, .78);
+  font: 600 13px/1.6 ui-monospace, monospace;
+  white-space: nowrap;
+}
+.rules-dialog .logic-section {
+  padding: 24px 26px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 16px;
+}
+.logic-number {
+  padding-top: 3px;
+  color: var(--accent);
+  font: 700 12px/1 ui-monospace, monospace;
+  letter-spacing: .12em;
+}
+.logic-section h3 { margin: 0; font-size: 19px; }
+.logic-section > div > p { margin-top: 8px; }
+.logic-example {
+  margin-top: 14px;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  background: #faf9f5;
+}
+.logic-example b { color: var(--ink); font-size: 13px; }
+.logic-example p { margin-top: 5px; font-size: 13px; }
+.logic-example.success { border-left: 3px solid var(--green); }
+.logic-example.warning { border-left: 3px solid #c78b35; background: #fcf8ed; }
+.logic-cases,
+.logic-status-grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.logic-cases div,
+.logic-status-grid div {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: #faf9f5;
+}
+.logic-cases b,
+.logic-status-grid b { display: block; color: var(--green); font-size: 13px; }
+.logic-cases span,
+.logic-status-grid span { margin-top: 5px; display: block; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.logic-status-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.logic-result { background: rgba(47, 111, 98, .035); }
+
 @media (max-width: 760px) {
   .shell { width: min(100% - 24px, 1120px); padding-top: 36px; }
   .brand-line { gap: 10px; margin-bottom: 12px; }
@@ -282,6 +362,16 @@ button small { opacity: .78; }
   .upload { min-height: 168px; }
   .rules { flex-wrap: wrap; }
   button { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .logic-button { align-items: center; flex-direction: row; }
   .dialog-close { align-items: center; flex-direction: row; }
   .changelog-dialog { max-height: calc(100vh - 24px); }
+  .logic-intro { margin: 16px 18px 4px; padding: 16px; }
+  .logic-intro code { white-space: normal; }
+  .rules-dialog .logic-section {
+    padding: 20px 18px;
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .logic-cases,
+  .logic-status-grid { grid-template-columns: 1fr; }
 }
