@@ -9,10 +9,43 @@ const statusTitle = document.querySelector("#status-title");
 const statusText = document.querySelector("#status-text");
 const spinner = document.querySelector("#spinner");
 const progressBar = document.querySelector("#progress-bar");
+const weekSelect = document.querySelector("#week-label");
+const weekHint = document.querySelector("#week-hint");
 
 let worker;
 
-function bindFileName(input, output) {
+function weekOfMonthFromDate(date) {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const mondayOffset = (firstDay.getDay() + 6) % 7;
+  return Math.min(5, Math.floor((date.getDate() + mondayOffset - 1) / 7) + 1);
+}
+
+function chineseWeek(number) {
+  return ["", "第一周", "第二周", "第三周", "第四周", "第五周"][number] || "";
+}
+
+function inferWeekFromFilename(filename) {
+  const matches = [...filename.matchAll(/(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})/g)];
+  if (!matches.length) return "";
+  const dates = matches.map((match) => new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  const middleDate = dates[Math.floor(dates.length / 2)];
+  return chineseWeek(weekOfMonthFromDate(middleDate));
+}
+
+function updateWeekHint() {
+  if (weekSelect.value !== "auto") {
+    weekHint.textContent = `已手动指定为${weekSelect.value}`;
+    return;
+  }
+  const inferred = listFile.files[0] ? inferWeekFromFilename(listFile.files[0].name) : "";
+  weekHint.textContent = inferred
+    ? `根据文件日期预计为${inferred}，生成时会再用课次日期校验`
+    : "选择名单后，将根据上课日期自动判断";
+}
+
+function bindFileName(input, output, onChange) {
   const label = input.closest(".upload");
   const nameText = output.querySelector(".file-name-text");
   input.addEventListener("change", () => {
@@ -21,6 +54,7 @@ function bindFileName(input, output) {
     nameText.textContent = displayName;
     nameText.title = file?.name || "";
     label.classList.toggle("has-file", Boolean(file));
+    onChange?.();
   });
 }
 
@@ -46,8 +80,9 @@ function downloadResult(buffer, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
-bindFileName(listFile, listName);
+bindFileName(listFile, listName, updateWeekHint);
 bindFileName(chatFile, chatName);
+weekSelect.addEventListener("change", updateWeekHint);
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -95,7 +130,7 @@ form.addEventListener("submit", (event) => {
     type: "process",
     listFile: listFile.files[0],
     chatFile: chatFile.files[0],
-    weekLabel: document.querySelector("#week-label").value.trim(),
+    weekLabel: weekSelect.value,
     useSingle: document.querySelector("#use-single").checked,
   });
 });

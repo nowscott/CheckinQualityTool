@@ -56,9 +56,17 @@
         </div>
 
         <div class="options">
-          <label>
-            <span>服务周标记</span>
-            <input id="week-label" name="week_label" type="text" placeholder="例如：第六周">
+          <label class="week-field">
+            <span class="option-title">服务周标记</span>
+            <select id="week-label" name="week_label">
+              <option value="auto">自动识别（推荐）</option>
+              <option value="第一周">第一周</option>
+              <option value="第二周">第二周</option>
+              <option value="第三周">第三周</option>
+              <option value="第四周">第四周</option>
+              <option value="第五周">第五周</option>
+            </select>
+            <small id="week-hint">选择名单后，将根据上课日期自动判断</small>
           </label>
           <label class="switch-row">
             <span>

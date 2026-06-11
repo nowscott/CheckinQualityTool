@@ -110,9 +110,27 @@ h1 { margin: 0; font-family: "Songti SC", "STSong", serif; font-size: clamp(42px
 .options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
 .options > label { min-width: 0; min-height: 82px; padding: 15px 17px; border: 1px solid var(--line); background: rgba(255, 255, 255, .3); }
 .options span { display: block; font-size: 14px; }
-.options input[type="text"] {
-  width: 100%; margin-top: 12px; padding: 9px 0; border: 0; border-bottom: 1px solid #9ea9a8;
-  outline: none; background: transparent; font-size: 16px;
+.option-title { font-weight: 600; }
+.week-field select {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 32px 8px 0;
+  color: var(--ink);
+  border: 0;
+  border-bottom: 1px solid #9ea9a8;
+  border-radius: 0;
+  outline: none;
+  background-color: transparent;
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+.week-field small {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
 }
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .switch-row small { display: block; margin-top: 6px; color: var(--muted); line-height: 1.4; }

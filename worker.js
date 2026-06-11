@@ -61,6 +61,30 @@ function sortDate(value) {
   return Number.isNaN(timestamp) ? Number.MAX_SAFE_INTEGER : timestamp;
 }
 
+function weekOfMonth(value) {
+  const normalized = excelDate(value);
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return 0;
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const firstDay = new Date(year, month, 1);
+  const mondayOffset = (firstDay.getDay() + 6) % 7;
+  return Math.min(5, Math.floor((day + mondayOffset - 1) / 7) + 1);
+}
+
+function chineseWeek(number) {
+  return ["", "第一周", "第二周", "第三周", "第四周", "第五周"][number] || "";
+}
+
+function inferServiceWeek(counts) {
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+  return {
+    label: chineseWeek(ranked[0]?.[0] || 0),
+    distribution: ranked.map(([week, count]) => `${chineseWeek(week)} ${count}课次`).join("；"),
+  };
+}
+
 function headerMap(headerRow) {
   const map = new Map();
   headerRow.forEach((value, index) => {
@@ -109,6 +133,7 @@ function buildTargets(workbook) {
     email: index("老师邮箱"),
   };
   const grouped = new Map();
+  const weekCounts = new Map();
   const counts = { 原始课次行数: Math.max(0, rows.length - 1), 跳过教师或学员为空: 0, 名单教师邮箱为空: 0 };
 
   for (let rowIndex = 1; rowIndex < rows.length; rowIndex += 1) {
@@ -121,6 +146,8 @@ function buildTargets(workbook) {
       continue;
     }
     if (!teacherEmail) counts.名单教师邮箱为空 += 1;
+    const lessonWeek = weekOfMonth(row[columns.lessonDate]);
+    if (lessonWeek) weekCounts.set(lessonWeek, (weekCounts.get(lessonWeek) || 0) + 1);
     const key = `${teacherEmail || `__name__:${teacher}`}\u0000${student}`;
     const record = {
       教师姓名: teacher,
@@ -151,7 +178,7 @@ function buildTargets(workbook) {
   targets.sort((a, b) => a.教师姓名.localeCompare(b.教师姓名, "zh-CN") || a.学员姓名.localeCompare(b.学员姓名, "zh-CN"));
   counts.去重后质检人数 = targets.length;
   counts.合并的重复课次 = counts.原始课次行数 - targets.length - counts.跳过教师或学员为空;
-  return { targets, counts, sheetName: found.name };
+  return { targets, counts, weekCounts, sheetName: found.name };
 }
 
 function preprocessChats(workbook) {
@@ -394,7 +421,9 @@ function buildOutput(listInfo, chatInfo, matchInfo, useSingle, weekLabel, source
     { 项目: "生成时间", 值: new Date().toLocaleString("zh-CN", { hour12: false }) },
     { 项目: "质检名单文件", 值: sourceNames.list },
     { 项目: "聊天明细文件", 值: sourceNames.chat },
-    { 项目: "服务周", 值: weekLabel || "未填写" },
+    { 项目: "服务周", 值: weekLabel || "未识别" },
+    { 项目: "服务周识别方式", 值: listInfo.weekMode },
+    { 项目: "课次周次分布", 值: listInfo.weekDistribution || "无有效日期" },
     { 项目: "名单工作表", 值: listInfo.sheetName },
     { 项目: "聊天工作表", 值: chatInfo.sheetName },
     { 项目: "名单去重规则", 值: "按教师邮箱+学员姓名合并，保留最早课次" },
@@ -522,7 +551,18 @@ self.onmessage = async ({ data }) => {
     );
 
     progress("正在匹配教师与学员", "按教师邮箱建立索引，再检查群名和聊天内容中的学员关键词。", 64);
-    const matchInfo = matchData(listInfo.targets, chatInfo.chats, data.useSingle, data.weekLabel);
+    const inferredWeek = inferServiceWeek(listInfo.weekCounts);
+    const selectedWeek = data.weekLabel === "auto" ? inferredWeek.label : data.weekLabel;
+    listInfo.weekMode = data.weekLabel === "auto" ? "根据课次日期自动识别" : "人工指定";
+    listInfo.weekDistribution = inferredWeek.distribution;
+    if (!selectedWeek) throw new Error("无法从课次日期识别服务周，请手动选择第一周至第五周。");
+    progress(
+      "服务周识别完成",
+      `${selectedWeek}（${listInfo.weekMode}）${inferredWeek.distribution ? `；${inferredWeek.distribution}` : ""}`,
+      61,
+    );
+
+    const matchInfo = matchData(listInfo.targets, chatInfo.chats, data.useSingle, selectedWeek);
     progress(
       "匹配完成",
       `已发送 ${matchInfo.counts.已发送.toLocaleString()}，未发送 ${matchInfo.counts.未发送.toLocaleString()}。`,
@@ -535,7 +575,7 @@ self.onmessage = async ({ data }) => {
       chatInfo,
       matchInfo,
       data.useSingle,
-      data.weekLabel,
+      selectedWeek,
       { list: data.listFile.name, chat: data.chatFile.name },
     );
     const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
