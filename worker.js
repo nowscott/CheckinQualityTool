@@ -7,7 +7,7 @@ const QUOTE_PREFIX = /^\s*[「『][\s\S]{0,500}?[：:]/;
 const FINAL_COLUMNS = [
   "教师姓名", "上课日期", "上课时间", "学生姓名", "服务周", "发送情况",
   "序号", "教师邮箱", "匹配学员姓名", "姓名清洗说明", "该周课次数",
-  "匹配结论", "命中关键词", "命中位置", "命中群名",
+  "匹配结论", "命中关键词", "命中位置", "命中群名", "白名单命中", "白名单说明",
   "命中聊天时间", "匹配消息数", "校区", "项目组", "科目", "源名单行号",
 ];
 const DETAIL_COLUMNS = [
@@ -20,6 +20,7 @@ const CHAT_COLUMNS = [
   "有效教师邮箱", "邮箱来源", "发送人名称", "群名/好友昵称",
   "聊天时间", "聊天内容", "源聊天行号",
 ];
+const WHITELIST_COLUMNS = ["学员号哈希", "教师邮箱", "教师姓名", "学员姓名", "匹配学员姓名", "处理方式", "说明"];
 
 function progress(title, message, value) {
   postMessage({ type: "progress", title, message, progress: value });
@@ -37,6 +38,7 @@ function emailValue(value) {
 function cleanStudentName(value) {
   const original = text(value);
   let cleaned = original.replace(/\s+/g, "");
+  if (/^[\u4e00-\u9fff]{4}$/u.test(cleaned) && cleaned.endsWith("一")) cleaned = cleaned.slice(0, -1);
   const suffixRules = [
     /[（(【\[].+?[）)】\]]$/u,
     /[0-9０-９]+$/u,
@@ -61,6 +63,103 @@ function cleanStudentName(value) {
     cleaned,
     note: original.replace(/\s+/g, "") === cleaned ? "" : `${original} → ${cleaned || "空"}`,
   };
+}
+
+function normalizeMatchText(value) {
+  return text(value).toLocaleLowerCase("zh-CN");
+}
+
+async function sha256(value) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text(value)));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function parseCsv(value) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let quoted = false;
+  const source = String(value || "").replace(/^\uFEFF/, "");
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    if (quoted) {
+      if (character === '"' && source[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else if (character === '"') {
+        quoted = false;
+      } else {
+        field += character;
+      }
+    } else if (character === '"') {
+      quoted = true;
+    } else if (character === ",") {
+      row.push(field);
+      field = "";
+    } else if (character === "\n") {
+      row.push(field.replace(/\r$/, ""));
+      rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += character;
+    }
+  }
+  if (field || row.length) {
+    row.push(field.replace(/\r$/, ""));
+    rows.push(row);
+  }
+  return rows;
+}
+
+async function buildWhitelist(csvText) {
+  const rows = parseCsv(csvText).filter((row) => row.some((value) => text(value)));
+  if (!rows.length) return { entries: [], byStudentId: new Map(), byEmail: new Map(), byName: new Map() };
+  const headers = rows[0].map(text);
+  const index = (name) => headers.indexOf(name);
+  const entries = [];
+  const byStudentId = new Map();
+  const byEmail = new Map();
+  const byName = new Map();
+  for (const row of rows.slice(1)) {
+    const studentName = cleanStudentName(row[index("学员姓名")]);
+    const studentIdHash = text(row[index("学员号哈希")]).toLowerCase();
+    if (!studentIdHash && !studentName.original) continue;
+    const entry = {
+      学员号哈希: studentIdHash,
+      教师邮箱: emailValue(row[index("教师邮箱")]),
+      教师姓名: text(row[index("教师姓名")]),
+      学员姓名: studentName.original,
+      匹配学员姓名: studentName.cleaned,
+      处理方式: text(row[index("处理方式")]) || "已发送",
+      说明: text(row[index("说明")]),
+    };
+    entries.push(entry);
+    const studentKey = normalizeMatchText(entry.匹配学员姓名 || entry.学员姓名);
+    if (entry.学员号哈希) byStudentId.set(entry.学员号哈希, entry);
+    if (entry.教师邮箱) byEmail.set(`${entry.教师邮箱}\u0000${studentKey}`, entry);
+    if (entry.教师姓名) byName.set(`${normalizeMatchText(entry.教师姓名)}\u0000${studentKey}`, entry);
+  }
+  return { entries, byStudentId, byEmail, byName };
+}
+
+async function attachStudentIdHashes(targets, whitelist) {
+  if (!whitelist.byStudentId.size) return;
+  const ids = [...new Set(targets.map((target) => target.学员号).filter(Boolean))];
+  const hashes = new Map(await Promise.all(ids.map(async (id) => [id, await sha256(id)])));
+  targets.forEach((target) => {
+    target.学员号哈希 = hashes.get(target.学员号) || "";
+  });
+}
+
+function findWhitelistEntry(target, whitelist) {
+  const studentKey = normalizeMatchText(target.学员姓名 || target.原始学员姓名);
+  return (
+    (target.学员号哈希 && whitelist.byStudentId.get(target.学员号哈希)) ||
+    (target.教师邮箱 && whitelist.byEmail.get(`${target.教师邮箱}\u0000${studentKey}`)) ||
+    whitelist.byName.get(`${normalizeMatchText(target.教师姓名)}\u0000${studentKey}`) ||
+    null
+  );
 }
 
 function excelDate(value) {
@@ -285,7 +384,7 @@ function preprocessChats(workbook) {
   return { chats, counts, sheetName: found.name };
 }
 
-function matchData(targets, chats, useSingle, weekLabel) {
+function matchData(targets, chats, useSingle, weekLabel, whitelist) {
   const chatsByEmail = new Map();
   chats.forEach((chat) => {
     if (!chatsByEmail.has(chat.有效教师邮箱)) chatsByEmail.set(chat.有效教师邮箱, []);
@@ -294,28 +393,35 @@ function matchData(targets, chats, useSingle, weekLabel) {
 
   const finalRows = [];
   const detailRows = [];
-  const counts = { 已发送: 0, 未发送: 0, 人工复核: 0, 强匹配: 0, 弱匹配: 0, 无匹配: 0 };
+  const counts = { 已发送: 0, 未发送: 0, 免检: 0, 强匹配: 0, 弱匹配: 0, 白名单: 0, 无匹配: 0 };
 
   targets.forEach((target, targetIndex) => {
-    const requiresReview = [...target.学员姓名].length < 2;
-    const strong = requiresReview ? "" : target.学员姓名.slice(-2);
-    const weak = !requiresReview && useSingle ? target.学员姓名.slice(-1) : "";
-    const candidates = chatsByEmail.get(target.教师邮箱) || [];
+    const nameLength = [...target.学员姓名].length;
+    const strong = nameLength >= 2 ? target.学员姓名.slice(-2) : "";
+    const weakSource = target.学员姓名 || target.原始学员姓名;
+    const automaticWeak = nameLength < 2;
+    const weak = automaticWeak || useSingle ? weakSource.slice(-1) : "";
+    const whitelistEntry = findWhitelistEntry(target, whitelist);
+    const candidates = whitelistEntry ? [] : chatsByEmail.get(target.教师邮箱) || [];
     const matches = [];
     for (const chat of candidates) {
       const group = chat["群名/好友昵称"];
       const content = chat.聊天内容;
+      const normalizedGroup = normalizeMatchText(group);
+      const normalizedContent = normalizeMatchText(content);
+      const normalizedStrong = normalizeMatchText(strong);
+      const normalizedWeak = normalizeMatchText(weak);
       let keyword = "";
       let strength = "";
       const locations = [];
-      if (strong && group.includes(strong)) locations.push("群名");
-      if (strong && content.includes(strong)) locations.push("聊天内容");
+      if (normalizedStrong && normalizedGroup.includes(normalizedStrong)) locations.push("群名");
+      if (normalizedStrong && normalizedContent.includes(normalizedStrong)) locations.push("聊天内容");
       if (locations.length) {
         keyword = strong;
         strength = "强匹配";
       } else if (weak) {
-        if (group.includes(weak)) locations.push("群名");
-        if (content.includes(weak)) locations.push("聊天内容");
+        if (normalizedGroup.includes(normalizedWeak)) locations.push("群名");
+        if (normalizedContent.includes(normalizedWeak)) locations.push("聊天内容");
         if (locations.length) {
           keyword = weak;
           strength = "弱匹配";
@@ -331,8 +437,9 @@ function matchData(targets, chats, useSingle, weekLabel) {
     );
     const best = matches[0];
     const sent = Boolean(best);
-    const status = requiresReview ? "人工复核" : sent ? "已发送" : "未发送";
-    const conclusion = requiresReview ? "姓名不足两字，需人工复核" : best?.匹配强度 || "无匹配";
+    const whitelistStatus = whitelistEntry?.处理方式 === "免检" ? "免检" : "已发送";
+    const status = whitelistEntry ? whitelistStatus : sent ? "已发送" : "未发送";
+    const conclusion = whitelistEntry ? "白名单" : best?.匹配强度 || "无匹配";
     counts[status] += 1;
     if (Object.hasOwn(counts, conclusion)) counts[conclusion] += 1;
     const id = targetIndex + 1;
@@ -352,6 +459,8 @@ function matchData(targets, chats, useSingle, weekLabel) {
       命中关键词: best?.命中关键词 || "",
       命中位置: best?.命中位置 || "",
       命中群名: best?.["群名/好友昵称"] || "",
+      白名单命中: whitelistEntry ? "是" : "否",
+      白名单说明: whitelistEntry?.说明 || "",
       命中聊天时间: best?.聊天时间 || "",
       匹配消息数: matches.length,
       校区: target.校区,
@@ -464,7 +573,7 @@ function concatenate(chunks) {
   return output;
 }
 
-function buildOutput(listInfo, chatInfo, matchInfo, useSingle, weekLabel, sourceNames) {
+function buildOutput(listInfo, chatInfo, matchInfo, whitelist, useSingle, weekLabel, sourceNames) {
   const explanation = [
     { 项目: "生成时间", 值: new Date().toLocaleString("zh-CN", { hour12: false }) },
     { 项目: "质检名单文件", 值: sourceNames.list },
@@ -475,13 +584,15 @@ function buildOutput(listInfo, chatInfo, matchInfo, useSingle, weekLabel, source
     { 项目: "名单工作表", 值: listInfo.sheetName },
     { 项目: "聊天工作表", 值: chatInfo.sheetName },
     { 项目: "名单去重规则", 值: "先清洗学员姓名，再按教师邮箱+匹配学员姓名合并，保留最早课次" },
-    { 项目: "学员姓名清洗", 值: "循环去除空格及末尾数字、重复、学员/同学/学生、家长/妈妈/爸爸及兄弟姐妹称谓、初一至初三/高一至高三、括号备注等标记" },
+    { 项目: "学员姓名清洗", 值: "四字中文姓名末尾为“一”时去除该标记；另循环去除空格及末尾数字、重复、学员/同学/学生、家长/妈妈/爸爸及兄弟姐妹称谓、初一至初三/高一至高三、括号备注等标记" },
+    { 项目: "教师匹配规则", 值: "教师姓名仅用于展示；教师姓名带数字或与企微昵称不同时，仍直接按教师邮箱匹配" },
     { 项目: "邮箱规则", 值: "优先群聊发送人邮箱，为空时回退邮箱" },
     { 项目: "聊天清洗规则", 值: "删除私聊、无有效邮箱、发送方非员工、引用回复" },
+    { 项目: "文本匹配规则", 值: "英文忽略大小写；中文按原字符匹配" },
     { 项目: "强匹配规则", 值: "教师邮箱一致，且群名或聊天内容包含学员名后两字" },
-    { 项目: "弱匹配规则", 值: useSingle ? "已启用：姓名至少两字且强匹配失败后，使用学员名末字" : "未启用" },
-    { 项目: "人工复核规则", 值: "清洗后学员姓名不足两个字时，不进行自动匹配，发送情况标记为人工复核" },
-    { 项目: "发送判定", 值: "姓名至少两字时，强匹配或已启用的弱匹配任一命中即为已发送" },
+    { 项目: "弱匹配规则", 值: `清洗后不足两字自动使用末字；正常姓名末字弱匹配${useSingle ? "已启用" : "未启用"}` },
+    { 项目: "白名单规则", 值: "优先按学员号 SHA-256 哈希匹配，其次按教师邮箱+清洗后学员名，邮箱为空时回退教师姓名；支持已发送和免检" },
+    { 项目: "内置白名单数量", 值: whitelist.entries.length },
   ];
   Object.entries(listInfo.counts).forEach(([key, value]) => explanation.push({ 项目: `名单_${key}`, 值: value }));
   Object.entries(chatInfo.counts).forEach(([key, value]) => explanation.push({ 项目: `聊天_${key}`, 值: value }));
@@ -493,7 +604,7 @@ function buildOutput(listInfo, chatInfo, matchInfo, useSingle, weekLabel, source
       rows: matchInfo.finalRows,
       columns: FINAL_COLUMNS,
       widths: { 教师邮箱: 28, 命中群名: 36, 项目组: 28, 校区: 24 },
-      rowStyle: (row) => row.发送情况 === "人工复核" || row.匹配结论 === "弱匹配" ? 4 : row.发送情况 === "已发送" ? 2 : 3,
+      rowStyle: (row) => row.匹配结论 === "白名单" || row.匹配结论 === "弱匹配" ? 4 : row.发送情况 === "已发送" ? 2 : 3,
     },
     {
       name: "匹配明细",
@@ -512,6 +623,12 @@ function buildOutput(listInfo, chatInfo, matchInfo, useSingle, weekLabel, source
       rows: explanation,
       columns: ["项目", "值"],
       widths: { 项目: 34, 值: 90 },
+    },
+    {
+      name: "内置白名单",
+      rows: whitelist.entries,
+      columns: WHITELIST_COLUMNS,
+      widths: { 学员号哈希: 68, 教师邮箱: 28, 教师姓名: 16, 学员姓名: 18, 匹配学员姓名: 18, 处理方式: 12, 说明: 60 },
     },
   ];
 
@@ -612,7 +729,9 @@ self.onmessage = async ({ data }) => {
       61,
     );
 
-    const matchInfo = matchData(listInfo.targets, chatInfo.chats, data.useSingle, selectedWeek);
+    const whitelist = await buildWhitelist(data.whitelistCsv);
+    await attachStudentIdHashes(listInfo.targets, whitelist);
+    const matchInfo = matchData(listInfo.targets, chatInfo.chats, data.useSingle, selectedWeek, whitelist);
     progress(
       "匹配完成",
       `已发送 ${matchInfo.counts.已发送.toLocaleString()}，未发送 ${matchInfo.counts.未发送.toLocaleString()}。`,
@@ -624,6 +743,7 @@ self.onmessage = async ({ data }) => {
       listInfo,
       chatInfo,
       matchInfo,
+      whitelist,
       data.useSingle,
       selectedWeek,
       { list: data.listFile.name, chat: data.chatFile.name },
@@ -637,7 +757,7 @@ self.onmessage = async ({ data }) => {
         targets: listInfo.targets.length,
         sent: matchInfo.counts.已发送,
         unsent: matchInfo.counts.未发送,
-        review: matchInfo.counts.人工复核,
+        exempt: matchInfo.counts.免检,
         cleanChats: chatInfo.chats.length,
       },
     }, [output.buffer]);

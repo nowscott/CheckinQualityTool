@@ -11,8 +11,20 @@ const spinner = document.querySelector("#spinner");
 const progressBar = document.querySelector("#progress-bar");
 const weekSelect = document.querySelector("#week-label");
 const weekHint = document.querySelector("#week-hint");
+const versionButton = document.querySelector("#version-button");
+const changelogDialog = document.querySelector("#changelog-dialog");
+const changelogClose = document.querySelector("#changelog-close");
 
 let worker;
+let whitelistCsvPromise;
+
+function loadWhitelistCsv() {
+  whitelistCsvPromise ||= fetch("./data/whitelist.csv", { cache: "no-store" }).then((response) => {
+    if (!response.ok) throw new Error("内置白名单读取失败，请刷新页面后重试。");
+    return response.text();
+  });
+  return whitelistCsvPromise;
+}
 
 function weekOfMonthFromDate(date) {
   const year = date.getFullYear();
@@ -83,8 +95,13 @@ function downloadResult(buffer, filename) {
 bindFileName(listFile, listName, updateWeekHint);
 bindFileName(chatFile, chatName);
 weekSelect.addEventListener("change", updateWeekHint);
+versionButton.addEventListener("click", () => changelogDialog.showModal());
+changelogClose.addEventListener("click", () => changelogDialog.close());
+changelogDialog.addEventListener("click", (event) => {
+  if (event.target === changelogDialog) changelogDialog.close();
+});
 
-form.addEventListener("submit", (event) => {
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!listFile.files[0] || !chatFile.files[0]) return;
 
@@ -92,6 +109,16 @@ form.addEventListener("submit", (event) => {
   worker = new Worker("./worker.js");
   button.disabled = true;
   setStatus("正在启动本地处理引擎", "所有文件只在当前浏览器中处理，不会上传。", 2);
+  let whitelistCsv;
+  try {
+    whitelistCsv = await loadWhitelistCsv();
+  } catch (error) {
+    setStatus("处理失败", error.message, 100, "error");
+    button.disabled = false;
+    worker.terminate();
+    worker = null;
+    return;
+  }
 
   worker.onmessage = ({ data }) => {
     if (data.type === "progress") {
@@ -102,7 +129,7 @@ form.addEventListener("submit", (event) => {
       downloadResult(data.buffer, data.filename);
       setStatus(
         "处理完成，结果已下载",
-        `质检 ${data.summary.targets.toLocaleString()} 人：已发送 ${data.summary.sent.toLocaleString()}，未发送 ${data.summary.unsent.toLocaleString()}，人工复核 ${data.summary.review.toLocaleString()}；清洗后聊天 ${data.summary.cleanChats.toLocaleString()} 条。`,
+        `质检 ${data.summary.targets.toLocaleString()} 人：已发送 ${data.summary.sent.toLocaleString()}，未发送 ${data.summary.unsent.toLocaleString()}，免检 ${data.summary.exempt.toLocaleString()}；清洗后聊天 ${data.summary.cleanChats.toLocaleString()} 条。`,
         100,
         "done",
       );
@@ -132,5 +159,6 @@ form.addEventListener("submit", (event) => {
     chatFile: chatFile.files[0],
     weekLabel: weekSelect.value,
     useSingle: document.querySelector("#use-single").checked,
+    whitelistCsv,
   });
 });

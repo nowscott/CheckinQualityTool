@@ -34,6 +34,17 @@ header { max-width: 780px; margin-bottom: 34px; }
   object-fit: contain;
 }
 .eyebrow { margin: 0; color: var(--accent); font: 700 12px/1.2 ui-monospace, monospace; letter-spacing: .18em; }
+.version-button {
+  width: auto;
+  margin-left: auto;
+  padding: 6px 9px;
+  color: var(--green);
+  border: 1px solid #b9cbc5;
+  background: transparent;
+  font: 700 11px/1 ui-monospace, monospace;
+  letter-spacing: .06em;
+}
+.version-button:hover { color: white; background: var(--green); }
 h1 { margin: 0; font-family: "Songti SC", "STSong", serif; font-size: clamp(42px, 6vw, 70px); line-height: 1.08; letter-spacing: -.04em; }
 .subtitle { max-width: 700px; margin: 20px 0 0; color: var(--muted); font-size: 17px; line-height: 1.8; }
 
@@ -167,6 +178,38 @@ button small { opacity: .78; }
 .output-grid span { color: var(--accent); font: 700 11px ui-monospace, monospace; letter-spacing: .1em; }
 .output-grid strong { display: block; margin-top: 24px; font-size: 17px; }
 .output-grid p { margin: 9px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+.changelog-dialog {
+  width: min(620px, calc(100% - 28px));
+  max-height: min(720px, calc(100vh - 40px));
+  padding: 0;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: 0 30px 100px rgba(23, 33, 38, .24);
+}
+.changelog-dialog::backdrop { background: rgba(23, 33, 38, .52); backdrop-filter: blur(3px); }
+.changelog-head { padding: 24px 26px 20px; display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.changelog-head span { color: var(--accent); font: 700 11px ui-monospace, monospace; letter-spacing: .14em; }
+.changelog-head h2 { margin: 7px 0 0; font: 700 28px/1.2 "Songti SC", "STSong", serif; }
+.dialog-close {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  background: transparent;
+  font: 400 24px/1 sans-serif;
+}
+.dialog-close:hover { color: white; background: var(--accent); }
+.changelog-dialog section { padding: 22px 26px; border-bottom: 1px solid var(--line); }
+.changelog-dialog section:last-child { border-bottom: 0; }
+.changelog-dialog section strong { color: var(--green); font: 700 16px ui-monospace, monospace; }
+.changelog-dialog time { margin-left: 10px; color: var(--muted); font-size: 12px; }
+.changelog-dialog ul { margin: 14px 0 0; padding-left: 20px; color: var(--muted); line-height: 1.8; }
+.changelog-dialog p { margin: 12px 0 0; color: var(--muted); line-height: 1.7; }
 
 @media (max-width: 760px) {
   .shell { width: min(100% - 24px, 1120px); padding-top: 36px; }

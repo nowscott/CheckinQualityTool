@@ -15,6 +15,7 @@
       <div class="brand-line">
         <img class="brand-icon" src="/assets/checkin-icon.png" alt="" width="42" height="42">
         <p class="eyebrow">LOCAL QUALITY CHECK</p>
+        <button class="version-button" id="version-button" type="button">v1.1.0</button>
       </div>
       <h1>打卡质检数据生成</h1>
       <p class="subtitle">上传课堂反馈名单与聊天导出数据，在浏览器本地完成清洗、匹配并生成可追溯的多 Sheet Excel。文件不会上传服务器。</p>
@@ -79,12 +80,12 @@
 
         <div class="rules">
           <span>自动清洗</span>
-          <b>私聊</b><b>无邮箱</b><b>非员工发送</b><b>引用回复</b><b>姓名异常后缀</b>
+          <b>私聊</b><b>无邮箱</b><b>非员工发送</b><b>引用回复</b><b>姓名异常后缀</b><b>内置白名单</b>
         </div>
 
         <button id="submit-button" type="submit">
           <span>生成质检结果</span>
-          <small>输出打卡结果、匹配明细、清洗后聊天、处理说明</small>
+          <small>输出打卡结果、匹配明细、清洗后聊天、处理说明、内置白名单</small>
         </button>
       </form>
     </section>
@@ -99,12 +100,39 @@
     </section>
 
     <section class="output-grid">
-      <article><span>Sheet 1</span><strong>打卡结果</strong><p>核心结果列连续排列，姓名不足两字时标记人工复核。</p></article>
+      <article><span>Sheet 1</span><strong>打卡结果</strong><p>核心结果列连续排列，清洗后单字姓名自动使用弱匹配。</p></article>
       <article><span>Sheet 2</span><strong>匹配明细</strong><p>记录命中关键词、位置、群名、聊天时间、内容和源行号。</p></article>
       <article><span>Sheet 3</span><strong>清洗后聊天</strong><p>仅保留后续匹配所需字段，移除无关列和无效记录。</p></article>
       <article><span>Sheet 4</span><strong>处理说明</strong><p>记录清洗规则、去重规则、各阶段数量和生成时间。</p></article>
+      <article><span>Sheet 5</span><strong>内置白名单</strong><p>展示本次处理使用的学员号哈希、教师和豁免说明。</p></article>
     </section>
   </main>
+
+  <dialog class="changelog-dialog" id="changelog-dialog">
+    <div class="changelog-head">
+      <div>
+        <span>CHANGELOG</span>
+        <h2>版本更新记录</h2>
+      </div>
+      <button class="dialog-close" id="changelog-close" type="button" aria-label="关闭">×</button>
+    </div>
+    <section>
+      <strong>v1.1.0</strong>
+      <time datetime="2026-06-11">2026-06-11</time>
+      <ul>
+        <li>教师统一通过邮箱匹配，不受姓名数字后缀或企微昵称影响。</li>
+        <li>英文姓名及英文聊天内容匹配忽略大小写。</li>
+        <li>四字中文姓名末尾“一”自动清理，单字姓名自动使用弱匹配。</li>
+        <li>新增项目内置 CSV 白名单和白名单审计 Sheet。</li>
+        <li>打卡结果删除 B、C 空白列，核心字段连续排列。</li>
+      </ul>
+    </section>
+    <section>
+      <strong>v1.0.0</strong>
+      <time datetime="2026-06-10">2026-06-10</time>
+      <p>上线纯前端打卡质检、聊天清洗、匹配明细和 Excel 导出。</p>
+    </section>
+  </dialog>
   <script src="./app.js"></script>
 </body>
 </html>
