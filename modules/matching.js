@@ -66,9 +66,10 @@ async function matchData(targets, chats, useSingle, weekLabel, whitelist) {
     const best = matches[0];
     const sent = Boolean(best);
     const isExempt = whitelistEntry?.处理方式 === "免检";
-    const status = isExempt ? "免检" : sent ? "已发送" : "未发送";
+    const status = isExempt || sent ? "已发送" : "未发送";
     const conclusion = isExempt ? "白名单免检" : best?.匹配强度 || "无匹配";
     counts[status] += 1;
+    if (isExempt) counts.免检 += 1;
     if (Object.hasOwn(counts, conclusion)) counts[conclusion] += 1;
     const id = targetIndex + 1;
     finalRows.push({

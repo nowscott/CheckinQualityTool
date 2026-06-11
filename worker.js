@@ -388,7 +388,7 @@ function buildOutput(listInfo, chatInfo, matchInfo, whitelist, useSingle, weekLa
     { 项目: "文本匹配规则", 值: "英文忽略大小写；中文按原字符匹配" },
     { 项目: "强匹配规则", 值: "教师邮箱一致，且群名或聊天内容包含学员名后两字" },
     { 项目: "弱匹配规则", 值: `清洗后不足两字自动使用末字；正常姓名末字弱匹配${useSingle ? "已启用" : "未启用"}` },
-    { 项目: "白名单规则", 值: "免检项直接豁免；别名项增加实际姓名后两字，聊天真实命中后才判已发送。优先按学员号关联" },
+    { 项目: "白名单规则", 值: "免检项不检查聊天，发送情况直接记为已发送，匹配结论保留“白名单免检”；别名项增加实际姓名后两字，聊天真实命中后才判已发送。优先按学员号关联" },
     { 项目: "内置白名单数量", 值: whitelist.entries.length },
   ];
   Object.entries(listInfo.counts).forEach(([key, value]) => explanation.push({ 项目: `名单_${key}`, 值: value }));
