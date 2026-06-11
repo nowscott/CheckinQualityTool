@@ -15,10 +15,10 @@
       <div class="brand-line">
         <img class="brand-icon" src="/assets/checkin-icon.png" alt="" width="42" height="42">
         <p class="eyebrow">LOCAL QUALITY CHECK</p>
-        <button class="version-button" id="version-button" type="button">v1.2.0</button>
       </div>
       <h1>打卡质检数据生成</h1>
       <p class="subtitle">上传课堂反馈名单与聊天导出数据，在浏览器本地完成清洗、匹配并生成可追溯的多 Sheet Excel。文件不会上传服务器。</p>
+      <button class="version-button" id="version-button" type="button">v1.2.0</button>
     </header>
 
     <section class="card">
@@ -108,13 +108,15 @@
     </section>
   </main>
 
-  <dialog class="changelog-dialog" id="changelog-dialog">
+  <dialog class="changelog-dialog" id="changelog-dialog" tabindex="-1">
     <div class="changelog-head">
       <div>
         <span>CHANGELOG</span>
         <h2>版本更新记录</h2>
       </div>
-      <button class="dialog-close" id="changelog-close" type="button" aria-label="关闭">×</button>
+      <button class="dialog-close" id="changelog-close" type="button" aria-label="关闭">
+        <span aria-hidden="true"></span>
+      </button>
     </div>
     <section>
       <strong>v1.2.0</strong>

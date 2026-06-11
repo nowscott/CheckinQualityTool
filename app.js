@@ -17,6 +17,24 @@ const changelogClose = document.querySelector("#changelog-close");
 
 let worker;
 let whitelistCsvPromise;
+let dialogScrollY = 0;
+
+function openChangelog() {
+  dialogScrollY = window.scrollY;
+  document.body.style.top = `-${dialogScrollY}px`;
+  document.documentElement.classList.add("dialog-open");
+  document.body.classList.add("dialog-open");
+  changelogDialog.showModal();
+  changelogDialog.focus({ preventScroll: true });
+}
+
+function unlockPageScroll() {
+  if (!document.body.classList.contains("dialog-open")) return;
+  document.documentElement.classList.remove("dialog-open");
+  document.body.classList.remove("dialog-open");
+  document.body.style.top = "";
+  window.scrollTo(0, dialogScrollY);
+}
 
 function loadWhitelistCsv() {
   whitelistCsvPromise ||= fetch("./data/whitelist.csv", { cache: "no-store" }).then((response) => {
@@ -95,11 +113,12 @@ function downloadResult(buffer, filename) {
 bindFileName(listFile, listName, updateWeekHint);
 bindFileName(chatFile, chatName);
 weekSelect.addEventListener("change", updateWeekHint);
-versionButton.addEventListener("click", () => changelogDialog.showModal());
+versionButton.addEventListener("click", openChangelog);
 changelogClose.addEventListener("click", () => changelogDialog.close());
 changelogDialog.addEventListener("click", (event) => {
   if (event.target === changelogDialog) changelogDialog.close();
 });
+changelogDialog.addEventListener("close", unlockPageScroll);
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
