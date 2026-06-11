@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v1.3.1",
+    date: "2026-06-11",
+    items: [
+      "关闭图标改用固定坐标 SVG 绘制，确保叉号与方框在桌面端和移动端严格居中。",
+    ],
+  },
+  {
     version: "v1.3.0",
     date: "2026-06-11",
     items: [

@@ -247,35 +247,30 @@ button small { opacity: .78; }
   padding: 0;
   display: grid !important;
   place-items: center;
+  align-content: center;
+  justify-content: center;
   border: 1px solid var(--line);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
   transition: border-color .2s ease, background-color .2s ease;
 }
-.dialog-close span {
-  position: relative;
+.dialog-close svg {
   display: block;
   width: 18px;
   height: 18px;
+  overflow: visible;
 }
-.dialog-close span::before,
-.dialog-close span::after {
-  content: "";
-  position: absolute;
-  top: 8px;
-  left: 0;
-  width: 18px;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--muted);
-  transition: background-color .2s ease;
+.dialog-close path {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 2;
+  stroke-linecap: square;
+  vector-effect: non-scaling-stroke;
+  transition: stroke .2s ease;
 }
-.dialog-close span::before { transform: rotate(45deg); }
-.dialog-close span::after { transform: rotate(-45deg); }
 .dialog-close:hover { border-color: var(--accent); background: rgba(189, 79, 50, .08); }
-.dialog-close:hover span::before,
-.dialog-close:hover span::after { background: var(--accent); }
+.dialog-close:hover path { stroke: var(--accent); }
 .dialog-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .changelog-dialog section { padding: 22px 26px; border-bottom: 1px solid var(--line); }
 .changelog-dialog section:last-child { border-bottom: 0; }

@@ -3,7 +3,9 @@ import { CHANGELOG_ENTRIES, MATCHING_GUIDE } from "./modal-content.js";
 function closeButton(id) {
   return `
     <button class="dialog-close" id="${id}" type="button" aria-label="关闭">
-      <span aria-hidden="true"></span>
+      <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+        <path d="M4 4 16 16M16 4 4 16"></path>
+      </svg>
     </button>
   `;
 }
