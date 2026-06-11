@@ -21,7 +21,9 @@ let dialogScrollY = 0;
 
 function openChangelog() {
   dialogScrollY = window.scrollY;
+  const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
   document.body.style.top = `-${dialogScrollY}px`;
+  document.body.style.paddingRight = `${scrollbarWidth}px`;
   document.documentElement.classList.add("dialog-open");
   document.body.classList.add("dialog-open");
   changelogDialog.showModal();
@@ -33,6 +35,7 @@ function unlockPageScroll() {
   document.documentElement.classList.remove("dialog-open");
   document.body.classList.remove("dialog-open");
   document.body.style.top = "";
+  document.body.style.paddingRight = "";
   window.scrollTo(0, dialogScrollY);
 }
 

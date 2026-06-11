@@ -222,16 +222,18 @@ button small { opacity: .78; }
 .changelog-head span { color: var(--accent); font: 700 11px ui-monospace, monospace; letter-spacing: .14em; }
 .changelog-head h2 { margin: 7px 0 0; font: 700 28px/1.2 "Songti SC", "STSong", serif; }
 .dialog-close {
-  flex: 0 0 38px;
-  width: 38px;
-  height: 38px;
-  min-height: 38px;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
   padding: 0;
   display: grid !important;
   place-items: center;
-  border: 1px solid var(--line);
+  border: 0;
+  border-radius: 50%;
   background: transparent;
-  transition: border-color .2s ease, background-color .2s ease;
+  box-shadow: none;
+  transition: background-color .2s ease;
 }
 .dialog-close span {
   position: relative;
@@ -253,9 +255,9 @@ button small { opacity: .78; }
 }
 .dialog-close span::before { transform: rotate(45deg); }
 .dialog-close span::after { transform: rotate(-45deg); }
-.dialog-close:hover { border-color: var(--accent); background: var(--accent); }
+.dialog-close:hover { background: rgba(189, 79, 50, .12); }
 .dialog-close:hover span::before,
-.dialog-close:hover span::after { background: white; }
+.dialog-close:hover span::after { background: var(--accent); }
 .dialog-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .changelog-dialog section { padding: 22px 26px; border-bottom: 1px solid var(--line); }
 .changelog-dialog section:last-child { border-bottom: 0; }
