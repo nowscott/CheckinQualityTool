@@ -1,5 +1,13 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.0.0",
+    date: "2026-06-12",
+    items: [
+      "页面重构为 Vite、React 和 TypeScript 组件架构。",
+      "保留原有页面结构、视觉样式、Web Worker 处理流程和 Excel 输出规则。",
+    ],
+  },
+  {
     version: "v1.3.5",
     date: "2026-06-11",
     items: [
@@ -73,7 +81,7 @@ export const CHANGELOG_ENTRIES = [
     date: "2026-06-10",
     description: "上线纯前端打卡质检、聊天清洗、匹配明细和 Excel 导出。",
   },
-];
+] as const;
 
 export const MATCHING_GUIDE = {
   intro: {
@@ -152,4 +160,4 @@ export const MATCHING_GUIDE = {
       ],
     },
   ],
-};
+} as const;

@@ -1,6 +1,7 @@
 *.xlsx
 .~*
 node_modules/
+dist/
 部署包/
 .vercel/
 .DS_Store

@@ -1,6 +1,6 @@
 # 打卡质检数据生成工具
 
-纯前端打卡质检网页工具。Excel 文件只在浏览器本地处理，不会上传服务器。
+使用 Vite、React 和 TypeScript 构建的纯前端打卡质检网页工具。Excel 文件只在浏览器本地处理，不会上传服务器。
 
 [在线使用](https://checkin-quality-tool.vercel.app)
 
@@ -19,29 +19,27 @@
 
 ## 在线部署
 
-仓库可直接导入 Vercel，无需构建命令、后端或数据库。
+仓库可直接导入 Vercel，无需后端或数据库。
 
 1. 在 Vercel 选择 `Add New Project`
 2. 导入本 GitHub 仓库
-3. Framework Preset 选择 `Other`
-4. 保持 Build Command 为空
-5. 点击 Deploy
+3. Framework Preset 选择 `Vite`
+4. Build Command 使用 `npm run build`
+5. Output Directory 使用 `dist`
+6. 点击 Deploy
 
 `vercel.json` 已包含静态站点与安全响应头配置。
 
 ## 本地开发
 
-Web Worker 需要通过 HTTP 访问。可在仓库目录运行：
+安装依赖并启动 Vite 开发服务器：
 
 ```bash
-python3 -m http.server 8765
+npm install
+npm run dev
 ```
 
-然后访问：
-
-```text
-http://127.0.0.1:8765
-```
+生产构建使用 `npm run build`。
 
 ## 输出工作表
 
@@ -60,9 +58,10 @@ http://127.0.0.1:8765
 
 ## 代码结构
 
-- `worker.js`：文件读取、名单/聊天预处理和整体流程
-- `modules/whitelist.js`：CSV白名单解析与学员关联
-- `modules/matching.js`：教师邮箱、学员姓名和别名匹配
+- `src/`：React 页面组件、状态管理、规则文案和 TypeScript 类型
+- `public/worker.js`：文件读取、名单/聊天预处理和整体流程
+- `public/modules/whitelist.js`：CSV白名单解析与学员关联
+- `public/modules/matching.js`：教师邮箱、学员姓名和别名匹配
 
 浏览器建议使用最新版 Chrome 或 Edge，并关闭不必要的标签页，以便为 50MB 以上 Excel 留出足够内存。
 
