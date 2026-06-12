@@ -1,5 +1,13 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.3.2",
+    date: "2026-06-13",
+    items: [
+      "主题切换按钮移至页头右上角，与右下角版本入口分开摆放。",
+      "主题切换按钮与版本入口统一宽高、边框和文字规格。",
+    ],
+  },
+  {
     version: "v2.3.1",
     date: "2026-06-13",
     items: [

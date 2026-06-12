@@ -105,31 +105,31 @@ header { position: relative; margin-bottom: 34px; }
 .eyebrow { margin: 0; color: var(--accent); font: 700 12px/1.2 ui-monospace, monospace; letter-spacing: .18em; }
 .header-controls {
   position: absolute;
-  right: 0;
-  bottom: 4px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+  inset: 0;
+  pointer-events: none;
 }
 .version-button,
 .theme-button {
-  width: auto;
-  margin-left: auto;
-  padding: 6px 9px;
+  position: absolute;
+  right: 0;
+  width: 76px;
+  height: 29px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--green);
   border: 1px solid var(--green-line);
   background: transparent;
   font: 700 11px/1 ui-monospace, monospace;
   letter-spacing: .06em;
+  pointer-events: auto;
 }
+.version-button { bottom: 4px; }
 .version-button:hover { color: white; background: var(--green); }
 .theme-button {
-  min-height: 29px;
-  display: flex;
+  top: 0;
   flex-direction: row;
-  align-items: center;
-  justify-content: center;
   gap: 7px;
 }
 .theme-button svg {
@@ -431,12 +431,15 @@ button small { opacity: .78; }
   .brand-icon { width: 36px; height: 36px; }
   .header-controls {
     position: static;
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
     margin-top: 18px;
-    align-items: flex-start;
+    pointer-events: auto;
   }
   .version-button,
   .theme-button {
-    margin-left: 0;
+    position: static;
   }
   .card { padding: 16px; }
   .grid, .options, .output-grid { grid-template-columns: 1fr; }
