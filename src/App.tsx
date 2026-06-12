@@ -7,6 +7,7 @@ import { StatusCard } from "./components/StatusCard";
 import { UploadForm } from "./components/UploadForm";
 import { downloadResult } from "./lib/download";
 import { inferWeekFromFilename } from "./lib/week";
+import { useTheme } from "./hooks/useTheme";
 import type { ProcessingStatus, WeekLabel, WorkerResponse } from "./types/worker";
 
 type ActiveModal = "guide" | "changelog" | null;
@@ -42,6 +43,7 @@ export default function App() {
   const [status, setStatus] = useState(INITIAL_STATUS);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const workerRef = useRef<Worker | null>(null);
+  const { theme, usesSystemTheme, toggleTheme } = useTheme();
 
   useEffect(() => () => workerRef.current?.terminate(), []);
 
@@ -126,6 +128,9 @@ export default function App() {
     <>
       <main className="shell">
         <Header
+          theme={theme}
+          usesSystemTheme={usesSystemTheme}
+          onToggleTheme={toggleTheme}
           onOpenGuide={() => setActiveModal("guide")}
           onOpenChangelog={() => setActiveModal("changelog")}
         />

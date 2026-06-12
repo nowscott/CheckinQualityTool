@@ -62,22 +62,7 @@ export function matchData(
       let keyword = "";
       let strength = "";
       const locations: string[] = [];
-      if (normalizedStrong && normalizedGroup.includes(normalizedStrong)) locations.push("群名");
-      if (normalizedStrong && normalizedContent.includes(normalizedStrong)) {
-        locations.push("聊天内容");
-      }
-      if (locations.length) {
-        keyword = strong;
-        strength = "强匹配";
-      } else if (weak) {
-        if (normalizedGroup.includes(normalizedWeak)) locations.push("群名");
-        if (normalizedContent.includes(normalizedWeak)) locations.push("聊天内容");
-        if (locations.length) {
-          keyword = weak;
-          strength = "弱匹配";
-        }
-      }
-      if (!locations.length && whitelistEntry?.处理方式 === "别名") {
+      if (whitelistEntry?.处理方式 === "别名") {
         const aliasKeyword = whitelistEntry.匹配别名关键词.find(
           (value) => normalizedGroup.includes(value) || normalizedContent.includes(value),
         );
@@ -86,6 +71,24 @@ export function matchData(
         if (locations.length) {
           keyword = aliasKeyword || "";
           strength = "别名匹配";
+        }
+      }
+      if (!locations.length) {
+        if (normalizedStrong && normalizedGroup.includes(normalizedStrong)) locations.push("群名");
+        if (normalizedStrong && normalizedContent.includes(normalizedStrong)) {
+          locations.push("聊天内容");
+        }
+        if (locations.length) {
+          keyword = strong;
+          strength = "强匹配";
+        }
+      }
+      if (!locations.length && weak) {
+        if (normalizedGroup.includes(normalizedWeak)) locations.push("群名");
+        if (normalizedContent.includes(normalizedWeak)) locations.push("聊天内容");
+        if (locations.length) {
+          keyword = weak;
+          strength = "弱匹配";
         }
       }
       if (locations.length) {
@@ -97,9 +100,14 @@ export function matchData(
         });
       }
     }
+    const matchPriority: Record<string, number> = {
+      别名匹配: 0,
+      强匹配: 1,
+      弱匹配: 2,
+    };
     matches.sort(
       (a, b) =>
-        (a.匹配强度 === "强匹配" ? 0 : 1) - (b.匹配强度 === "强匹配" ? 0 : 1) ||
+        (matchPriority[a.匹配强度] ?? 9) - (matchPriority[b.匹配强度] ?? 9) ||
         sortDate(a.聊天时间) - sortDate(b.聊天时间),
     );
     const best = matches[0];
