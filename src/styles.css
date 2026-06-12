@@ -378,7 +378,7 @@ button small { opacity: .78; }
   color: var(--green);
   border: 1px solid var(--green-line);
   background: var(--card-translucent);
-  font: 600 13px/1.6 ui-monospace, monospace;
+  font: 600 13px/1.6 var(--serif);
   white-space: nowrap;
 }
 .rules-dialog .logic-section {

@@ -18,7 +18,7 @@ export function ChangelogDialog({ open, onClose }: ChangelogDialogProps) {
       {CHANGELOG_ENTRIES.map((entry) => (
         <section key={entry.version}>
           <strong>{entry.version}</strong>
-          <time dateTime={entry.date}>{entry.date}</time>
+          <time dateTime={entry.date.replace(" ", "T")}>{entry.date}</time>
           {"items" in entry ? (
             <ul>
               {entry.items.map((item) => (
