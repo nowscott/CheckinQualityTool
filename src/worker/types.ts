@@ -50,6 +50,7 @@ export interface WhitelistEntry extends DataRow {
 export interface Whitelist {
   entries: WhitelistEntry[];
   byStudentId: Map<string, WhitelistEntry>;
+  byOriginalStudentName: Map<string, WhitelistEntry>;
   byStudentName: Map<string, WhitelistEntry>;
 }
 

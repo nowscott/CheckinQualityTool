@@ -53,6 +53,7 @@ export function buildWhitelist(csvText: string): Whitelist {
   const empty = {
     entries: [],
     byStudentId: new Map<string, WhitelistEntry>(),
+    byOriginalStudentName: new Map<string, WhitelistEntry>(),
     byStudentName: new Map<string, WhitelistEntry>(),
   };
   if (!rows.length) return empty;
@@ -61,9 +62,11 @@ export function buildWhitelist(csvText: string): Whitelist {
   const index = (name: string) => headers.indexOf(name);
   const entries: WhitelistEntry[] = [];
   const byStudentId = new Map<string, WhitelistEntry>();
+  const byOriginalStudentName = new Map<string, WhitelistEntry>();
   const byStudentName = new Map<string, WhitelistEntry>();
   for (const row of rows.slice(1)) {
     const studentName = cleanStudentName(row[index("学员姓名")]);
+    const matchStudentName = text(row[index("匹配学员姓名")]).replace(/\s+/g, "");
     const studentId = text(row[index("学员号")]);
     if (!studentId && !studentName.original) continue;
     const aliases = text(row[index("匹配别名")])
@@ -73,7 +76,7 @@ export function buildWhitelist(csvText: string): Whitelist {
     const entry: WhitelistEntry = {
       学员号: studentId,
       学员姓名: studentName.original,
-      匹配学员姓名: studentName.cleaned,
+      匹配学员姓名: matchStudentName || studentName.cleaned,
       处理方式: text(row[index("处理方式")]) || "已发送",
       匹配别名: aliases.join("|"),
       匹配别名关键词: aliases.map((value) => normalizeMatchText(value.slice(-2))),
@@ -81,10 +84,24 @@ export function buildWhitelist(csvText: string): Whitelist {
     };
     entries.push(entry);
     const studentKey = normalizeMatchText(entry.匹配学员姓名 || entry.学员姓名);
+    const originalStudentKey = normalizeMatchText(entry.学员姓名);
     if (entry.学员号) byStudentId.set(normalizeMatchText(entry.学员号), entry);
+    if (originalStudentKey) byOriginalStudentName.set(originalStudentKey, entry);
     if (studentKey) byStudentName.set(studentKey, entry);
   }
-  return { entries, byStudentId, byStudentName };
+  return { entries, byStudentId, byOriginalStudentName, byStudentName };
+}
+
+export function findPreCleanWhitelistEntry(
+  studentId: string,
+  originalStudentName: string,
+  whitelist: Whitelist,
+) {
+  return (
+    (studentId && whitelist.byStudentId.get(normalizeMatchText(studentId))) ||
+    whitelist.byOriginalStudentName.get(normalizeMatchText(originalStudentName)) ||
+    null
+  );
 }
 
 export function findWhitelistEntry(target: TargetRow, whitelist: Whitelist) {

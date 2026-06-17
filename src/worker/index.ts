@@ -24,8 +24,9 @@ importScripts("/vendor/xlsx.full.min.js");
 workerScope.onmessage = async ({ data }: MessageEvent<ProcessRequest>) => {
   if (data.type !== "process") return;
   try {
+    const whitelist = buildWhitelist(data.whitelistCsv);
     const listWorkbook = await readWorkbook(data.listFile, 3, 18, "课堂反馈名单");
-    const listInfo = buildTargets(listWorkbook);
+    const listInfo = buildTargets(listWorkbook, whitelist);
     progress(
       "名单预处理完成",
       `原始 ${listInfo.counts.原始课次行数.toLocaleString()} 条，去重后 ${listInfo.targets.length.toLocaleString()} 人。`,
@@ -54,7 +55,6 @@ workerScope.onmessage = async ({ data }: MessageEvent<ProcessRequest>) => {
       61,
     );
 
-    const whitelist = buildWhitelist(data.whitelistCsv);
     const matchInfo = matchData(
       listInfo.targets,
       chatInfo.chats,

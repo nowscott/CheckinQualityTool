@@ -1,8 +1,9 @@
 import { findSheet, headerMap } from "./excelReader";
-import type { ListInfo, TargetRow } from "./types";
+import type { ListInfo, TargetRow, Whitelist } from "./types";
 import { cleanStudentName, emailValue, sortDate, text, weekOfMonth } from "./utils";
+import { findPreCleanWhitelistEntry } from "./whitelist";
 
-export function buildTargets(workbook: SheetJsWorkbook): ListInfo {
+export function buildTargets(workbook: SheetJsWorkbook, whitelist?: Whitelist): ListInfo {
   const found = findSheet(workbook, ["老师姓名", "学员姓名", "老师邮箱", "课次开始时"]);
   const rows = found.rows;
   const map = headerMap(rows[0]);
@@ -34,14 +35,26 @@ export function buildTargets(workbook: SheetJsWorkbook): ListInfo {
   for (let rowIndex = 1; rowIndex < rows.length; rowIndex += 1) {
     const row = rows[rowIndex];
     const teacher = text(row[columns.teacher]);
-    const studentName = cleanStudentName(row[columns.student]);
-    const student = studentName.cleaned;
+    const rawStudentName = text(row[columns.student]);
+    const studentId = text(row[columns.studentId]);
+    const studentName = cleanStudentName(rawStudentName);
+    const whitelistEntry = whitelist
+      ? findPreCleanWhitelistEntry(studentId, studentName.original, whitelist)
+      : null;
+    const whitelistStudentName = whitelistEntry?.匹配学员姓名 || "";
+    const student = whitelistStudentName || studentName.cleaned;
+    const studentNote =
+      whitelistStudentName && whitelistStudentName !== studentName.cleaned
+        ? whitelistStudentName === studentName.original
+          ? `${studentName.original}（白名单保留）`
+          : `${studentName.original} → ${whitelistStudentName}（白名单保留）`
+        : studentName.note;
     const teacherEmail = emailValue(row[columns.email]);
     if (!teacher || !studentName.original) {
       counts.跳过教师或学员为空 += 1;
       continue;
     }
-    if (studentName.note) counts.姓名已清洗课次 += 1;
+    if (studentNote) counts.姓名已清洗课次 += 1;
     if ([...student].length < 2) counts.姓名不足两字课次 += 1;
     if (!teacherEmail) counts.名单教师邮箱为空 += 1;
     const lessonWeek = weekOfMonth(row[columns.lessonDate]);
@@ -52,8 +65,8 @@ export function buildTargets(workbook: SheetJsWorkbook): ListInfo {
       教师邮箱: teacherEmail,
       学员姓名: student,
       原始学员姓名: studentName.original,
-      姓名清洗说明: studentName.note,
-      学员号: text(row[columns.studentId]),
+      姓名清洗说明: studentNote,
+      学员号: studentId,
       上课日期: row[columns.lessonDate],
       上课开始: text(row[columns.start]),
       上课结束: text(row[columns.end]),
