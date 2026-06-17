@@ -37,17 +37,13 @@ export function buildTargets(workbook: SheetJsWorkbook, whitelist?: Whitelist): 
     const teacher = text(row[columns.teacher]);
     const rawStudentName = text(row[columns.student]);
     const studentId = text(row[columns.studentId]);
+    const whitelistEntry = whitelist ? findPreCleanWhitelistEntry(studentId, rawStudentName, whitelist) : null;
+    const preserveOriginalName = whitelistEntry?.处理方式 === "保留原名";
     const studentName = cleanStudentName(rawStudentName);
-    const whitelistEntry = whitelist
-      ? findPreCleanWhitelistEntry(studentId, studentName.original, whitelist)
-      : null;
-    const whitelistStudentName = whitelistEntry?.匹配学员姓名 || "";
-    const student = whitelistStudentName || studentName.cleaned;
+    const student = preserveOriginalName ? studentName.original.replace(/\s+/g, "") : studentName.cleaned;
     const studentNote =
-      whitelistStudentName && whitelistStudentName !== studentName.cleaned
-        ? whitelistStudentName === studentName.original
-          ? `${studentName.original}（白名单保留）`
-          : `${studentName.original} → ${whitelistStudentName}（白名单保留）`
+      preserveOriginalName && student !== studentName.cleaned
+        ? `${studentName.original}（白名单保留原名）`
         : studentName.note;
     const teacherEmail = emailValue(row[columns.email]);
     if (!teacher || !studentName.original) {

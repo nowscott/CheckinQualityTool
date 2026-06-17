@@ -66,9 +66,9 @@ export function buildWhitelist(csvText: string): Whitelist {
   const byStudentName = new Map<string, WhitelistEntry>();
   for (const row of rows.slice(1)) {
     const studentName = cleanStudentName(row[index("学员姓名")]);
-    const matchStudentName = text(row[index("匹配学员姓名")]).replace(/\s+/g, "");
     const studentId = text(row[index("学员号")]);
     if (!studentId && !studentName.original) continue;
+    const mode = text(row[index("处理方式")]) || "已发送";
     const aliases = text(row[index("匹配别名")])
       .split(/[|；;]/u)
       .map((value) => cleanStudentName(value).cleaned)
@@ -76,8 +76,8 @@ export function buildWhitelist(csvText: string): Whitelist {
     const entry: WhitelistEntry = {
       学员号: studentId,
       学员姓名: studentName.original,
-      匹配学员姓名: matchStudentName || studentName.cleaned,
-      处理方式: text(row[index("处理方式")]) || "已发送",
+      匹配学员姓名: mode === "保留原名" ? studentName.original.replace(/\s+/g, "") : studentName.cleaned,
+      处理方式: mode,
       匹配别名: aliases.join("|"),
       匹配别名关键词: aliases.map((value) => normalizeMatchText(value.slice(-2))),
       说明: text(row[index("说明")]),
