@@ -6,7 +6,7 @@
 - 技术栈：Vite 8、React 19、TypeScript 6、Web Worker
 - Excel 读取：SheetJS 0.20.3 浏览器构建
 - Excel 导出：fflate 流式生成 OOXML/XLSX
-- 当前版本：`v2.4.7`
+- 当前版本：`v2.4.8`
 
 项目没有文件上传接口、后端服务、数据库或分析脚本。教师、学员和聊天数据只在当前浏览器中处理。
 

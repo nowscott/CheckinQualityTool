@@ -1,5 +1,10 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.4.8",
+    date: "2026-07-01 14:15",
+    items: ["新增一条系统登记名与企微群名不一致的学员别名白名单。"],
+  },
+  {
     version: "v2.4.7",
     date: "2026-06-17 16:12",
     items: [
