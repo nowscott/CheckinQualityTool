@@ -129,6 +129,18 @@ function pushTotalRow(rows: DataRow[], labelColumn: string, label: string, bucke
   });
 }
 
+function passFailStyle(passed: boolean, includeResultColors: boolean) {
+  if (!includeResultColors) return 8;
+  return passed ? 2 : 3;
+}
+
+function summaryAwareStyle(row: DataRow, includeResultColors: boolean) {
+  if (row.__rowType === "grandTotal") return 10;
+  if (row.__rowType === "projectTotal") return 10;
+  if (row.__rowType === "groupTotal") return 9;
+  return passFailStyle(row["是否达标（80%）"] === "是", includeResultColors);
+}
+
 function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
   const projectOrder = ["博文项目", "双语项目", "益智项目", "文理综项目", "其他项目"];
   const grouped = new Map<string, Map<string, Map<string, SummaryBucket>>>();
@@ -442,7 +454,9 @@ export function buildReminderOutput(
       rows: studentOutputRows(matchInfo.studentRows),
       columns: STUDENT_COLUMNS,
       widths: { 教研组: 18, 师训组长: 18, 助理主管: 18, 申诉情况说明: 32 },
-      rowStyle: includeResultColors ? (row) => row.是否发送 === "是" ? 2 : row.是否发送 === "已申诉通过" ? 4 : 3 : undefined,
+      rowStyle: (row) => row.是否发送 === "已申诉通过"
+        ? 8
+        : passFailStyle(row.是否发送 === "是", includeResultColors),
     },
     {
       name: "教师维度发送进度",
@@ -450,7 +464,7 @@ export function buildReminderOutput(
       rows: teacherOutputRows(matchInfo.teacherRows),
       columns: TEACHER_COLUMNS,
       widths: { 教研组: 18, 师训组长: 18, 助理主管: 18 },
-      rowStyle: includeResultColors ? (row) => row.是否达标 === "是" ? 2 : 3 : undefined,
+      rowStyle: (row) => passFailStyle(row.是否达标 === "是", includeResultColors),
     },
     {
       name: "师训组维度",
@@ -458,13 +472,7 @@ export function buildReminderOutput(
       rows: buildTrainingRows(matchInfo.studentRows),
       columns: TRAINING_COLUMNS,
       widths: { 教研组: 26 },
-      rowStyle: (row) => {
-        if (!includeResultColors) return 0;
-        if (row.__rowType === "grandTotal") return 10;
-        if (row.__rowType === "projectTotal") return 10;
-        if (row.__rowType === "groupTotal") return 9;
-        return row["是否达标（80%）"] === "是" ? 2 : 3;
-      },
+      rowStyle: (row) => summaryAwareStyle(row, includeResultColors),
     },
     {
       name: "助理主管维度",
@@ -473,13 +481,7 @@ export function buildReminderOutput(
       columns: ASSISTANT_COLUMNS,
       widths: { 项目组: 18, 教研组: 18, 助理主管: 22 },
       mergeCells: publicTable.mergeCells,
-      rowStyle: (row) => {
-        if (!includeResultColors) return 0;
-        if (row.__rowType === "grandTotal") return 10;
-        if (row.__rowType === "projectTotal") return 10;
-        if (row.__rowType === "groupTotal") return 9;
-        return row["是否达标（80%）"] === "是" ? 2 : 3;
-      },
+      rowStyle: (row) => summaryAwareStyle(row, includeResultColors),
       cellStyle: (row, column, baseStyle) => {
         if (column === "项目组" || column === "教研组") return baseStyle || 8;
         return baseStyle;
@@ -491,7 +493,7 @@ export function buildReminderOutput(
       rows: buildProjectRows(matchInfo.studentRows),
       columns: PROJECT_COLUMNS,
       widths: { 教研组: 24, 负责人: 42 },
-      rowStyle: includeResultColors ? (row) => row.__rowType === "grandTotal" || row.__rowType === "projectTotal" ? 10 : row["是否达标（80%）"] === "是" ? 2 : 3 : undefined,
+      rowStyle: (row) => summaryAwareStyle(row, includeResultColors),
     },
     {
       name: "校区维度",
@@ -499,14 +501,14 @@ export function buildReminderOutput(
       rows: buildCampusRows(matchInfo.studentRows),
       columns: CAMPUS_COLUMNS,
       widths: { 校区: 30, 区域教学负责人: 18 },
-      rowStyle: includeResultColors ? (row) => row["是否达标（80%）"] === "是" ? 2 : 3 : undefined,
+      rowStyle: (row) => passFailStyle(row["是否达标（80%）"] === "是", includeResultColors),
     },
     {
       name: "匹配核对-异常明细",
       rows: matchInfo.exceptionRows,
       columns: EXCEPTION_COLUMNS,
       widths: { 异常原因: 48, 命中群名: 38, 命中聊天内容: 80, 命中质检文件: 36 },
-      rowStyle: () => 4,
+      rowStyle: () => 8,
     },
   ];
   if (includeCleanChats) {
