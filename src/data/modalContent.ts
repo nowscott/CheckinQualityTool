@@ -1,5 +1,10 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.5.1",
+    date: "2026-07-08 19:21",
+    items: ["修复生产环境直接访问 /remind 返回 404 的问题，补充 Vercel 前端路由回退规则。"],
+  },
+  {
     version: "v2.5.0",
     date: "2026-07-08 19:15",
     items: [
