@@ -87,7 +87,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
         workerScope.postMessage({
           type: "complete",
           buffer,
-          filename: `暑期课程提醒-增量（${localMonthDay()}）.xlsx`,
+          filename: `暑期开课提醒话术发送进度-增量（${localMonthDay()}）.xlsx`,
           summary: {
             mode: "reminder",
             reminderMode: "incremental",
@@ -157,7 +157,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       workerScope.postMessage({
         type: "complete",
         buffer,
-        filename: `暑期课程提醒（${localMonthDay()}）.xlsx`,
+        filename: `暑期开课提醒话术发送进度（${localMonthDay()}）.xlsx`,
         summary: {
           mode: "reminder",
           targets: listInfo.targets.length,

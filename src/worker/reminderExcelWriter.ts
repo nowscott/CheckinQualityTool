@@ -28,10 +28,6 @@ const PROJECT_COLUMNS = [
   "教研组", "负责人", "应发送数", "已发送数", "发送率", "是否达标（80%）",
 ] as const;
 
-const CAMPUS_COLUMNS = [
-  "校区", "区域教学负责人", "应发送数", "已发送数", "发送率", "是否达标（80%）",
-] as const;
-
 const EXCEPTION_COLUMNS = [
   "异常类型", "异常原因", "质检序号", "授课教师", "学员姓名", "匹配学员姓名",
   "教研组", "师训组长", "助理主管", "源名单行号", "保留名单行号",
@@ -389,26 +385,6 @@ function buildProjectRows(studentRows: DataRow[]) {
   return rows;
 }
 
-function buildCampusRows(studentRows: DataRow[]) {
-  const campus = new Map<string, SummaryBucket>();
-  for (const row of studentRows) {
-    const key = text(row.校区) || "未填写";
-    if (!campus.has(key)) campus.set(key, createBucket());
-    addStudent(campus.get(key)!, row);
-  }
-  return [...campus.entries()]
-    .filter(([, item]) => item.total)
-    .sort((a, b) => compareText(a[0], b[0]))
-    .map(([name, item]) => ({
-      校区: name,
-      区域教学负责人: "/",
-      应发送数: item.total,
-      已发送数: item.sent,
-      发送率: rateText(item.sent, item.total),
-      "是否达标（80%）": passText(item.sent, item.total),
-    }));
-}
-
 function explanationRows(
   listInfo: ReminderListInfo,
   chatInfo: ChatInfo,
@@ -483,7 +459,8 @@ export function buildReminderOutput(
       mergeCells: publicTable.mergeCells,
       rowStyle: (row) => summaryAwareStyle(row, includeResultColors),
       cellStyle: (row, column, baseStyle) => {
-        if (column === "项目组" || column === "教研组") return baseStyle || 8;
+        if (column === "项目组") return 7;
+        if (column === "教研组") return baseStyle || 8;
         return baseStyle;
       },
     },
@@ -494,14 +471,6 @@ export function buildReminderOutput(
       columns: PROJECT_COLUMNS,
       widths: { 教研组: 24, 负责人: 42 },
       rowStyle: (row) => summaryAwareStyle(row, includeResultColors),
-    },
-    {
-      name: "校区维度",
-      title: "开课提醒发送进度（校区维度）",
-      rows: buildCampusRows(matchInfo.studentRows),
-      columns: CAMPUS_COLUMNS,
-      widths: { 校区: 30, 区域教学负责人: 18 },
-      rowStyle: (row) => passFailStyle(row["是否达标（80%）"] === "是", includeResultColors),
     },
     {
       name: "匹配核对-异常明细",
