@@ -103,12 +103,9 @@ export function matchReminderData(listInfo: ReminderListInfo, chats: ChatRow[]):
     content: normalizeMatchText(chat.聊天内容),
   }));
   const studentCounts = new Map<string, number>();
-  const teachersByStudent = new Map<string, Set<string>>();
   listInfo.targets.forEach((target) => {
     const student = normalizeMatchText(target.匹配学员姓名);
     studentCounts.set(student, (studentCounts.get(student) || 0) + 1);
-    if (!teachersByStudent.has(student)) teachersByStudent.set(student, new Set());
-    teachersByStudent.get(student)!.add(normalizeTeacherName(target.授课教师));
   });
 
   const studentRows: DataRow[] = [];
@@ -133,18 +130,16 @@ export function matchReminderData(listInfo: ReminderListInfo, chats: ChatRow[]):
     const teacher = normalizeTeacherName(target.授课教师);
     const isUniqueStudent = (studentCounts.get(student) || 0) === 1;
     const matches: ReminderMatchedChat[] = [];
-    const ambiguousChats: ChatRow[] = [];
 
     for (const item of normalizedChats) {
       const groupHasStudent = Boolean(student && item.group.includes(student));
       const contentHasStudent = Boolean(student && item.content.includes(student));
       const groupHasTeacher = Boolean(teacher && item.group.includes(teacher));
+      const contentHasTeacher = Boolean(teacher && item.content.includes(teacher));
       const hasStudent = groupHasStudent || contentHasStudent;
+      const hasTeacher = groupHasTeacher || contentHasTeacher;
       const senderTeacher = normalizeTeacherName(item.chat.发送人名称);
       const senderMatchesThisTeacher = Boolean(teacher && senderTeacher && senderTeacher === teacher);
-      const senderMatchesAnyTeacherForStudent = Boolean(
-        student && senderTeacher && teachersByStudent.get(student)?.has(senderTeacher),
-      );
       if (hasStudent && senderMatchesThisTeacher) {
         matches.push({
           ...item.chat,
@@ -157,12 +152,15 @@ export function matchReminderData(listInfo: ReminderListInfo, chats: ChatRow[]):
         });
         continue;
       }
-      if (groupHasStudent && groupHasTeacher) {
+      if (hasStudent && hasTeacher) {
         matches.push({
           ...item.chat,
           匹配优先级: 2,
           匹配方式: REMINDER_MATCH_RULES.groupStudentAndTeacher,
-          命中位置: "群聊名称",
+          命中位置: [
+            groupHasStudent || groupHasTeacher ? "群聊名称" : "",
+            contentHasStudent || contentHasTeacher ? "聊天内容" : "",
+          ].filter(Boolean).join("+"),
           命中关键词: `${target.授课教师}+${target.匹配学员姓名}`,
         });
         continue;
@@ -187,9 +185,6 @@ export function matchReminderData(listInfo: ReminderListInfo, chats: ChatRow[]):
         });
         continue;
       }
-      if (hasStudent && !isUniqueStudent && !senderMatchesAnyTeacherForStudent) {
-        ambiguousChats.push(item.chat);
-      }
     }
 
     matches.sort(
@@ -206,10 +201,8 @@ export function matchReminderData(listInfo: ReminderListInfo, chats: ChatRow[]):
       target.助理主管 ? "" : "助理主管",
     ].filter(Boolean);
     const sent = Boolean(best);
-    const matchStatus = sent ? (matches.length > 1 ? "已发送-需核对" : "已发送") : ambiguousChats.length ? "待核对" : "未发送";
-    const reason = sent
-      ? matches.length > 1 ? "多条质检记录命中同一分母记录，已按最高优先级和最早时间取首条" : ""
-      : ambiguousChats.length ? "学员姓名在分母中不唯一，聊天记录无法唯一定位" : "未找到可自动判定的聊天记录";
+    const matchStatus = sent ? "已发送" : "未发送";
+    const reason = sent ? "" : "未找到可自动判定的聊天记录";
 
     if (sent) {
       counts.已发送数 += 1;
@@ -220,15 +213,7 @@ export function matchReminderData(listInfo: ReminderListInfo, chats: ChatRow[]):
     } else {
       counts.未发送数 += 1;
     }
-    if (matches.length > 1) {
-      counts.多条质检命中 += 1;
-      matches.slice(1).forEach((match) => addException(exceptionRows, target, "多条质检命中", reason, match));
-    }
-    if (ambiguousChats.length && !sent) {
-      counts.待核对数 += 1;
-      counts.无法唯一匹配 += 1;
-      ambiguousChats.forEach((chat) => addException(exceptionRows, target, "无法唯一匹配", reason, chat));
-    }
+    if (matches.length > 1) counts.多条质检命中 += 1;
     if (missing.length) {
       counts.字段缺失 += 1;
       addException(exceptionRows, target, "字段缺失", `分母记录缺少：${missing.join("、")}`);

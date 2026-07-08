@@ -78,7 +78,7 @@ test("聊天内容命中唯一学员时自动判定已发送", () => {
   assert.equal(result.counts.内容唯一学员命中, 1);
 });
 
-test("同名学员无法唯一定位时进入异常且不自动判定已发送", () => {
+test("同名学员仅命中学生姓名时不进入异常，保持未发送", () => {
   const list = buildReminderTargets(workbook([
     ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
     ["张老师", "益智组", "王组长", "李主管", "陈一", "12"],
@@ -87,8 +87,8 @@ test("同名学员无法唯一定位时进入异常且不自动判定已发送",
   const result = matchReminderData(list, [chat({ group: "陈一新东方学习群" })]);
   assert.equal(result.studentRows[0].是否发送, "否");
   assert.equal(result.studentRows[1].是否发送, "否");
-  assert.equal(result.counts.无法唯一匹配, 2);
-  assert.ok(result.exceptionRows.some((row) => row.异常类型 === "无法唯一匹配"));
+  assert.equal(result.counts.无法唯一匹配, 0);
+  assert.equal(result.exceptionRows.length, 0);
 });
 
 test("同名学员可按聊天发送人与授课教师自动定位到老师-学生记录", () => {
@@ -103,6 +103,37 @@ test("同名学员可按聊天发送人与授课教师自动定位到老师-学�
   assert.equal(result.studentRows[1].匹配方式, "聊天发送人与授课教师一致，且群聊名称或聊天内容包含学员姓名");
   assert.equal(result.counts.发送人教师学员命中, 1);
   assert.equal(result.counts.无法唯一匹配, 0);
+});
+
+test("同名学员可按聊天内容中的授课教师和学员姓名自动定位", () => {
+  const list = buildReminderTargets(workbook([
+    ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
+    ["张老师", "益智组", "王组长", "李主管", "陈一", "12"],
+    ["李老师", "益智组", "王组长", "赵主管", "陈一", "24"],
+  ]));
+  const result = matchReminderData(list, [chat({ content: "李老师 陈一家长您好，暑假课马上开始。" })]);
+  assert.equal(result.studentRows[0].是否发送, "否");
+  assert.equal(result.studentRows[1].是否发送, "是");
+  assert.equal(result.studentRows[1].匹配方式, "群聊名称或聊天内容同时包含学员姓名和授课教师");
+  assert.equal(result.counts.群名教师学员命中, 1);
+  assert.equal(result.exceptionRows.length, 0);
+});
+
+test("多条质检记录命中同一分母记录时正常判定已发送且不进异常", () => {
+  const list = buildReminderTargets(workbook([
+    ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
+    ["张老师", "益智组", "王组长", "李主管", "陈一", "12"],
+  ]));
+  const result = matchReminderData(list, [
+    chat({ group: "张老师 陈一 新东方学习群", time: "2026-07-07 09:00:00", row: 2 }),
+    chat({ group: "张老师 陈一 暑假班学习群", time: "2026-07-07 09:30:00", row: 3 }),
+  ]);
+  assert.equal(result.studentRows[0].是否发送, "是");
+  assert.equal(result.studentRows[0].匹配状态, "已发送");
+  assert.equal(result.studentRows[0].异常原因, "");
+  assert.equal(result.studentRows[0].匹配消息数, 2);
+  assert.equal(result.counts.多条质检命中, 1);
+  assert.equal(result.exceptionRows.length, 0);
 });
 
 test("聊天发送人姓名末尾数字不影响教师匹配", () => {
