@@ -69,27 +69,45 @@ function* worksheetChunks(
   columns: readonly string[],
   widths: Record<string, number>,
   rowStyle?: (row: DataRow) => number,
+  cellStyle?: (row: DataRow, column: string, rowStyle: number) => number,
+  title = "",
+  titleStyle = 5,
+  headerStyle = 1,
+  titleHeight = 38,
+  headerHeight = 24,
+  dataRowHeight = 0,
+  mergeCells: string[] = [],
 ) {
-  const lastCell = `${excelColumn(columns.length - 1)}${rows.length + 1}`;
+  const headerRowIndex = title ? 2 : 1;
+  const dataStartRow = headerRowIndex + 1;
+  const lastCell = `${excelColumn(columns.length - 1)}${rows.length + headerRowIndex}`;
   const colsXml = columns.map((column, index) => {
     const width = widths[column] || Math.min(Math.max(column.length * 2 + 2, 12), 24);
     return `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`;
   }).join("");
+  const titleMerge = title ? [`A1:${excelColumn(columns.length - 1)}1`] : [];
+  const allMerges = [...titleMerge, ...mergeCells];
+  const mergeXml = allMerges.length
+    ? `<mergeCells count="${allMerges.length}">${allMerges.map((ref) => `<mergeCell ref="${ref}"/>`).join("")}</mergeCells>`
+    : "";
   yield (
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
-    `<dimension ref="A1:${lastCell}"/><sheetViews><sheetView workbookViewId="0">` +
-    `<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>` +
+    `<dimension ref="A1:${lastCell}"/><sheetViews><sheetView workbookViewId="0"${title ? ` showGridLines="0"` : ""}>` +
+    `<pane ySplit="${headerRowIndex}" topLeftCell="A${dataStartRow}" activePane="bottomLeft" state="frozen"/>` +
     `</sheetView></sheetViews><cols>${colsXml}</cols><sheetData>` +
-    `<row r="1">${columns.map((column, index) => cellXml(column, index, 1, 1)).join("")}</row>`
+    (title
+      ? `<row r="1" ht="${titleHeight}" customHeight="1">${cellXml(title, 0, 1, titleStyle)}</row>`
+      : "") +
+    `<row r="${headerRowIndex}" ht="${headerHeight}" customHeight="1">${columns.map((column, index) => cellXml(column, index, headerRowIndex, headerStyle)).join("")}</row>`
   );
   let buffer = "";
   for (let rowOffset = 0; rowOffset < rows.length; rowOffset += 1) {
     const row = rows[rowOffset];
-    const rowIndex = rowOffset + 2;
+    const rowIndex = rowOffset + dataStartRow;
     const style = rowStyle ? rowStyle(row) : 0;
-    buffer += `<row r="${rowIndex}">${columns.map((column, columnIndex) =>
-      cellXml(row[column] ?? "", columnIndex, rowIndex, style)
+    buffer += `<row r="${rowIndex}"${dataRowHeight ? ` ht="${dataRowHeight}" customHeight="1"` : ""}>${columns.map((column, columnIndex) =>
+      cellXml(row[column] ?? "", columnIndex, rowIndex, cellStyle ? cellStyle(row, column, style) : style)
     ).join("")}</row>`;
     if (buffer.length >= 512 * 1024) {
       yield buffer;
@@ -97,7 +115,7 @@ function* worksheetChunks(
     }
   }
   if (buffer) yield buffer;
-  yield `</sheetData><autoFilter ref="A1:${lastCell}"/></worksheet>`;
+  yield `</sheetData>${mergeXml}<autoFilter ref="A${headerRowIndex}:${lastCell}"/></worksheet>`;
 }
 
 function concatenate(chunks: Uint8Array[]) {
@@ -184,6 +202,10 @@ export function buildOutput(
     },
   ];
 
+  return buildWorkbook(sheets);
+}
+
+export function buildWorkbook(sheets: SheetDefinition[]) {
   const outputChunks: Uint8Array[] = [];
   const zip = new Zip((error, chunk) => {
     if (error) throw error;
@@ -226,28 +248,57 @@ export function buildOutput(
   addZipTextFile(zip, "xl/styles.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
-    `<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts>` +
-    `<fills count="6"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>` +
+    `<fonts count="5"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font>` +
+    `<font><b/><color rgb="FFFFFFFF"/><sz val="22"/><name val="Microsoft YaHei"/></font>` +
+    `<font><b/><color rgb="FFFFFFFF"/><sz val="13"/><name val="Microsoft YaHei"/></font>` +
+    `<font><b/><color rgb="FF000000"/><sz val="12"/><name val="Microsoft YaHei"/></font></fonts>` +
+    `<fills count="8"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>` +
     `<fill><patternFill patternType="solid"><fgColor rgb="FF1F4E78"/><bgColor indexed="64"/></patternFill></fill>` +
     `<fill><patternFill patternType="solid"><fgColor rgb="FFC6EFCE"/><bgColor indexed="64"/></patternFill></fill>` +
     `<fill><patternFill patternType="solid"><fgColor rgb="FFFFC7CE"/><bgColor indexed="64"/></patternFill></fill>` +
-    `<fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill></fills>` +
-    `<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FF009C82"/><bgColor indexed="64"/></patternFill></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FFFFE9A6"/><bgColor indexed="64"/></patternFill></fill></fills>` +
+    `<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>` +
+    `<border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="thin"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border></borders>` +
     `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
-    `<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
+    `<cellXfs count="11"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
     `<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>` +
     `<xf numFmtId="0" fontId="0" fillId="3" borderId="0" xfId="0" applyFill="1"/>` +
     `<xf numFmtId="0" fontId="0" fillId="4" borderId="0" xfId="0" applyFill="1"/>` +
-    `<xf numFmtId="0" fontId="0" fillId="5" borderId="0" xfId="0" applyFill="1"/></cellXfs>` +
+    `<xf numFmtId="0" fontId="0" fillId="5" borderId="0" xfId="0" applyFill="1"/>` +
+    `<xf numFmtId="0" fontId="2" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
+    `<xf numFmtId="0" fontId="3" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
+    `<xf numFmtId="0" fontId="3" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+    `<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
+    `<xf numFmtId="0" fontId="4" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
+    `<xf numFmtId="0" fontId="4" fillId="7" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs>` +
     `<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>` +
     `</styleSheet>`,
   );
   sheets.forEach((sheet, index) => {
-    progress("正在流式写入 Excel", `${sheet.name}：${sheet.rows.length.toLocaleString()} 行`, 85 + index * 3);
+    progress(
+      "正在流式写入 Excel",
+      `${sheet.name}：${sheet.rows.length.toLocaleString()} 行`,
+      Math.min(98, 85 + index * 3),
+    );
     addZipTextFile(
       zip,
       `xl/worksheets/sheet${index + 1}.xml`,
-      worksheetChunks(sheet.rows, sheet.columns, sheet.widths, sheet.rowStyle),
+      worksheetChunks(
+        sheet.rows,
+        sheet.columns,
+        sheet.widths,
+        sheet.rowStyle,
+        sheet.cellStyle,
+        sheet.title,
+        sheet.titleStyle,
+        sheet.headerStyle,
+        sheet.titleHeight,
+        sheet.headerHeight,
+        sheet.dataRowHeight,
+        sheet.mergeCells,
+      ),
     );
   });
   zip.end();

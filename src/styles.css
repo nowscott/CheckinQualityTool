@@ -161,6 +161,22 @@ h1 { margin: 0; font-family: var(--serif); font-size: clamp(42px, 5vw, 62px); li
   white-space: nowrap;
 }
 .logic-button:hover { color: white; border-color: var(--green); background: var(--green); }
+.secondary-tool-link {
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  color: var(--green);
+  border-bottom: 1px solid var(--green-line);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.secondary-tool-link:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
 .card, .status-card, .output-grid article {
   border: 1px solid var(--line);
   background: var(--card-translucent);
@@ -231,6 +247,41 @@ h1 { margin: 0; font-family: var(--serif); font-size: clamp(42px, 5vw, 62px); li
   content: "✓ ";
 }
 
+.segmented {
+  width: 100%;
+  margin-bottom: 14px;
+  padding: 3px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  background: var(--field);
+}
+.segmented label {
+  min-width: 0;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  cursor: pointer;
+}
+.segmented label.active {
+  color: white;
+  background: var(--green);
+}
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.segmented span {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
 .options > label { min-width: 0; min-height: 70px; padding: 11px 15px; border: 1px solid var(--line); background: var(--field); }
 .options span { display: block; font-size: 14px; }
@@ -259,6 +310,7 @@ h1 { margin: 0; font-family: var(--serif); font-size: clamp(42px, 5vw, 62px); li
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .switch-row small { display: block; margin-top: 4px; color: var(--muted); line-height: 1.4; }
 .switch-row input { width: 46px; height: 24px; accent-color: var(--accent); }
+.reminder-options { grid-template-columns: minmax(0, 1fr); }
 .rules { display: flex; align-items: center; gap: 7px; margin: 14px 0; color: var(--muted); font-size: 11px; }
 .rules span { margin-right: 5px; color: var(--ink); font-weight: 700; }
 .rules b { padding: 4px 8px; color: var(--green); border: 1px solid var(--green-line); font-weight: 500; }

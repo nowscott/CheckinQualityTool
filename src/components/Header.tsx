@@ -1,19 +1,35 @@
+import type { MouseEvent } from "react";
 import type { Theme } from "../hooks/useTheme";
+
+interface HeaderLink {
+  href: string;
+  label: string;
+}
 
 interface HeaderProps {
   theme: Theme;
   usesSystemTheme: boolean;
+  title?: string;
+  subtitle?: string;
+  showGuide?: boolean;
+  secondaryLink?: HeaderLink;
   onToggleTheme: () => void;
   onOpenGuide: () => void;
   onOpenChangelog: () => void;
+  onSecondaryLinkClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 }
 
 export function Header({
   theme,
   usesSystemTheme,
+  title = "打卡质检数据生成",
+  subtitle = "上传课堂反馈名单与聊天导出数据，在浏览器本地完成清洗、匹配并生成可追溯的多 Sheet Excel。文件不会上传服务器。",
+  showGuide = true,
+  secondaryLink,
   onToggleTheme,
   onOpenGuide,
   onOpenChangelog,
+  onSecondaryLinkClick,
 }: HeaderProps) {
   const nextThemeLabel = theme === "dark" ? "浅色" : "深色";
   const currentThemeLabel = theme === "dark" ? "深色" : "浅色";
@@ -30,13 +46,19 @@ export function Header({
         />
         <p className="eyebrow">LOCAL QUALITY CHECK</p>
       </div>
-      <h1>打卡质检数据生成</h1>
+      <h1>{title}</h1>
       <p className="subtitle">
-        上传课堂反馈名单与聊天导出数据，在浏览器本地完成清洗、匹配并生成可追溯的多 Sheet
-        Excel。文件不会上传服务器。{" "}
-        <button className="logic-button" id="logic-button" type="button" onClick={onOpenGuide}>
-          查看匹配规则
-        </button>
+        {subtitle}{" "}
+        {showGuide ? (
+          <button className="logic-button" id="logic-button" type="button" onClick={onOpenGuide}>
+            查看匹配规则
+          </button>
+        ) : null}
+        {secondaryLink ? (
+          <a className="secondary-tool-link" href={secondaryLink.href} onClick={onSecondaryLinkClick}>
+            {secondaryLink.label}
+          </a>
+        ) : null}
       </p>
       <div className="header-controls">
         <button
@@ -64,7 +86,7 @@ export function Header({
           type="button"
           onClick={onOpenChangelog}
         >
-          v2.4.8
+          v2.5.0
         </button>
       </div>
     </header>

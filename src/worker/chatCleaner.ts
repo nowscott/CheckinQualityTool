@@ -5,7 +5,7 @@ import { emailValue, text } from "./utils";
 const QUOTE_SEPARATOR = /(?:-\s*){8,}|[—－-]{12,}/;
 const QUOTE_PREFIX = /^\s*[「『][\s\S]{0,500}?[：:]/;
 
-export function preprocessChats(workbook: SheetJsWorkbook): ChatInfo {
+export function preprocessChats(workbook: SheetJsWorkbook, sourceFile = ""): ChatInfo {
   const found = findSheet(workbook, ["聊天类型", "发送方", "聊天内容"]);
   const rows = found.rows;
   const map = headerMap(rows[0]);
@@ -59,6 +59,7 @@ export function preprocessChats(workbook: SheetJsWorkbook): ChatInfo {
       continue;
     }
     chats.push({
+      来源文件: sourceFile,
       有效教师邮箱: effectiveEmail,
       邮箱来源: primaryEmail ? "群聊发送人邮箱" : "邮箱",
       发送人名称: text(row[columns.groupSender]) || text(row[columns.name]),

@@ -6,10 +6,26 @@ const OUTPUT_SHEETS = [
   ["Sheet 5", "内置白名单", "展示本次处理使用的学员号、别名和豁免说明。"],
 ] as const;
 
-export function OutputGrid() {
+const REMINDER_OUTPUT_SHEETS = [
+  ["Sheet 1", "学员名单", "对齐春季明细结构，保留教师、邮箱、教研组、学员、发送状态和申诉说明。"],
+  ["Sheet 2", "教师维度发送进度", "按教师、教研组、师训组长、助理主管和校区汇总发送进度。"],
+  ["Sheet 3", "师训组维度", "按项目、教研组和师训组长分层汇总，阈值为 80%。"],
+  ["Sheet 4", "助理主管维度", "按项目组、教研组和助理主管汇总，博文/实验字母组归入文理综。"],
+  ["Sheet 5", "项目组维度", "按教研组和项目组汇总发送进度，结构贴近春季示例。"],
+  ["Sheet 6", "校区维度", "按校区汇总应发送数、已发送数、发送率和达标情况。"],
+  ["辅助", "匹配核对-异常明细", "记录字段缺失、多命中和无法唯一匹配等核对项。"],
+  ["可选", "清洗后聊天", "默认不输出；勾选后追加聊天来源、群名、时间、内容和源行号。"],
+] as const;
+
+interface OutputGridProps {
+  mode?: "checkin" | "reminder";
+}
+
+export function OutputGrid({ mode = "checkin" }: OutputGridProps) {
+  const sheets = mode === "reminder" ? REMINDER_OUTPUT_SHEETS : OUTPUT_SHEETS;
   return (
     <section className="output-grid">
-      {OUTPUT_SHEETS.map(([sheet, title, description]) => (
+      {sheets.map(([sheet, title, description]) => (
         <article key={sheet}>
           <span>{sheet}</span>
           <strong>{title}</strong>

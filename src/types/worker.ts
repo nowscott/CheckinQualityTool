@@ -11,11 +11,16 @@ export interface ProcessingStatus {
 }
 
 export interface ResultSummary {
+  mode?: "checkin" | "reminder";
+  reminderMode?: "full" | "incremental";
   targets: number;
   sent: number;
   unsent: number;
-  exempt: number;
+  exempt?: number;
   cleanChats: number;
+  exceptions?: number;
+  chatFiles?: number;
+  incrementalSent?: number;
 }
 
 export type WorkerResponse =

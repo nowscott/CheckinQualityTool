@@ -28,6 +28,7 @@ export interface TargetRow {
 }
 
 export interface ChatRow extends DataRow {
+  来源文件?: string;
   有效教师邮箱: string;
   邮箱来源: string;
   发送人名称: string;
@@ -82,6 +83,7 @@ export interface SourceNames {
 
 export interface ProcessRequest {
   type: "process";
+  mode?: "checkin";
   listFile: File;
   chatFile: File;
   weekLabel: WeekLabel;
@@ -89,10 +91,38 @@ export interface ProcessRequest {
   whitelistCsv: string;
 }
 
+export interface ReminderProcessRequest {
+  type: "process";
+  mode: "reminder";
+  reminderMode?: "full";
+  denominatorFile: File;
+  chatFiles: File[];
+  includeCleanChats: boolean;
+}
+
+export interface ReminderIncrementalProcessRequest {
+  type: "process";
+  mode: "reminder";
+  reminderMode: "incremental";
+  previousFile: File;
+  chatFiles: File[];
+  includeCleanChats: boolean;
+}
+
+export type WorkerRequest = ProcessRequest | ReminderProcessRequest | ReminderIncrementalProcessRequest;
+
 export interface SheetDefinition {
   name: string;
   rows: DataRow[];
   columns: readonly string[];
   widths: Record<string, number>;
   rowStyle?: (row: DataRow) => number;
+  cellStyle?: (row: DataRow, column: string, rowStyle: number) => number;
+  title?: string;
+  titleStyle?: number;
+  headerStyle?: number;
+  titleHeight?: number;
+  headerHeight?: number;
+  dataRowHeight?: number;
+  mergeCells?: string[];
 }

@@ -3,12 +3,20 @@ import { basename, resolve } from "node:path";
 import vm from "node:vm";
 
 const root = resolve(import.meta.dirname, "..");
-const [listPath, chatPath, outputPath = "/tmp/typescript-worker-result.xlsx"] =
-  process.argv.slice(2);
+const args = process.argv.slice(2);
+const includeCleanChatsIndex = args.indexOf("--include-clean-chats");
+const includeCleanChats = includeCleanChatsIndex >= 0;
+if (includeCleanChats) args.splice(includeCleanChatsIndex, 1);
+const modeArg = args[0]?.startsWith("--mode=") ? args.shift() : "";
+const mode = modeArg ? modeArg.split("=")[1] : "checkin";
+const [listPath, chatPath, outputPath = mode === "reminder"
+  ? "/tmp/reminder-worker-result.xlsx"
+  : "/tmp/typescript-worker-result.xlsx"] = args;
 
 if (!listPath || !chatPath) {
-  throw new Error("用法：node scripts/regression-worker.mjs <名单.xlsx> <聊天.xlsx> [输出.xlsx]");
+  throw new Error("用法：node scripts/regression-worker.mjs [--mode=checkin|reminder] <名单.xlsx> <聊天.xlsx> [输出.xlsx]");
 }
+if (!["checkin", "reminder"].includes(mode)) throw new Error(`不支持的 mode：${mode}`);
 
 const assets = await import("node:fs/promises").then(({ readdir }) =>
   readdir(resolve(root, "dist/assets")),
@@ -16,7 +24,7 @@ const assets = await import("node:fs/promises").then(({ readdir }) =>
 let workerFile = "";
 for (const asset of assets.filter((name) => name.endsWith(".js"))) {
   const source = await readFile(resolve(root, "dist/assets", asset), "utf8");
-  if (source.includes('importScripts(`/vendor/xlsx.full.min.js`)')) {
+  if (source.includes("暑期课程提醒") && source.includes("onmessage") && source.includes("postMessage") && !source.includes("createRoot")) {
     workerFile = resolve(root, "dist/assets", asset);
     break;
   }
@@ -25,7 +33,9 @@ if (!workerFile) throw new Error("找不到构建后的 Worker，请先运行 np
 
 const listBuffer = await readFile(resolve(listPath));
 const chatBuffer = await readFile(resolve(chatPath));
-const whitelistCsv = await readFile(resolve(root, "public/data/whitelist.csv"), "utf8");
+const whitelistCsv = mode === "checkin"
+  ? await readFile(resolve(root, "public/data/whitelist.csv"), "utf8")
+  : "";
 const workerSources = new Map([
   [
     resolve(root, "dist/vendor/xlsx.full.min.js"),
@@ -50,6 +60,13 @@ const sandbox = {
   TextDecoder,
   Uint8Array,
   ArrayBuffer,
+  fetch: async (url) => {
+    if (url !== "/vendor/xlsx.full.min.js") throw new Error(`不支持的 fetch 地址：${url}`);
+    return {
+      ok: true,
+      text: async () => workerSources.get(resolve(root, "dist/vendor/xlsx.full.min.js")),
+    };
+  },
   postMessage: (message) => complete(message),
   importScripts: (...urls) => {
     for (const url of urls) {
@@ -72,20 +89,29 @@ const file = (path, buffer) => ({
 });
 
 await context.self.onmessage({
-  data: {
-    type: "process",
-    listFile: file(listPath, listBuffer),
-    chatFile: file(chatPath, chatBuffer),
-    weekLabel: "auto",
-    useSingle: false,
-    whitelistCsv,
-  },
+  data: mode === "reminder"
+    ? {
+        type: "process",
+        mode: "reminder",
+        denominatorFile: file(listPath, listBuffer),
+        chatFiles: [file(chatPath, chatBuffer)],
+        includeCleanChats,
+      }
+    : {
+        type: "process",
+        listFile: file(listPath, listBuffer),
+        chatFile: file(chatPath, chatBuffer),
+        weekLabel: "auto",
+        useSingle: false,
+        whitelistCsv,
+      },
 });
 
 const message = await result;
 await writeFile(resolve(outputPath), new Uint8Array(message.buffer));
 console.log(JSON.stringify({
   worker: basename(workerFile),
+  mode,
   output: resolve(outputPath),
   bytes: message.buffer.byteLength,
   summary: message.summary,

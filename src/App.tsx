@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { ChangelogDialog } from "./components/ChangelogDialog";
 import { Header } from "./components/Header";
 import { MatchingGuideDialog } from "./components/MatchingGuideDialog";
 import { OutputGrid } from "./components/OutputGrid";
+import { ReminderForm } from "./components/ReminderForm";
 import { StatusCard } from "./components/StatusCard";
 import { UploadForm } from "./components/UploadForm";
 import { downloadResult } from "./lib/download";
@@ -11,6 +12,7 @@ import { useTheme } from "./hooks/useTheme";
 import type { ProcessingStatus, WeekLabel, WorkerResponse } from "./types/worker";
 
 type ActiveModal = "guide" | "changelog" | null;
+type ToolMode = "checkin" | "reminder";
 
 const INITIAL_STATUS: ProcessingStatus = {
   visible: false,
@@ -34,9 +36,23 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+function modeFromPath(): ToolMode {
+  return window.location.pathname.replace(/\/+$/, "") === "/remind" ? "reminder" : "checkin";
+}
+
+function createProcessingWorker() {
+  return new Worker(new URL("./worker/index.ts", import.meta.url), { type: "module" });
+}
+
 export default function App() {
+  const [activeMode, setActiveMode] = useState<ToolMode>(modeFromPath);
   const [listFile, setListFile] = useState<File | null>(null);
   const [chatFile, setChatFile] = useState<File | null>(null);
+  const [reminderMode, setReminderMode] = useState<"full" | "incremental">("full");
+  const [reminderListFile, setReminderListFile] = useState<File | null>(null);
+  const [reminderPreviousFile, setReminderPreviousFile] = useState<File | null>(null);
+  const [reminderChatFiles, setReminderChatFiles] = useState<File[]>([]);
+  const [includeReminderChats, setIncludeReminderChats] = useState(false);
   const [weekLabel, setWeekLabel] = useState<WeekLabel>("auto");
   const [useSingle, setUseSingle] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -46,6 +62,12 @@ export default function App() {
   const { theme, usesSystemTheme, toggleTheme } = useTheme();
 
   useEffect(() => () => workerRef.current?.terminate(), []);
+
+  useEffect(() => {
+    const syncMode = () => setActiveMode(modeFromPath());
+    window.addEventListener("popstate", syncMode);
+    return () => window.removeEventListener("popstate", syncMode);
+  }, []);
 
   const weekHint = useMemo(() => {
     if (weekLabel !== "auto") return `已手动指定为${weekLabel}`;
@@ -70,12 +92,24 @@ export default function App() {
     workerRef.current = null;
   }
 
+  function changeMode(mode: ToolMode) {
+    setActiveMode(mode);
+    setStatus(INITIAL_STATUS);
+    const path = mode === "reminder" ? "/remind" : "/";
+    if (window.location.pathname !== path) window.history.pushState(null, "", path);
+  }
+
+  function handleSecondaryLinkClick(event: MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault();
+    changeMode(activeMode === "reminder" ? "checkin" : "reminder");
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!listFile || !chatFile) return;
 
     workerRef.current?.terminate();
-    const worker = new Worker(new URL("./worker/index.ts", import.meta.url));
+    const worker = createProcessingWorker();
     workerRef.current = worker;
     setProcessing(true);
     updateStatus("正在启动本地处理引擎", "所有文件只在当前浏览器中处理，不会上传。", 2);
@@ -98,7 +132,7 @@ export default function App() {
         downloadResult(data.buffer, data.filename);
         updateStatus(
           "处理完成，结果已下载",
-          `质检 ${data.summary.targets.toLocaleString()} 人：已发送 ${data.summary.sent.toLocaleString()}，未发送 ${data.summary.unsent.toLocaleString()}，免检 ${data.summary.exempt.toLocaleString()}；清洗后聊天 ${data.summary.cleanChats.toLocaleString()} 条。`,
+          `质检 ${data.summary.targets.toLocaleString()} 人：已发送 ${data.summary.sent.toLocaleString()}，未发送 ${data.summary.unsent.toLocaleString()}，免检 ${Number(data.summary.exempt || 0).toLocaleString()}；清洗后聊天 ${data.summary.cleanChats.toLocaleString()} 条。`,
           100,
           "done",
         );
@@ -124,31 +158,122 @@ export default function App() {
     });
   }
 
+  async function handleReminderSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!reminderChatFiles.length) return;
+    if (reminderMode === "full" && !reminderListFile) return;
+    if (reminderMode === "incremental" && !reminderPreviousFile) return;
+
+    workerRef.current?.terminate();
+    const worker = createProcessingWorker();
+    workerRef.current = worker;
+    setProcessing(true);
+    updateStatus("正在启动本地处理引擎", "所有文件只在当前浏览器中处理，不会上传。", 2);
+
+    worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
+      if (data.type === "progress") {
+        updateStatus(data.title, data.message, data.progress);
+        return;
+      }
+      if (data.type === "complete") {
+        downloadResult(data.buffer, data.filename);
+        const incremental = data.summary.reminderMode === "incremental";
+        updateStatus(
+          "处理完成，结果已下载",
+          incremental
+            ? `开课提醒增量 ${data.summary.targets.toLocaleString()} 条：本次新增发送 ${Number(data.summary.incrementalSent || 0).toLocaleString()}，当前已发送 ${data.summary.sent.toLocaleString()}，未发送 ${data.summary.unsent.toLocaleString()}；聊天文件 ${Number(data.summary.chatFiles || 0).toLocaleString()} 个，清洗后聊天 ${data.summary.cleanChats.toLocaleString()} 条。`
+            : `开课提醒 ${data.summary.targets.toLocaleString()} 条：已发送 ${data.summary.sent.toLocaleString()}，未发送 ${data.summary.unsent.toLocaleString()}，异常核对 ${Number(data.summary.exceptions || 0).toLocaleString()}；聊天文件 ${Number(data.summary.chatFiles || 0).toLocaleString()} 个，清洗后聊天 ${data.summary.cleanChats.toLocaleString()} 条。`,
+          100,
+          "done",
+        );
+        finishWorker();
+        return;
+      }
+      updateStatus("处理失败", data.message, 100, "error");
+      finishWorker();
+    };
+
+    worker.onerror = (event) => {
+      updateStatus("处理失败", event.message || "浏览器工作线程发生错误。", 100, "error");
+      finishWorker();
+    };
+
+    if (reminderMode === "incremental") {
+      worker.postMessage({
+        type: "process",
+        mode: "reminder",
+        reminderMode: "incremental",
+        previousFile: reminderPreviousFile,
+        chatFiles: reminderChatFiles,
+        includeCleanChats: false,
+      });
+    } else {
+      worker.postMessage({
+        type: "process",
+        mode: "reminder",
+        reminderMode: "full",
+        denominatorFile: reminderListFile,
+        chatFiles: reminderChatFiles,
+        includeCleanChats: includeReminderChats,
+      });
+    }
+  }
+
   return (
     <>
       <main className="shell">
         <Header
           theme={theme}
           usesSystemTheme={usesSystemTheme}
+          title={activeMode === "reminder" ? "开课提醒发送率公示" : "打卡质检数据生成"}
+          subtitle={
+            activeMode === "reminder"
+              ? "上传开课提醒学员明细名单与企微聊天质检结果，在浏览器本地匹配群聊名称和聊天内容，生成发送率公示 Excel。文件不会上传服务器。"
+              : undefined
+          }
+          showGuide={activeMode === "checkin"}
+          secondaryLink={
+            activeMode === "reminder"
+              ? { href: "/", label: "返回打卡质检" }
+              : { href: "/remind", label: "开课提醒" }
+          }
           onToggleTheme={toggleTheme}
           onOpenGuide={() => setActiveModal("guide")}
           onOpenChangelog={() => setActiveModal("changelog")}
+          onSecondaryLinkClick={handleSecondaryLinkClick}
         />
-        <UploadForm
-          listFile={listFile}
-          chatFile={chatFile}
-          weekLabel={weekLabel}
-          weekHint={weekHint}
-          useSingle={useSingle}
-          processing={processing}
-          onListFileChange={setListFile}
-          onChatFileChange={setChatFile}
-          onWeekLabelChange={setWeekLabel}
-          onUseSingleChange={setUseSingle}
-          onSubmit={handleSubmit}
-        />
+        {activeMode === "reminder" ? (
+          <ReminderForm
+            reminderMode={reminderMode}
+            denominatorFile={reminderListFile}
+            previousFile={reminderPreviousFile}
+            chatFiles={reminderChatFiles}
+            includeCleanChats={includeReminderChats}
+            processing={processing}
+            onReminderModeChange={setReminderMode}
+            onDenominatorFileChange={setReminderListFile}
+            onPreviousFileChange={setReminderPreviousFile}
+            onChatFilesChange={setReminderChatFiles}
+            onIncludeCleanChatsChange={setIncludeReminderChats}
+            onSubmit={handleReminderSubmit}
+          />
+        ) : (
+          <UploadForm
+            listFile={listFile}
+            chatFile={chatFile}
+            weekLabel={weekLabel}
+            weekHint={weekHint}
+            useSingle={useSingle}
+            processing={processing}
+            onListFileChange={setListFile}
+            onChatFileChange={setChatFile}
+            onWeekLabelChange={setWeekLabel}
+            onUseSingleChange={setUseSingle}
+            onSubmit={handleSubmit}
+          />
+        )}
         <StatusCard status={status} />
-        <OutputGrid />
+        <OutputGrid mode={activeMode} />
       </main>
 
       <ChangelogDialog
