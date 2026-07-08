@@ -189,6 +189,8 @@ test("开课提醒项目组归类将博文和实验字母组归入文理综", ()
   assert.equal(reminderProjectGroup("实验P"), "文理综项目");
   assert.equal(reminderProjectGroup("实验Ｂ"), "文理综项目");
   assert.equal(reminderProjectGroup("文综"), "文理综项目");
+  assert.equal(reminderProjectGroup("政史地生"), "文理综项目");
+  assert.equal(reminderProjectGroup("史地生"), "文理综项目");
   assert.equal(reminderProjectGroup("初中博文"), "博文项目");
   assert.equal(reminderProjectGroup("高中博文"), "博文项目");
   assert.equal(reminderProjectGroup("初中益智"), "益智项目");

@@ -21,7 +21,7 @@ const TRAINING_COLUMNS = [
 ] as const;
 
 const ASSISTANT_COLUMNS = [
-  "项目组", "教研组", "助理主管", "应发送数", "已发送数", "发送率", "是否达标（80%）",
+  "教研组", "助理主管", "应发送数", "已发送数", "发送率", "是否达标（80%）",
 ] as const;
 
 const PROJECT_COLUMNS = [
@@ -137,12 +137,43 @@ function summaryAwareStyle(row: DataRow, includeResultColors: boolean) {
   return passFailStyle(row["是否达标（80%）"] === "是", includeResultColors);
 }
 
+function assistantStyle(row: DataRow, includeResultColors: boolean) {
+  if (row.__rowType === "projectTotal" || row.__rowType === "grandTotal") return 11;
+  if (row.__rowType === "groupTotal") return 14;
+  return passFailStyle(row["是否达标（80%）"] === "是", includeResultColors);
+}
+
+function assistantCellStyle(row: DataRow, column: string, baseStyle: number) {
+  if (column !== "发送率") return baseStyle;
+  if (row.__rowType === "projectTotal" || row.__rowType === "grandTotal") return 13;
+  if (row.__rowType === "groupTotal") return 15;
+  return 12;
+}
+
+function assistantTeachingGroup(value: unknown) {
+  const group = text(value) || "未分组";
+  const project = reminderProjectGroup(group);
+  const compactGroup = group.replace(/\s+/g, "");
+  if (project !== "文理综项目") return group;
+  if (compactGroup.includes("实验P")) return "实验P";
+  if (compactGroup.includes("实验C")) return "实验C";
+  return "政史地生";
+}
+
+function assistantTeachingGroupCompare(a: string, b: string) {
+  const order = ["实验P", "实验C", "政史地生"];
+  const ai = order.indexOf(a);
+  const bi = order.indexOf(b);
+  if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || compareText(a, b);
+  return compareText(a, b);
+}
+
 function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
   const projectOrder = ["博文项目", "双语项目", "益智项目", "文理综项目", "其他项目"];
   const grouped = new Map<string, Map<string, Map<string, SummaryBucket>>>();
   for (const row of matchInfo.studentRows) {
-    const teachingGroup = String(row.教研组 || "未分组");
-    const project = reminderProjectGroup(teachingGroup);
+    const teachingGroup = assistantTeachingGroup(row.教研组);
+    const project = reminderProjectGroup(row.教研组);
     const assistant = String(row.助理主管 || "未填写");
     if (!grouped.has(project)) grouped.set(project, new Map());
     const teachingGroups = grouped.get(project)!;
@@ -163,10 +194,9 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
   );
 
   for (const project of sortedProjects) {
-    const projectStart = rows.length;
     const teachingGroups = grouped.get(project)!;
     const projectBucket = createBucket();
-    const sortedTeachingGroups = [...teachingGroups.keys()].sort((a, b) => a.localeCompare(b, "zh-CN"));
+    const sortedTeachingGroups = [...teachingGroups.keys()].sort(assistantTeachingGroupCompare);
     for (const teachingGroup of sortedTeachingGroups) {
       const groupStart = rows.length;
       const assistants = teachingGroups.get(teachingGroup)!;
@@ -179,25 +209,25 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
         groupBucket.sent += item.sent;
         groupBucket.counselorSent += item.counselorSent;
         rows.push({
-          项目组: rows.length === projectStart ? project : "",
           教研组: rows.length === groupStart ? teachingGroup : "",
           助理主管: assistant,
           应发送数: item.total,
           已发送数: item.sent,
-          发送率: rateText(item.sent, item.total),
+          发送率: rate(item.sent, item.total),
           "是否达标（80%）": passText(item.sent, item.total),
           __rowType: "detail",
         });
       });
       if (!groupBucket.total) continue;
-      if (rows.length - groupStart > 1) mergeCells.push(mergeRef(1, actualRow(groupStart), actualRow(rows.length - 1)));
+      if (rows.length - groupStart > 1) mergeCells.push(mergeRef(0, actualRow(groupStart), actualRow(rows.length - 1)));
+      const groupSummaryRow = actualRow(rows.length);
+      mergeCells.push(`A${groupSummaryRow}:B${groupSummaryRow}`);
       rows.push({
-        项目组: "",
-        教研组: "",
-        助理主管: `${displayTeachingGroup(teachingGroup)}小计`,
+        教研组: displayTeachingGroup(teachingGroup),
+        助理主管: "",
         应发送数: groupBucket.total,
         已发送数: groupBucket.sent,
-        发送率: rateText(groupBucket.sent, groupBucket.total),
+        发送率: rate(groupBucket.sent, groupBucket.total),
         "是否达标（80%）": passText(groupBucket.sent, groupBucket.total),
         __rowType: "groupTotal",
       });
@@ -206,17 +236,17 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
       projectBucket.counselorSent += groupBucket.counselorSent;
     }
     if (!projectBucket.total) continue;
+    const projectSummaryRow = actualRow(rows.length);
+    mergeCells.push(`A${projectSummaryRow}:B${projectSummaryRow}`);
     rows.push({
-      项目组: "",
-      教研组: "",
-      助理主管: `${project}合计`,
+      教研组: project,
+      助理主管: "",
       应发送数: projectBucket.total,
       已发送数: projectBucket.sent,
-      发送率: rateText(projectBucket.sent, projectBucket.total),
+      发送率: rate(projectBucket.sent, projectBucket.total),
       "是否达标（80%）": passText(projectBucket.sent, projectBucket.total),
       __rowType: "projectTotal",
     });
-    if (rows.length - projectStart > 1) mergeCells.push(mergeRef(0, actualRow(projectStart), actualRow(rows.length - 1)));
   }
 
   const grandBucket = createBucket();
@@ -225,13 +255,14 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
     grandBucket.total += Number(row.应发送数) || 0;
     grandBucket.sent += Number(row.已发送数) || 0;
   });
+  const grandSummaryRow = actualRow(rows.length);
+  mergeCells.push(`A${grandSummaryRow}:B${grandSummaryRow}`);
   rows.push({
-    项目组: "总计",
-    教研组: "",
-    助理主管: "总计",
+    教研组: "总计",
+    助理主管: "",
     应发送数: grandBucket.total,
     已发送数: grandBucket.sent,
-    发送率: rateText(grandBucket.sent, grandBucket.total),
+    发送率: rate(grandBucket.sent, grandBucket.total),
     "是否达标（80%）": passText(grandBucket.sent, grandBucket.total),
     __rowType: "grandTotal",
   });
@@ -455,14 +486,11 @@ export function buildReminderOutput(
       title: "开课提醒话术发送进度（助理主管维度）",
       rows: publicTable.rows,
       columns: ASSISTANT_COLUMNS,
-      widths: { 项目组: 18, 教研组: 18, 助理主管: 22 },
+      widths: { 教研组: 14, 助理主管: 18, 应发送数: 10, 已发送数: 10, 发送率: 11, "是否达标（80%）": 15 },
       mergeCells: publicTable.mergeCells,
-      rowStyle: (row) => summaryAwareStyle(row, includeResultColors),
-      cellStyle: (row, column, baseStyle) => {
-        if (column === "项目组") return 7;
-        if (column === "教研组") return baseStyle || 8;
-        return baseStyle;
-      },
+      rowStyle: (row) => assistantStyle(row, includeResultColors),
+      cellStyle: assistantCellStyle,
+      dataBarColumns: ["发送率"],
     },
     {
       name: "项目组维度",

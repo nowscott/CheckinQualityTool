@@ -7,7 +7,10 @@ function compact(value: unknown) {
 export function reminderProjectGroup(teachingGroup: unknown) {
   const value = compact(teachingGroup);
   if (!value) return "其他项目";
-  if (/(博文|实验)[A-Za-zＡ-Ｚａ-ｚ]/u.test(value) || value.includes("文综") || value.includes("理综")) {
+  if (
+    /(博文|实验)[A-Za-zＡ-Ｚａ-ｚ]/u.test(value) ||
+    /文综|理综|文理综|政史地生|政史地|史地生/u.test(value)
+  ) {
     return "文理综项目";
   }
   if (value.includes("博文")) return "博文项目";

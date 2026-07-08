@@ -128,4 +128,5 @@ export interface SheetDefinition {
   headerHeight?: number;
   dataRowHeight?: number;
   mergeCells?: string[];
+  dataBarColumns?: readonly string[];
 }
