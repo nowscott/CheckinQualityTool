@@ -7,8 +7,12 @@
   "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/((?!assets/|vendor/|data/).*)",
-      "destination": "/index.html"
+      "source": "/remind",
+      "destination": "/"
+    },
+    {
+      "source": "/remind/:path*",
+      "destination": "/"
     }
   ],
   "headers": [
