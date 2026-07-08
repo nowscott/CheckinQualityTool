@@ -7,6 +7,7 @@ interface UploadCardProps {
   title: string;
   description: string;
   file: File | null;
+  required?: boolean;
   onChange: (file: File | null) => void;
 }
 
@@ -17,6 +18,7 @@ export function UploadCard({
   title,
   description,
   file,
+  required = true,
   onChange,
 }: UploadCardProps) {
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
@@ -37,7 +39,7 @@ export function UploadCard({
         <strong>{title}</strong>
         <small>{description}</small>
       </span>
-      <input id={id} name={name} type="file" accept=".xlsx" required onChange={handleChange} />
+      <input id={id} name={name} type="file" accept=".xlsx" required={required} onChange={handleChange} />
       <span className="file-name" id={`${id.replace("-file", "")}-name`}>
         <span className="file-name-text" title={file?.name || ""}>
           {displayName}

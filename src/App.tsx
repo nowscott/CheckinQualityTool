@@ -50,9 +50,11 @@ export default function App() {
   const [chatFile, setChatFile] = useState<File | null>(null);
   const [reminderMode, setReminderMode] = useState<"full" | "incremental">("full");
   const [reminderListFile, setReminderListFile] = useState<File | null>(null);
+  const [reminderAppealFile, setReminderAppealFile] = useState<File | null>(null);
   const [reminderPreviousFile, setReminderPreviousFile] = useState<File | null>(null);
   const [reminderChatFiles, setReminderChatFiles] = useState<File[]>([]);
   const [includeReminderChats, setIncludeReminderChats] = useState(false);
+  const [includeReminderColors, setIncludeReminderColors] = useState(false);
   const [weekLabel, setWeekLabel] = useState<WeekLabel>("auto");
   const [useSingle, setUseSingle] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -206,6 +208,7 @@ export default function App() {
         previousFile: reminderPreviousFile,
         chatFiles: reminderChatFiles,
         includeCleanChats: false,
+        includeResultColors: includeReminderColors,
       });
     } else {
       worker.postMessage({
@@ -213,8 +216,10 @@ export default function App() {
         mode: "reminder",
         reminderMode: "full",
         denominatorFile: reminderListFile,
+        appealFile: reminderAppealFile,
         chatFiles: reminderChatFiles,
         includeCleanChats: includeReminderChats,
+        includeResultColors: includeReminderColors,
       });
     }
   }
@@ -246,15 +251,19 @@ export default function App() {
           <ReminderForm
             reminderMode={reminderMode}
             denominatorFile={reminderListFile}
+            appealFile={reminderAppealFile}
             previousFile={reminderPreviousFile}
             chatFiles={reminderChatFiles}
             includeCleanChats={includeReminderChats}
+            includeResultColors={includeReminderColors}
             processing={processing}
             onReminderModeChange={setReminderMode}
             onDenominatorFileChange={setReminderListFile}
+            onAppealFileChange={setReminderAppealFile}
             onPreviousFileChange={setReminderPreviousFile}
             onChatFilesChange={setReminderChatFiles}
             onIncludeCleanChatsChange={setIncludeReminderChats}
+            onIncludeResultColorsChange={setIncludeReminderColors}
             onSubmit={handleReminderSubmit}
           />
         ) : (

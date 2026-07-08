@@ -1,6 +1,7 @@
 import { REMINDER_MATCH_RULES, REMINDER_PASS_RATE } from "./reminderConfig";
 import type { ChatRow, CountMap, DataRow } from "./types";
 import { displayValue, normalizeMatchText, sortDate } from "./utils";
+import { appealKey, type ReminderAppealInfo } from "./reminderAppealParser";
 import type { ReminderListInfo, ReminderTarget } from "./reminderListParser";
 
 export interface ReminderMatchedChat extends ChatRow {
@@ -29,6 +30,10 @@ function rateText(value: number) {
 
 function passText(value: number) {
   return value >= REMINDER_PASS_RATE ? "是" : "否";
+}
+
+function isAppealed(row: DataRow) {
+  return row.是否发送 === "已申诉通过" || row.匹配状态 === "已申诉通过";
 }
 
 function compactKey(parts: unknown[]) {
@@ -66,6 +71,7 @@ export function buildReminderGroupSummary(
 ) {
   const grouped = new Map<string, DataRow & { 应发送数: number; 已发送数: number }>();
   for (const row of rows) {
+    if (isAppealed(row)) continue;
     const key = compactKey(keyColumns.map((column) => row[column]));
     if (!grouped.has(key)) {
       const item: DataRow & { 应发送数: number; 已发送数: number } = {
@@ -96,7 +102,11 @@ export function buildReminderGroupSummary(
     ).find((value) => value !== 0) || 0);
 }
 
-export function matchReminderData(listInfo: ReminderListInfo, chats: ChatRow[]): ReminderMatchInfo {
+export function matchReminderData(
+  listInfo: ReminderListInfo,
+  chats: ChatRow[],
+  appealInfo?: ReminderAppealInfo,
+): ReminderMatchInfo {
   const normalizedChats = chats.map((chat) => ({
     chat,
     group: normalizeMatchText(chat["群名/好友昵称"]),
@@ -111,9 +121,10 @@ export function matchReminderData(listInfo: ReminderListInfo, chats: ChatRow[]):
   const studentRows: DataRow[] = [];
   const exceptionRows: DataRow[] = [];
   const counts: CountMap = {
-    应发送数: listInfo.targets.length,
+    应发送数: 0,
     已发送数: 0,
     未发送数: 0,
+    申诉通过剔除数: 0,
     待核对数: 0,
     发送人教师学员命中: 0,
     群名教师学员命中: 0,
@@ -126,6 +137,45 @@ export function matchReminderData(listInfo: ReminderListInfo, chats: ChatRow[]):
   };
 
   for (const target of listInfo.targets) {
+    const appeal = appealInfo?.byKey.get(appealKey(target.授课教师, target.学员姓名)) ||
+      appealInfo?.byKey.get(appealKey(target.授课教师, target.匹配学员姓名));
+    if (appeal) {
+      counts.申诉通过剔除数 += 1;
+      studentRows.push({
+        质检序号: target.id,
+        教师姓名: target.授课教师,
+        教师邮箱: target.教师邮箱,
+        教研组: target.教研组,
+        师训组长: target.师训组长,
+        助理主管: target.助理主管,
+        学员姓名: target.学员姓名,
+        匹配学员姓名: target.匹配学员姓名,
+        姓名清洗说明: target.姓名清洗说明,
+        校区: target.校区,
+        年级: target.年级,
+        学管姓名: target.学管,
+        新老生季度: target.新老生季度,
+        课时: target.课时,
+        是否发送: "已申诉通过",
+        匹配状态: "已申诉通过",
+        匹配方式: "申诉通过，剔除分母",
+        申诉情况说明: [appeal.reason, appeal.description].filter(Boolean).join("：") || "申诉通过，剔除分母",
+        异常原因: "",
+        命中位置: "",
+        命中关键词: "",
+        命中群名: "",
+        命中聊天时间: "",
+        命中质检文件: "",
+        发送人名称: "",
+        发送人邮箱: "",
+        源名单行号: target.源名单行号,
+        去重合并行号: target.去重合并行号,
+        源聊天行号: "",
+        匹配消息数: 0,
+      });
+      continue;
+    }
+    counts.应发送数 += 1;
     const student = normalizeMatchText(target.匹配学员姓名);
     const teacher = normalizeTeacherName(target.授课教师);
     const isUniqueStudent = (studentCounts.get(student) || 0) === 1;

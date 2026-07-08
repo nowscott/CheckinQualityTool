@@ -10,6 +10,7 @@ globalThis.XLSX = {
 };
 
 const { buildReminderTargets } = await import("../worker/reminderListParser.js");
+const { buildReminderAppeals } = await import("../worker/reminderAppealParser.js");
 const { matchReminderData } = await import("../worker/reminderMatching.js");
 const { reminderProjectGroup } = await import("../worker/reminderProjectGroup.js");
 
@@ -146,6 +147,26 @@ test("聊天发送人姓名末尾数字不影响教师匹配", () => {
   assert.equal(result.studentRows[0].是否发送, "是");
   assert.equal(result.studentRows[1].是否发送, "否");
   assert.equal(result.counts.发送人教师学员命中, 1);
+});
+
+test("申诉通过按教师和学生剔除分母并保留明细标注", () => {
+  const list = buildReminderTargets(workbook([
+    ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
+    ["张老师", "益智组", "王组长", "李主管", "陈一", "12"],
+    ["李老师", "益智组", "王组长", "赵主管", "王二", "24"],
+  ]));
+  const appeals = buildReminderAppeals(workbook([
+    ["教师姓名", "学生姓名", "申诉原因", "申诉原因描述", "申诉是否通过"],
+    ["张老师", "陈一", "已发送提醒话术", "截图已核实", "是"],
+  ]));
+  const result = matchReminderData(list, [], appeals);
+  assert.equal(result.counts.应发送数, 1);
+  assert.equal(result.counts.申诉通过剔除数, 1);
+  assert.equal(result.counts.未发送数, 1);
+  assert.equal(result.studentRows[0].是否发送, "已申诉通过");
+  assert.equal(result.studentRows[0].申诉情况说明, "已发送提醒话术：截图已核实");
+  assert.equal(result.teacherRows.length, 1);
+  assert.equal(result.teacherRows[0].教师姓名, "李老师");
 });
 
 test("助理主管维度按应发送和已发送静态汇总", () => {

@@ -6,6 +6,7 @@ import { buildOutput } from "./excelWriter";
 import { buildTargets } from "./listParser";
 import { matchData } from "./matching";
 import { progress } from "./progress";
+import { buildReminderAppeals } from "./reminderAppealParser";
 import { buildIncrementalReminderOutput } from "./reminderIncremental";
 import { buildReminderOutput } from "./reminderExcelWriter";
 import { buildReminderTargets } from "./reminderListParser";
@@ -75,7 +76,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
         const result = buildIncrementalReminderOutput(previousWorkbook, chatInfo, {
           list: data.previousFile.name,
           chat: data.chatFiles.map((file) => file.name).join("；"),
-        }, data.includeCleanChats);
+        }, data.includeCleanChats, data.includeResultColors);
         progress(
           "增量匹配完成",
           `本次新增发送 ${result.summary.incrementalSent.toLocaleString()} 条，当前已发送 ${result.summary.sent.toLocaleString()} 条。`,
@@ -108,6 +109,16 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
         `原始 ${listInfo.counts.原始分母行数.toLocaleString()} 条，整行去重后 ${listInfo.targets.length.toLocaleString()} 条。`,
         28,
       );
+      let appealInfo;
+      if (data.appealFile) {
+        const appealWorkbook = await readWorkbook(data.appealFile, 28, 34, "申诉文件");
+        appealInfo = buildReminderAppeals(appealWorkbook);
+        progress(
+          "申诉文件读取完成",
+          `通过申诉 ${appealInfo.counts.申诉通过行数.toLocaleString()} 条，将从发送率分母中剔除。`,
+          34,
+        );
+      }
 
       const chatInfos: ChatInfo[] = [];
       for (let index = 0; index < data.chatFiles.length; index += 1) {
@@ -130,7 +141,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       );
 
       progress("正在匹配开课提醒", "按群聊名称和聊天内容中的学员姓名执行三档优先级匹配。", 68);
-      const matchInfo = matchReminderData(listInfo, chatInfo.chats);
+      const matchInfo = matchReminderData(listInfo, chatInfo.chats, appealInfo);
       progress(
         "匹配完成",
         `应发送 ${matchInfo.counts.应发送数.toLocaleString()}，已发送 ${matchInfo.counts.已发送数.toLocaleString()}，异常 ${matchInfo.counts.异常明细行数.toLocaleString()}。`,
@@ -141,7 +152,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       const output = buildReminderOutput(listInfo, chatInfo, matchInfo, {
         list: data.denominatorFile.name,
         chat: data.chatFiles.map((file) => file.name).join("；"),
-      }, data.includeCleanChats);
+      }, data.includeCleanChats, data.includeResultColors);
       const buffer = output.buffer as ArrayBuffer;
       workerScope.postMessage({
         type: "complete",

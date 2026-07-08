@@ -96,8 +96,10 @@ export interface ReminderProcessRequest {
   mode: "reminder";
   reminderMode?: "full";
   denominatorFile: File;
+  appealFile?: File | null;
   chatFiles: File[];
   includeCleanChats: boolean;
+  includeResultColors: boolean;
 }
 
 export interface ReminderIncrementalProcessRequest {
@@ -107,6 +109,7 @@ export interface ReminderIncrementalProcessRequest {
   previousFile: File;
   chatFiles: File[];
   includeCleanChats: boolean;
+  includeResultColors: boolean;
 }
 
 export type WorkerRequest = ProcessRequest | ReminderProcessRequest | ReminderIncrementalProcessRequest;

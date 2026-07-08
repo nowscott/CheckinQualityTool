@@ -113,6 +113,7 @@ export function buildIncrementalReminderOutput(
   chatInfo: ChatInfo,
   sourceNames: SourceNames,
   includeCleanChats: boolean,
+  includeResultColors = false,
 ) {
   const studentSheet = findSheet(previousWorkbook, STUDENT_REQUIRED_HEADERS);
   const previousRows = rowsToObjects(studentSheet.rows);
@@ -166,6 +167,7 @@ export function buildIncrementalReminderOutput(
       matchInfo,
       sourceNames,
       includeCleanChats,
+      includeResultColors,
     ),
     summary: {
       targets: finalRows.length,

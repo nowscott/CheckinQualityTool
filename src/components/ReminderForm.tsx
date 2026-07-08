@@ -5,30 +5,38 @@ import { UploadCard } from "./UploadCard";
 interface ReminderFormProps {
   reminderMode: "full" | "incremental";
   denominatorFile: File | null;
+  appealFile: File | null;
   previousFile: File | null;
   chatFiles: File[];
   includeCleanChats: boolean;
+  includeResultColors: boolean;
   processing: boolean;
   onReminderModeChange: (value: "full" | "incremental") => void;
   onDenominatorFileChange: (file: File | null) => void;
+  onAppealFileChange: (file: File | null) => void;
   onPreviousFileChange: (file: File | null) => void;
   onChatFilesChange: (files: File[]) => void;
   onIncludeCleanChatsChange: (value: boolean) => void;
+  onIncludeResultColorsChange: (value: boolean) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
 
 export function ReminderForm({
   reminderMode,
   denominatorFile,
+  appealFile,
   previousFile,
   chatFiles,
   includeCleanChats,
+  includeResultColors,
   processing,
   onReminderModeChange,
   onDenominatorFileChange,
+  onAppealFileChange,
   onPreviousFileChange,
   onChatFilesChange,
   onIncludeCleanChatsChange,
+  onIncludeResultColorsChange,
   onSubmit,
 }: ReminderFormProps) {
   return (
@@ -92,9 +100,23 @@ export function ReminderForm({
             onChange={onChatFilesChange}
           />
         </div>
-
         {reminderMode === "full" ? (
-          <div className="options reminder-options">
+          <div className="grid">
+            <UploadCard
+              id="reminder-appeal-file"
+              name="reminder_appeal_file"
+              step="03"
+              title="申诉通过名单"
+              description="可选；按教师姓名与学生姓名剔除已通过申诉的分母"
+              file={appealFile}
+              required={false}
+              onChange={onAppealFileChange}
+            />
+          </div>
+        ) : null}
+
+        <div className="options reminder-options">
+          {reminderMode === "full" ? (
             <label className="switch-row">
               <span>
                 <strong>包含聊天记录明细</strong>
@@ -107,8 +129,20 @@ export function ReminderForm({
                 onChange={(event) => onIncludeCleanChatsChange(event.target.checked)}
               />
             </label>
-          </div>
-        ) : null}
+          ) : null}
+          <label className="switch-row">
+            <span>
+              <strong>结果颜色标注</strong>
+              <small>默认关闭；勾选后按通过、未通过、汇总行保留底色提示</small>
+            </span>
+            <input
+              id="include-reminder-colors"
+              type="checkbox"
+              checked={includeResultColors}
+              onChange={(event) => onIncludeResultColorsChange(event.target.checked)}
+            />
+          </label>
+        </div>
 
         <div className="rules reminder-rules">
           {reminderMode === "incremental" ? (
