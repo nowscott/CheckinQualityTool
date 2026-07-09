@@ -107,7 +107,7 @@ export function ReminderForm({
               name="reminder_appeal_file"
               step="03"
               title="申诉名单"
-              description="可选；按教师姓名与学生姓名匹配申诉，公示原因并剔除分母"
+              description="可选；选择已发送的申诉计入分母，其他申诉公示原因并剔除分母"
               file={appealFile}
               required={false}
               onChange={onAppealFileChange}

@@ -1,25 +1,69 @@
-import { findSheet, headerMap } from "./excelReader";
+import { headerMap, type FoundSheet } from "./excelReader";
 import type { ChatInfo, ChatRow } from "./types";
 import { emailValue, text } from "./utils";
 
 const QUOTE_SEPARATOR = /(?:-\s*){8,}|[—－-]{12,}/;
 const QUOTE_PREFIX = /^\s*[「『][\s\S]{0,500}?[：:]/;
 
+const CHAT_HEADERS = {
+  name: ["姓名", "发送人名称", "发送人"],
+  email: ["邮箱", "发送人邮箱"],
+  type: ["聊天类型", "类型"],
+  sender: ["发送方", "消息发送方"],
+  group: ["群名/好友昵称", "群聊名称", "群名", "好友昵称"],
+  groupSender: ["群聊发送人名称", "发送人名称", "发送人"],
+  groupEmail: ["群聊发送人邮箱", "发送人邮箱", "邮箱"],
+  time: ["聊天时间", "发送时间", "消息时间"],
+  content: ["聊天内容", "消息内容", "内容"],
+} as const;
+
+function firstIndex(map: Map<string, number[]>, aliases: readonly string[]) {
+  for (const alias of aliases) {
+    const index = (map.get(alias) || [])[0];
+    if (index != null) return index;
+  }
+  return -1;
+}
+
+function hasAnyHeader(map: Map<string, number[]>, aliases: readonly string[]) {
+  return aliases.some((alias) => map.has(alias));
+}
+
+function findChatSheet(workbook: SheetJsWorkbook): FoundSheet {
+  const required = [CHAT_HEADERS.type, CHAT_HEADERS.sender, CHAT_HEADERS.content];
+  const seenSheets: string[] = [];
+  for (const name of workbook.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[name], {
+      header: 1,
+      range: 0,
+      blankrows: false,
+      defval: "",
+    });
+    if (!rows.length) continue;
+    seenSheets.push(name);
+    const map = headerMap(rows[0]);
+    if (required.every((aliases) => hasAnyHeader(map, aliases))) return { name, rows };
+  }
+  throw new Error(
+    "找不到聊天记录工作表：需要第一行包含“聊天类型/类型”、“发送方/消息发送方”和“聊天内容/消息内容/内容”。" +
+      `已检查 Sheet：${seenSheets.join("、") || "无"}`,
+  );
+}
+
 export function preprocessChats(workbook: SheetJsWorkbook, sourceFile = ""): ChatInfo {
-  const found = findSheet(workbook, ["聊天类型", "发送方", "聊天内容"]);
+  const found = findChatSheet(workbook);
   const rows = found.rows;
   const map = headerMap(rows[0]);
-  const index = (name: string) => (map.get(name) || [])[0] ?? -1;
   const columns = {
-    name: index("姓名"),
-    email: index("邮箱"),
-    type: index("聊天类型"),
-    sender: index("发送方"),
-    group: index("群名/好友昵称"),
-    groupSender: index("群聊发送人名称"),
-    groupEmail: index("群聊发送人邮箱"),
-    time: index("聊天时间"),
-    content: index("聊天内容"),
+    name: firstIndex(map, CHAT_HEADERS.name),
+    email: firstIndex(map, CHAT_HEADERS.email),
+    type: firstIndex(map, CHAT_HEADERS.type),
+    sender: firstIndex(map, CHAT_HEADERS.sender),
+    group: firstIndex(map, CHAT_HEADERS.group),
+    groupSender: firstIndex(map, CHAT_HEADERS.groupSender),
+    groupEmail: firstIndex(map, CHAT_HEADERS.groupEmail),
+    time: firstIndex(map, CHAT_HEADERS.time),
+    content: firstIndex(map, CHAT_HEADERS.content),
   };
   const chats: ChatRow[] = [];
   const counts = {

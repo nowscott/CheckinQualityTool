@@ -2,7 +2,7 @@ import { REMINDER_MATCH_RULES, REMINDER_PASS_RATE } from "./reminderConfig";
 import { isTeacherExempt, normalizeTeacherName } from "./teacherExemptions";
 import type { ChatRow, CountMap, DataRow } from "./types";
 import { displayValue, emailValue, normalizeMatchText, sortDate } from "./utils";
-import { appealKey, type ReminderAppealInfo } from "./reminderAppealParser";
+import { appealKey, isSentAppeal, type ReminderAppealInfo, type ReminderAppealRecord } from "./reminderAppealParser";
 import type { ReminderListInfo, ReminderTarget } from "./reminderListParser";
 
 export interface ReminderMatchedChat extends ChatRow {
@@ -99,6 +99,10 @@ function addException(rows: DataRow[], target: ReminderTarget, type: string, rea
     命中质检文件: chat?.来源文件 || "",
     源聊天行号: chat?.源聊天行号 || "",
   });
+}
+
+function appealReasonText(appeal: ReminderAppealRecord) {
+  return [appeal.reason, appeal.description].filter(Boolean).join("：") || "已申诉";
 }
 
 export function buildReminderGroupSummary(
@@ -302,9 +306,52 @@ export function matchReminderData(
     const matchStatus = sent ? "已发送" : "未发送";
     const reason = sent ? "" : "未找到可自动判定的聊天记录";
 
+    if (!sent && appeal && isSentAppeal(appeal)) {
+      counts.应发送数 += 1;
+      counts.已发送数 += 1;
+      counts.申诉已发送数 = (counts.申诉已发送数 || 0) + 1;
+      studentRows.push({
+        质检序号: target.id,
+        教师姓名: target.授课教师,
+        教师邮箱: target.教师邮箱,
+        学员号: target.学员号,
+        教研组: target.教研组,
+        师训组长: target.师训组长,
+        助理主管: target.助理主管,
+        学员姓名: target.学员姓名,
+        匹配学员姓名: target.匹配学员姓名,
+        白名单命中: target.白名单命中,
+        白名单说明: target.白名单说明,
+        姓名清洗说明: target.姓名清洗说明,
+        校区: target.校区,
+        年级: target.年级,
+        学管姓名: target.学管,
+        新老生季度: target.新老生季度,
+        课时: target.课时,
+        是否发送: "是",
+        匹配状态: "申诉已发送",
+        匹配方式: "申诉选择已发送，计入分母",
+        申诉情况说明: appealReasonText(appeal),
+        申诉状态: appeal.status,
+        申诉源行号: appeal.sourceRowNumber,
+        异常原因: "",
+        命中位置: "",
+        命中关键词: "",
+        命中群名: "",
+        命中聊天时间: "",
+        命中质检文件: "",
+        发送人名称: "",
+        发送人邮箱: "",
+        源名单行号: target.源名单行号,
+        去重合并行号: target.去重合并行号,
+        源聊天行号: "",
+        匹配消息数: 0,
+      });
+      continue;
+    }
+
     if (!sent && appeal) {
       counts.申诉数 += 1;
-      const appealReason = [appeal.reason, appeal.description].filter(Boolean).join("：") || "已申诉";
       studentRows.push({
         质检序号: target.id,
         教师姓名: target.授课教师,
@@ -326,7 +373,7 @@ export function matchReminderData(
         是否发送: "已申诉",
         匹配状态: "已申诉",
         匹配方式: "已申诉，剔除分母",
-        申诉情况说明: appealReason,
+        申诉情况说明: appealReasonText(appeal),
         申诉状态: appeal.status,
         申诉源行号: appeal.sourceRowNumber,
         异常原因: "",

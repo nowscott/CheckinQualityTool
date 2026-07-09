@@ -116,7 +116,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
         appealInfo = buildReminderAppeals(appealWorkbook);
         progress(
           "申诉文件读取完成",
-          `申诉 ${appealInfo.counts.申诉行数.toLocaleString()} 条，将公示申诉原因并从发送率分母中剔除。`,
+          `申诉 ${appealInfo.counts.申诉行数.toLocaleString()} 条，已发送申诉计入分母，其余申诉公示原因并剔除。`,
           34,
         );
       }

@@ -225,14 +225,14 @@ test("申诉按教师和学生剔除分母并保留明细标注，不依赖是�
   ]));
   const appeals = buildReminderAppeals(workbook([
     ["教师姓名", "学生姓名", "申诉原因", "申诉原因描述", "申诉是否通过"],
-    ["张老师", "陈一", "已发送提醒话术", "截图已核实", "是"],
+    ["张老师", "陈一", "其他特殊情况", "截图已核实", "是"],
   ]));
   const result = matchReminderData(list, [], appeals);
   assert.equal(result.counts.应发送数, 1);
   assert.equal(result.counts.申诉数, 1);
   assert.equal(result.counts.未发送数, 1);
   assert.equal(result.studentRows[0].是否发送, "已申诉");
-  assert.equal(result.studentRows[0].申诉情况说明, "已发送提醒话术：截图已核实");
+  assert.equal(result.studentRows[0].申诉情况说明, "其他特殊情况：截图已核实");
   assert.equal(result.teacherRows.length, 2);
   const appealedTeacher = result.teacherRows.find((row) => row.教师姓名 === "张老师");
   const unsentTeacher = result.teacherRows.find((row) => row.教师姓名 === "李老师");
@@ -240,6 +240,29 @@ test("申诉按教师和学生剔除分母并保留明细标注，不依赖是�
   assert.equal(appealedTeacher.申诉数, 1);
   assert.equal(unsentTeacher.应发送数, 1);
   assert.equal(unsentTeacher.申诉数, 0);
+});
+
+test("申诉原因选择已发送时计入分母和已发送数", () => {
+  const list = buildReminderTargets(workbook([
+    ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
+    ["张老师", "益智组", "王组长", "李主管", "陈一", "12"],
+  ]));
+  const appeals = buildReminderAppeals(workbook([
+    ["教师姓名", "学生姓名", "申诉原因", "申诉原因描述", "申诉是否通过"],
+    ["张老师", "陈一", "已发送提醒话术", "截图已核实", "是"],
+  ]));
+  const result = matchReminderData(list, [], appeals);
+  assert.equal(result.counts.应发送数, 1);
+  assert.equal(result.counts.已发送数, 1);
+  assert.equal(result.counts.申诉数, 0);
+  assert.equal(result.counts.申诉已发送数, 1);
+  assert.equal(result.studentRows[0].是否发送, "是");
+  assert.equal(result.studentRows[0].匹配状态, "申诉已发送");
+  assert.equal(result.studentRows[0].匹配方式, "申诉选择已发送，计入分母");
+  assert.equal(result.studentRows[0].申诉情况说明, "已发送提醒话术：截图已核实");
+  assert.equal(result.teacherRows[0].应发送数, 1);
+  assert.equal(result.teacherRows[0].已发送数, 1);
+  assert.equal(result.teacherRows[0].申诉数, 0);
 });
 
 test("未标记通过的申诉同样公示并剔除分母", () => {
@@ -297,9 +320,11 @@ test("同一申诉记录填写多个学员时分别拆分匹配", () => {
   assert.equal(appeals.counts.原始申诉行数, 2);
   assert.equal(appeals.counts.申诉行数, 5);
   assert.equal(appeals.counts.申诉拆分学员数, 3);
-  assert.equal(result.counts.应发送数, 0);
-  assert.equal(result.counts.申诉数, 5);
-  assert.deepEqual(result.studentRows.map((row) => row.是否发送), ["已申诉", "已申诉", "已申诉", "已申诉", "已申诉"]);
+  assert.equal(result.counts.应发送数, 3);
+  assert.equal(result.counts.已发送数, 3);
+  assert.equal(result.counts.申诉数, 2);
+  assert.equal(result.counts.申诉已发送数, 3);
+  assert.deepEqual(result.studentRows.map((row) => row.是否发送), ["是", "是", "是", "已申诉", "已申诉"]);
   assert.equal(result.studentRows[1].申诉情况说明, "已发送提醒话术：同一截图");
   assert.equal(result.studentRows[4].申诉情况说明, "其他特殊情况：未收到档案");
 });

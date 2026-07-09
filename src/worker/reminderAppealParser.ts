@@ -48,6 +48,10 @@ export function appealKey(teacher: unknown, student: unknown) {
   return `${normalizedTeacher}\u0000${normalizeMatchText(student)}`;
 }
 
+export function isSentAppeal(record: ReminderAppealRecord) {
+  return [record.reason, record.status].some((value) => normalizeMatchText(value).includes("已发送"));
+}
+
 export function buildReminderAppeals(workbook: SheetJsWorkbook): ReminderAppealInfo {
   const found = findSheet(workbook, ["教师姓名", "学生姓名"]);
   const rows = found.rows;
