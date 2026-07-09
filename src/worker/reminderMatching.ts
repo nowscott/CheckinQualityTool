@@ -33,7 +33,8 @@ function passText(value: number) {
 }
 
 function isAppealed(row: DataRow) {
-  return row.是否发送 === "已申诉通过" || row.匹配状态 === "已申诉通过";
+  return row.是否发送 === "已申诉" || row.匹配状态 === "已申诉" ||
+    row.是否发送 === "已申诉通过" || row.匹配状态 === "已申诉通过";
 }
 
 function compactKey(parts: unknown[]) {
@@ -42,6 +43,18 @@ function compactKey(parts: unknown[]) {
 
 function normalizeTeacherName(value: unknown) {
   return normalizeMatchText(value).replace(/\s+/g, "").replace(/[0-9０-９]+$/u, "");
+}
+
+function assistantOwnTeachingGroups(rows: DataRow[]) {
+  const groups = new Map<string, unknown>();
+  rows.forEach((row) => {
+    const teacher = normalizeTeacherName(row.教师姓名);
+    const assistant = normalizeTeacherName(row.助理主管);
+    if (teacher && assistant && teacher === assistant && row.教研组) {
+      groups.set(assistant, row.教研组);
+    }
+  });
+  return groups;
 }
 
 function addException(rows: DataRow[], target: ReminderTarget, type: string, reason: string, chat?: ChatRow) {
@@ -69,14 +82,14 @@ export function buildReminderGroupSummary(
   keyColumns: readonly string[],
   outputColumns: readonly string[],
 ) {
-  const grouped = new Map<string, DataRow & { 应发送数: number; 已发送数: number }>();
+  const grouped = new Map<string, DataRow & { 应发送数: number; 已发送数: number; 申诉数: number }>();
   for (const row of rows) {
-    if (isAppealed(row)) continue;
     const key = compactKey(keyColumns.map((column) => row[column]));
     if (!grouped.has(key)) {
-      const item: DataRow & { 应发送数: number; 已发送数: number } = {
+      const item: DataRow & { 应发送数: number; 已发送数: number; 申诉数: number } = {
         应发送数: 0,
         已发送数: 0,
+        申诉数: 0,
       };
       outputColumns.forEach((column) => {
         item[column] = row[column] || "";
@@ -84,6 +97,10 @@ export function buildReminderGroupSummary(
       grouped.set(key, item);
     }
     const item = grouped.get(key)!;
+    if (isAppealed(row)) {
+      item.申诉数 += 1;
+      continue;
+    }
     item.应发送数 += 1;
     if (row.是否发送 === "是") item.已发送数 += 1;
   }
@@ -124,7 +141,7 @@ export function matchReminderData(
     应发送数: 0,
     已发送数: 0,
     未发送数: 0,
-    申诉通过剔除数: 0,
+    申诉数: 0,
     待核对数: 0,
     发送人教师学员命中: 0,
     群名教师学员命中: 0,
@@ -140,7 +157,8 @@ export function matchReminderData(
     const appeal = appealInfo?.byKey.get(appealKey(target.授课教师, target.学员姓名)) ||
       appealInfo?.byKey.get(appealKey(target.授课教师, target.匹配学员姓名));
     if (appeal) {
-      counts.申诉通过剔除数 += 1;
+      counts.申诉数 += 1;
+      const appealReason = [appeal.reason, appeal.description].filter(Boolean).join("：") || "已申诉";
       studentRows.push({
         质检序号: target.id,
         教师姓名: target.授课教师,
@@ -156,10 +174,12 @@ export function matchReminderData(
         学管姓名: target.学管,
         新老生季度: target.新老生季度,
         课时: target.课时,
-        是否发送: "已申诉通过",
-        匹配状态: "已申诉通过",
-        匹配方式: "申诉通过，剔除分母",
-        申诉情况说明: [appeal.reason, appeal.description].filter(Boolean).join("：") || "申诉通过，剔除分母",
+        是否发送: "已申诉",
+        匹配状态: "已申诉",
+        匹配方式: "已申诉，剔除分母",
+        申诉情况说明: appealReason,
+        申诉状态: appeal.status,
+        申诉源行号: appeal.sourceRowNumber,
         异常原因: "",
         命中位置: "",
         命中关键词: "",
@@ -312,9 +332,14 @@ export function matchReminderData(
     ["教研组", "师训组长"],
     ["教研组", "师训组长"],
   );
+  const assistantGroups = assistantOwnTeachingGroups(studentRows);
+  const assistantSourceRows = studentRows.map((row) => {
+    const ownGroup = assistantGroups.get(normalizeTeacherName(row.助理主管));
+    return ownGroup ? { ...row, 教研组: ownGroup } : row;
+  });
   const assistantRows = buildReminderGroupSummary(
-    studentRows,
-    ["教研组", "助理主管"],
+    assistantSourceRows,
+    ["助理主管"],
     ["教研组", "助理主管"],
   );
   counts.异常明细行数 = exceptionRows.length;

@@ -149,7 +149,7 @@ test("聊天发送人姓名末尾数字不影响教师匹配", () => {
   assert.equal(result.counts.发送人教师学员命中, 1);
 });
 
-test("申诉通过按教师和学生剔除分母并保留明细标注", () => {
+test("申诉按教师和学生剔除分母并保留明细标注，不依赖是否通过", () => {
   const list = buildReminderTargets(workbook([
     ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
     ["张老师", "益智组", "王组长", "李主管", "陈一", "12"],
@@ -161,19 +161,67 @@ test("申诉通过按教师和学生剔除分母并保留明细标注", () => {
   ]));
   const result = matchReminderData(list, [], appeals);
   assert.equal(result.counts.应发送数, 1);
-  assert.equal(result.counts.申诉通过剔除数, 1);
+  assert.equal(result.counts.申诉数, 1);
   assert.equal(result.counts.未发送数, 1);
-  assert.equal(result.studentRows[0].是否发送, "已申诉通过");
+  assert.equal(result.studentRows[0].是否发送, "已申诉");
   assert.equal(result.studentRows[0].申诉情况说明, "已发送提醒话术：截图已核实");
-  assert.equal(result.teacherRows.length, 1);
-  assert.equal(result.teacherRows[0].教师姓名, "李老师");
+  assert.equal(result.teacherRows.length, 2);
+  const appealedTeacher = result.teacherRows.find((row) => row.教师姓名 === "张老师");
+  const unsentTeacher = result.teacherRows.find((row) => row.教师姓名 === "李老师");
+  assert.equal(appealedTeacher.应发送数, 0);
+  assert.equal(appealedTeacher.申诉数, 1);
+  assert.equal(unsentTeacher.应发送数, 1);
+  assert.equal(unsentTeacher.申诉数, 0);
 });
 
-test("助理主管维度按应发送和已发送静态汇总", () => {
+test("未标记通过的申诉同样公示并剔除分母", () => {
   const list = buildReminderTargets(workbook([
     ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
     ["张老师", "益智组", "王组长", "李主管", "陈一", "12"],
-    ["李老师", "益智组", "王组长", "李主管", "王二", "24"],
+  ]));
+  const appeals = buildReminderAppeals(workbook([
+    ["教师姓名", "学生姓名", "申诉原因", "申诉原因描述", "申诉是否通过"],
+    ["张老师", "陈一", "老师已私发", "待复核截图", "否"],
+  ]));
+  const result = matchReminderData(list, [chat({ group: "张老师 陈一 新东方学习群" })], appeals);
+  assert.equal(appeals.counts.申诉行数, 1);
+  assert.equal(result.counts.应发送数, 0);
+  assert.equal(result.counts.已发送数, 0);
+  assert.equal(result.counts.申诉数, 1);
+  assert.equal(result.studentRows[0].是否发送, "已申诉");
+  assert.equal(result.studentRows[0].申诉情况说明, "老师已私发：待复核截图");
+});
+
+test("同一申诉记录填写多个学员时分别拆分匹配", () => {
+  const list = buildReminderTargets(workbook([
+    ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
+    ["赖老师", "益智组", "王组长", "李主管", "陈浩艺", "12"],
+    ["赖老师", "益智组", "王组长", "李主管", "周秀雅", "12"],
+    ["赖老师", "益智组", "王组长", "李主管", "周少哲", "12"],
+    ["陈老师", "益智组", "王组长", "李主管", "全星熹", "12"],
+    ["陈老师", "益智组", "王组长", "李主管", "王唯应", "12"],
+  ]));
+  const appeals = buildReminderAppeals(workbook([
+    ["教师姓名", "学生姓名", "申诉原因", "申诉原因描述", "申诉是否通过"],
+    ["赖老师", "陈浩艺，周秀雅，周少哲", "已发送提醒话术", "同一截图", ""],
+    ["陈老师202", "全星熹 王唯应", "其他特殊情况", "未收到档案", "否"],
+  ]));
+  const result = matchReminderData(list, [], appeals);
+  assert.equal(appeals.counts.原始申诉行数, 2);
+  assert.equal(appeals.counts.申诉行数, 5);
+  assert.equal(appeals.counts.申诉拆分学员数, 3);
+  assert.equal(result.counts.应发送数, 0);
+  assert.equal(result.counts.申诉数, 5);
+  assert.deepEqual(result.studentRows.map((row) => row.是否发送), ["已申诉", "已申诉", "已申诉", "已申诉", "已申诉"]);
+  assert.equal(result.studentRows[1].申诉情况说明, "已发送提醒话术：同一截图");
+  assert.equal(result.studentRows[4].申诉情况说明, "其他特殊情况：未收到档案");
+});
+
+test("助理主管维度按主管自身汇总，跨教研组不重复主管分组", () => {
+  const list = buildReminderTargets(workbook([
+    ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
+    ["张老师", "益智组", "王组长", "李主管", "陈一", "12"],
+    ["李老师", "双语组", "赵组长", "李主管", "王二", "24"],
   ]));
   const result = matchReminderData(list, [chat({ group: "张老师 陈一 新东方学习群" })]);
   assert.equal(result.assistantRows.length, 1);
@@ -181,6 +229,21 @@ test("助理主管维度按应发送和已发送静态汇总", () => {
   assert.equal(result.assistantRows[0].已发送数, 1);
   assert.equal(result.assistantRows[0].发送率, "50.0%");
   assert.equal(result.assistantRows[0].是否达标, "否");
+});
+
+test("助理主管维度使用主管本人教研组归属其管辖老师", () => {
+  const list = buildReminderTargets(workbook([
+    ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
+    ["黄主管", "初中博文", "王组长", "黄主管", "陈一", "12"],
+    ["张老师", "高中博文", "王组长", "黄主管", "王二", "24"],
+    ["李老师", "高中博文", "王组长", "黄主管", "赵三", "24"],
+  ]));
+  const result = matchReminderData(list, [chat({ sender: "黄主管", group: "陈一新东方学习群" })]);
+  assert.equal(result.assistantRows.length, 1);
+  assert.equal(result.assistantRows[0].助理主管, "黄主管");
+  assert.equal(result.assistantRows[0].教研组, "初中博文");
+  assert.equal(result.assistantRows[0].应发送数, 3);
+  assert.equal(result.assistantRows[0].已发送数, 1);
 });
 
 test("开课提醒项目组归类将博文和实验字母组归入文理综", () => {

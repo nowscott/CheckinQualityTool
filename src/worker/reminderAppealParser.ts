@@ -8,6 +8,7 @@ export interface ReminderAppealRecord {
   matchedStudent: string;
   reason: string;
   description: string;
+  status: string;
   sourceRowNumber: number;
 }
 
@@ -26,17 +27,29 @@ function findFirstIndex(map: Map<string, number[]>, aliases: readonly string[]) 
   return -1;
 }
 
-function passed(value: unknown) {
-  const current = text(value);
-  return ["是", "通过", "已通过", "申诉通过", "true", "TRUE", "1"].includes(current);
+function splitStudentNames(value: unknown) {
+  const raw = text(value);
+  if (!raw) return [];
+  return raw
+    .split(/[、，,;；/／\n\r]+/u)
+    .flatMap((part) => {
+      const current = part.trim();
+      if (!current) return [];
+      const spaceParts = current.split(/\s+/u).filter(Boolean);
+      const shouldSplitSpaces = spaceParts.length > 1 && spaceParts.every((item) => item.length >= 2);
+      return shouldSplitSpaces ? spaceParts : [current];
+    })
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 export function appealKey(teacher: unknown, student: unknown) {
-  return `${normalizeMatchText(teacher)}\u0000${normalizeMatchText(student)}`;
+  const normalizedTeacher = normalizeMatchText(teacher).replace(/\s+/g, "").replace(/[0-9０-９]+$/u, "");
+  return `${normalizedTeacher}\u0000${normalizeMatchText(student)}`;
 }
 
 export function buildReminderAppeals(workbook: SheetJsWorkbook): ReminderAppealInfo {
-  const found = findSheet(workbook, ["教师姓名", "申诉是否通过"]);
+  const found = findSheet(workbook, ["教师姓名", "学生姓名"]);
   const rows = found.rows;
   const map = headerMap(rows[0]);
   const column = {
@@ -48,7 +61,8 @@ export function buildReminderAppeals(workbook: SheetJsWorkbook): ReminderAppealI
   };
   const counts: CountMap = {
     原始申诉行数: Math.max(0, rows.length - 1),
-    申诉通过行数: 0,
+    申诉行数: 0,
+    申诉拆分学员数: 0,
     申诉跳过行数: 0,
     申诉去重行数: 0,
   };
@@ -58,32 +72,36 @@ export function buildReminderAppeals(workbook: SheetJsWorkbook): ReminderAppealI
   for (let rowIndex = 1; rowIndex < rows.length; rowIndex += 1) {
     const row = rows[rowIndex] as CellValue[];
     const teacher = text(row[column.teacher]);
-    const rawStudent = text(row[column.student]);
-    if (!teacher || !rawStudent || !passed(row[column.passed])) {
+    const students = splitStudentNames(row[column.student]);
+    if (!teacher || !students.length) {
       counts.申诉跳过行数 += 1;
       continue;
     }
-    const cleaned = cleanStudentName(rawStudent);
-    const record: ReminderAppealRecord = {
-      teacher,
-      student: cleaned.original,
-      matchedStudent: cleaned.cleaned || cleaned.original,
-      reason: text(row[column.reason]),
-      description: text(row[column.description]),
-      sourceRowNumber: rowIndex + 1,
-    };
-    const keys = [
-      appealKey(record.teacher, record.student),
-      appealKey(record.teacher, record.matchedStudent),
-    ];
-    let duplicated = false;
-    keys.forEach((key) => {
-      if (byKey.has(key)) duplicated = true;
-      byKey.set(key, record);
+    counts.申诉拆分学员数 += students.length - 1;
+    students.forEach((rawStudent) => {
+      const cleaned = cleanStudentName(rawStudent);
+      const record: ReminderAppealRecord = {
+        teacher,
+        student: cleaned.original,
+        matchedStudent: cleaned.cleaned || cleaned.original,
+        reason: text(row[column.reason]),
+        description: text(row[column.description]),
+        status: column.passed >= 0 ? text(row[column.passed]) : "",
+        sourceRowNumber: rowIndex + 1,
+      };
+      const keys = [
+        appealKey(record.teacher, record.student),
+        appealKey(record.teacher, record.matchedStudent),
+      ];
+      let duplicated = false;
+      keys.forEach((key) => {
+        if (byKey.has(key)) duplicated = true;
+        byKey.set(key, record);
+      });
+      if (duplicated) counts.申诉去重行数 += 1;
+      records.push(record);
+      counts.申诉行数 += 1;
     });
-    if (duplicated) counts.申诉去重行数 += 1;
-    records.push(record);
-    counts.申诉通过行数 += 1;
   }
 
   return { records, byKey, counts, sheetName: found.name };

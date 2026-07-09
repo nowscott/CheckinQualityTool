@@ -106,8 +106,8 @@ export function ReminderForm({
               id="reminder-appeal-file"
               name="reminder_appeal_file"
               step="03"
-              title="申诉通过名单"
-              description="可选；按教师姓名与学生姓名剔除已通过申诉的分母"
+              title="申诉名单"
+              description="可选；按教师姓名与学生姓名匹配申诉，公示原因并剔除分母"
               file={appealFile}
               required={false}
               onChange={onAppealFileChange}

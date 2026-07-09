@@ -7,14 +7,27 @@ const args = process.argv.slice(2);
 const includeCleanChatsIndex = args.indexOf("--include-clean-chats");
 const includeCleanChats = includeCleanChatsIndex >= 0;
 if (includeCleanChats) args.splice(includeCleanChatsIndex, 1);
+const appealArgIndex = args.findIndex((arg) => arg.startsWith("--appeal="));
+const appealPath = appealArgIndex >= 0 ? args[appealArgIndex].slice("--appeal=".length) : "";
+if (appealArgIndex >= 0) args.splice(appealArgIndex, 1);
 const modeArg = args[0]?.startsWith("--mode=") ? args.shift() : "";
 const mode = modeArg ? modeArg.split("=")[1] : "checkin";
-const [listPath, chatPath, outputPath = mode === "reminder"
-  ? "/tmp/reminder-worker-result.xlsx"
-  : "/tmp/typescript-worker-result.xlsx"] = args;
+let listPath = "";
+let chatPaths = [];
+let outputPath = mode === "reminder" ? "/tmp/reminder-worker-result.xlsx" : "/tmp/typescript-worker-result.xlsx";
+if (mode === "reminder") {
+  listPath = args.shift() || "";
+  if (args.length > 1) outputPath = args.pop();
+  chatPaths = args;
+} else {
+  const [currentListPath, chatPath, currentOutputPath = outputPath] = args;
+  listPath = currentListPath;
+  chatPaths = chatPath ? [chatPath] : [];
+  outputPath = currentOutputPath;
+}
 
-if (!listPath || !chatPath) {
-  throw new Error("用法：node scripts/regression-worker.mjs [--mode=checkin|reminder] <名单.xlsx> <聊天.xlsx> [输出.xlsx]");
+if (!listPath || !chatPaths.length) {
+  throw new Error("用法：node scripts/regression-worker.mjs [--mode=checkin|reminder] <名单.xlsx> <聊天.xlsx>... [输出.xlsx]");
 }
 if (!["checkin", "reminder"].includes(mode)) throw new Error(`不支持的 mode：${mode}`);
 
@@ -24,7 +37,7 @@ const assets = await import("node:fs/promises").then(({ readdir }) =>
 let workerFile = "";
 for (const asset of assets.filter((name) => name.endsWith(".js"))) {
   const source = await readFile(resolve(root, "dist/assets", asset), "utf8");
-  if (source.includes("暑期课程提醒") && source.includes("onmessage") && source.includes("postMessage") && !source.includes("createRoot")) {
+  if (source.includes("onmessage") && source.includes("postMessage") && !source.includes("createRoot")) {
     workerFile = resolve(root, "dist/assets", asset);
     break;
   }
@@ -32,7 +45,8 @@ for (const asset of assets.filter((name) => name.endsWith(".js"))) {
 if (!workerFile) throw new Error("找不到构建后的 Worker，请先运行 npm run build。");
 
 const listBuffer = await readFile(resolve(listPath));
-const chatBuffer = await readFile(resolve(chatPath));
+const chatBuffers = await Promise.all(chatPaths.map((path) => readFile(resolve(path))));
+const appealBuffer = appealPath ? await readFile(resolve(appealPath)) : null;
 const whitelistCsv = mode === "checkin"
   ? await readFile(resolve(root, "public/data/whitelist.csv"), "utf8")
   : "";
@@ -94,13 +108,14 @@ await context.self.onmessage({
         type: "process",
         mode: "reminder",
         denominatorFile: file(listPath, listBuffer),
-        chatFiles: [file(chatPath, chatBuffer)],
+        appealFile: appealPath && appealBuffer ? file(appealPath, appealBuffer) : null,
+        chatFiles: chatPaths.map((path, index) => file(path, chatBuffers[index])),
         includeCleanChats,
       }
     : {
         type: "process",
         listFile: file(listPath, listBuffer),
-        chatFile: file(chatPath, chatBuffer),
+        chatFile: file(chatPaths[0], chatBuffers[0]),
         weekLabel: "auto",
         useSingle: false,
         whitelistCsv,

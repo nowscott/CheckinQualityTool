@@ -4,7 +4,7 @@ import { reminderProjectGroup } from "./reminderProjectGroup";
 import type { ChatInfo, DataRow, SheetDefinition, SourceNames } from "./types";
 import type { ReminderListInfo } from "./reminderListParser";
 import type { ReminderMatchInfo } from "./reminderMatching";
-import { text } from "./utils";
+import { normalizeMatchText, text } from "./utils";
 
 const STUDENT_COLUMNS = [
   "教师姓名", "教研组", "师训组长", "助理主管", "学员姓名",
@@ -13,19 +13,19 @@ const STUDENT_COLUMNS = [
 
 const TEACHER_COLUMNS = [
   "教师姓名", "教研组", "师训组长", "助理主管",
-  "应发送人次", "已发送人次", "发送差额", "发送进度", "是否达标",
+  "应发送人次", "已发送人次", "发送差额", "申诉数", "发送进度", "是否达标",
 ] as const;
 
 const TRAINING_COLUMNS = [
-  "教研组", "应发送数", "已发送数", "发送率", "是否达标（80%）",
+  "教研组", "应发送数", "已发送数", "申诉数", "发送率", "是否达标（80%）",
 ] as const;
 
 const ASSISTANT_COLUMNS = [
-  "教研组", "助理主管", "应发送数", "已发送数", "发送率", "是否达标（80%）",
+  "教研组", "助理主管", "应发送数", "已发送数", "申诉数", "发送率", "是否达标（80%）",
 ] as const;
 
 const PROJECT_COLUMNS = [
-  "教研组", "负责人", "应发送数", "已发送数", "发送率", "是否达标（80%）",
+  "教研组", "负责人", "应发送数", "已发送数", "申诉数", "发送率", "是否达标（80%）",
 ] as const;
 
 const EXCEPTION_COLUMNS = [
@@ -42,16 +42,21 @@ interface PublicTable {
 interface SummaryBucket {
   total: number;
   sent: number;
+  appealed: number;
   counselorSent: number;
   assistants: Set<string>;
 }
 
 function createBucket(): SummaryBucket {
-  return { total: 0, sent: 0, counselorSent: 0, assistants: new Set() };
+  return { total: 0, sent: 0, appealed: 0, counselorSent: 0, assistants: new Set() };
 }
 
 function addStudent(bucket: SummaryBucket, row: DataRow) {
-  if (row.是否发送 === "已申诉通过" || row.匹配状态 === "已申诉通过") return;
+  if (row.是否发送 === "已申诉" || row.匹配状态 === "已申诉" ||
+    row.是否发送 === "已申诉通过" || row.匹配状态 === "已申诉通过") {
+    bucket.appealed += 1;
+    return;
+  }
   bucket.total += 1;
   if (row.是否发送 === "是") bucket.sent += 1;
   if (row.学管是否发送 === "是") bucket.counselorSent += 1;
@@ -73,6 +78,10 @@ function passText(sent: number, total: number) {
 
 function compareText(a: unknown, b: unknown) {
   return text(a).localeCompare(text(b), "zh-CN");
+}
+
+function normalizePersonName(value: unknown) {
+  return normalizeMatchText(value).replace(/\s+/g, "").replace(/[0-9０-９]+$/u, "");
 }
 
 function displayTeachingGroup(value: unknown) {
@@ -104,6 +113,7 @@ function teacherOutputRows(rows: DataRow[]) {
     应发送人次: row.应发送数 || 0,
     已发送人次: row.已发送数 || 0,
     发送差额: row.发送差额 || 0,
+    申诉数: row.申诉数 || 0,
     发送进度: row.发送率 || "0.0%",
     是否达标: row.是否达标 || "否",
   }));
@@ -119,6 +129,7 @@ function pushTotalRow(rows: DataRow[], labelColumn: string, label: string, bucke
     [labelColumn]: label,
     应发送数: bucket.total,
     已发送数: bucket.sent,
+    申诉数: bucket.appealed,
     发送率: rateText(bucket.sent, bucket.total),
     "是否达标（80%）": passText(bucket.sent, bucket.total),
     __rowType: rowType,
@@ -168,13 +179,26 @@ function assistantTeachingGroupCompare(a: string, b: string) {
   return compareText(a, b);
 }
 
+function assistantOwnTeachingGroups(rows: DataRow[]) {
+  const groups = new Map<string, string>();
+  rows.forEach((row) => {
+    const teacher = normalizePersonName(row.教师姓名);
+    const assistant = normalizePersonName(row.助理主管);
+    if (teacher && assistant && teacher === assistant && row.教研组) {
+      groups.set(assistant, assistantTeachingGroup(row.教研组));
+    }
+  });
+  return groups;
+}
+
 function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
   const projectOrder = ["博文项目", "双语项目", "益智项目", "文理综项目", "其他项目"];
   const grouped = new Map<string, Map<string, Map<string, SummaryBucket>>>();
+  const ownTeachingGroups = assistantOwnTeachingGroups(matchInfo.studentRows);
   for (const row of matchInfo.studentRows) {
-    const teachingGroup = assistantTeachingGroup(row.教研组);
-    const project = reminderProjectGroup(row.教研组);
     const assistant = String(row.助理主管 || "未填写");
+    const teachingGroup = ownTeachingGroups.get(normalizePersonName(assistant)) || assistantTeachingGroup(row.教研组);
+    const project = reminderProjectGroup(teachingGroup);
     if (!grouped.has(project)) grouped.set(project, new Map());
     const teachingGroups = grouped.get(project)!;
     if (!teachingGroups.has(teachingGroup)) teachingGroups.set(teachingGroup, new Map());
@@ -190,7 +214,7 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
     (a, b) =>
       (projectOrder.indexOf(a) === -1 ? 99 : projectOrder.indexOf(a)) -
         (projectOrder.indexOf(b) === -1 ? 99 : projectOrder.indexOf(b)) ||
-      a.localeCompare(b, "zh-CN"),
+      compareText(a, b),
   );
 
   for (const project of sortedProjects) {
@@ -201,24 +225,26 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
       const groupStart = rows.length;
       const assistants = teachingGroups.get(teachingGroup)!;
       const groupBucket = createBucket();
-      const sortedAssistants = [...assistants.keys()].sort((a, b) => a.localeCompare(b, "zh-CN"));
+      const sortedAssistants = [...assistants.keys()].sort(compareText);
       sortedAssistants.forEach((assistant) => {
         const item = assistants.get(assistant)!;
-        if (!item.total) return;
+        if (!item.total && !item.appealed) return;
         groupBucket.total += item.total;
         groupBucket.sent += item.sent;
+        groupBucket.appealed += item.appealed;
         groupBucket.counselorSent += item.counselorSent;
         rows.push({
           教研组: rows.length === groupStart ? teachingGroup : "",
           助理主管: assistant,
           应发送数: item.total,
           已发送数: item.sent,
+          申诉数: item.appealed,
           发送率: rate(item.sent, item.total),
           "是否达标（80%）": passText(item.sent, item.total),
           __rowType: "detail",
         });
       });
-      if (!groupBucket.total) continue;
+      if (!groupBucket.total && !groupBucket.appealed) continue;
       if (rows.length - groupStart > 1) mergeCells.push(mergeRef(0, actualRow(groupStart), actualRow(rows.length - 1)));
       const groupSummaryRow = actualRow(rows.length);
       mergeCells.push(`A${groupSummaryRow}:B${groupSummaryRow}`);
@@ -227,15 +253,17 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
         助理主管: "",
         应发送数: groupBucket.total,
         已发送数: groupBucket.sent,
+        申诉数: groupBucket.appealed,
         发送率: rate(groupBucket.sent, groupBucket.total),
         "是否达标（80%）": passText(groupBucket.sent, groupBucket.total),
         __rowType: "groupTotal",
       });
       projectBucket.total += groupBucket.total;
       projectBucket.sent += groupBucket.sent;
+      projectBucket.appealed += groupBucket.appealed;
       projectBucket.counselorSent += groupBucket.counselorSent;
     }
-    if (!projectBucket.total) continue;
+    if (!projectBucket.total && !projectBucket.appealed) continue;
     const projectSummaryRow = actualRow(rows.length);
     mergeCells.push(`A${projectSummaryRow}:B${projectSummaryRow}`);
     rows.push({
@@ -243,6 +271,7 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
       助理主管: "",
       应发送数: projectBucket.total,
       已发送数: projectBucket.sent,
+      申诉数: projectBucket.appealed,
       发送率: rate(projectBucket.sent, projectBucket.total),
       "是否达标（80%）": passText(projectBucket.sent, projectBucket.total),
       __rowType: "projectTotal",
@@ -254,6 +283,7 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
     if (row.__rowType !== "projectTotal") return;
     grandBucket.total += Number(row.应发送数) || 0;
     grandBucket.sent += Number(row.已发送数) || 0;
+    grandBucket.appealed += Number(row.申诉数) || 0;
   });
   const grandSummaryRow = actualRow(rows.length);
   mergeCells.push(`A${grandSummaryRow}:B${grandSummaryRow}`);
@@ -262,6 +292,7 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
     助理主管: "",
     应发送数: grandBucket.total,
     已发送数: grandBucket.sent,
+    申诉数: grandBucket.appealed,
     发送率: rate(grandBucket.sent, grandBucket.total),
     "是否达标（80%）": passText(grandBucket.sent, grandBucket.total),
     __rowType: "grandTotal",
@@ -301,27 +332,31 @@ function buildTrainingRows(studentRows: DataRow[]) {
         const leads = groups.get(group)!;
         [...leads.keys()].sort(compareText).forEach((lead) => {
           const item = leads.get(lead)!;
-          if (!item.total) return;
+          if (!item.total && !item.appealed) return;
           groupBucket.total += item.total;
           groupBucket.sent += item.sent;
+          groupBucket.appealed += item.appealed;
           groupBucket.counselorSent += item.counselorSent;
           detailRows.push({
             教研组: lead,
             应发送数: item.total,
             已发送数: item.sent,
+            申诉数: item.appealed,
             发送率: rateText(item.sent, item.total),
             "是否达标（80%）": passText(item.sent, item.total),
             __rowType: "detail",
           });
         });
-        if (!groupBucket.total) return;
+        if (!groupBucket.total && !groupBucket.appealed) return;
         projectBucket.total += groupBucket.total;
         projectBucket.sent += groupBucket.sent;
+        projectBucket.appealed += groupBucket.appealed;
         projectBucket.counselorSent += groupBucket.counselorSent;
         projectRows.push({
           教研组: displayTeachingGroup(group),
           应发送数: groupBucket.total,
           已发送数: groupBucket.sent,
+          申诉数: groupBucket.appealed,
           发送率: rateText(groupBucket.sent, groupBucket.total),
           "是否达标（80%）": passText(groupBucket.sent, groupBucket.total),
           __rowType: "groupTotal",
@@ -332,6 +367,7 @@ function buildTrainingRows(studentRows: DataRow[]) {
         教研组: project,
         应发送数: projectBucket.total,
         已发送数: projectBucket.sent,
+        申诉数: projectBucket.appealed,
         发送率: rateText(projectBucket.sent, projectBucket.total),
         "是否达标（80%）": passText(projectBucket.sent, projectBucket.total),
         __rowType: "projectTotal",
@@ -343,6 +379,7 @@ function buildTrainingRows(studentRows: DataRow[]) {
     if (row.__rowType !== "projectTotal") return;
     grandBucket.total += Number(row.应发送数) || 0;
     grandBucket.sent += Number(row.已发送数) || 0;
+    grandBucket.appealed += Number(row.申诉数) || 0;
   });
   pushTotalRow(rows, "教研组", "总计", grandBucket, "grandTotal");
   return rows;
@@ -371,9 +408,10 @@ function buildProjectRows(studentRows: DataRow[]) {
       const projectBucket = createBucket();
       [...groups.keys()].sort(compareText).forEach((group) => {
         const item = groups.get(group)!;
-        if (!item.total) return;
+        if (!item.total && !item.appealed) return;
         projectBucket.total += item.total;
         projectBucket.sent += item.sent;
+        projectBucket.appealed += item.appealed;
         projectBucket.counselorSent += item.counselorSent;
         item.assistants.forEach((assistant) => projectBucket.assistants.add(assistant));
         rows.push({
@@ -381,17 +419,19 @@ function buildProjectRows(studentRows: DataRow[]) {
           负责人: [...item.assistants].sort(compareText).join("、") || "/",
           应发送数: item.total,
           已发送数: item.sent,
+          申诉数: item.appealed,
           发送率: rateText(item.sent, item.total),
           "是否达标（80%）": passText(item.sent, item.total),
           __rowType: "detail",
         });
       });
-      if (!projectBucket.total) return;
+      if (!projectBucket.total && !projectBucket.appealed) return;
       rows.push({
         教研组: project,
         负责人: [...projectBucket.assistants].sort(compareText).join("、") || "/",
         应发送数: projectBucket.total,
         已发送数: projectBucket.sent,
+        申诉数: projectBucket.appealed,
         发送率: rateText(projectBucket.sent, projectBucket.total),
         "是否达标（80%）": passText(projectBucket.sent, projectBucket.total),
         __rowType: "projectTotal",
@@ -402,6 +442,7 @@ function buildProjectRows(studentRows: DataRow[]) {
     if (row.__rowType !== "projectTotal") return;
     grandBucket.total += Number(row.应发送数) || 0;
     grandBucket.sent += Number(row.已发送数) || 0;
+    grandBucket.appealed += Number(row.申诉数) || 0;
     text(row.负责人).split("、").filter((item) => item && item !== "/").forEach((item) => grandBucket.assistants.add(item));
   });
   rows.push({
@@ -409,6 +450,7 @@ function buildProjectRows(studentRows: DataRow[]) {
     负责人: [...grandBucket.assistants].sort(compareText).join("、") || "/",
     应发送数: grandBucket.total,
     已发送数: grandBucket.sent,
+    申诉数: grandBucket.appealed,
     发送率: rateText(grandBucket.sent, grandBucket.total),
     "是否达标（80%）": passText(grandBucket.sent, grandBucket.total),
     __rowType: "grandTotal",
@@ -437,7 +479,7 @@ function explanationRows(
     { 项目: "匹配优先级3", 值: "群聊名称包含学员姓名，且该学员在去重后分母中唯一，自动判定已发送" },
     { 项目: "匹配优先级4", 值: "聊天内容包含学员姓名，且该学员在去重后分母中唯一，自动判定已发送" },
     { 项目: "异常处理", 值: "分母整行重复直接剔除，只在处理说明记录数量；多条质检命中同一分母时正常判定已发送；同名学员需通过授课教师+学员姓名定位，无法定位时保持未发送且不写入异常；字段缺失写入“匹配核对-异常明细”" },
-    { 项目: "申诉剔除规则", 值: "上传申诉文件且“申诉是否通过”为“是/通过”时，按教师姓名+学生姓名匹配分母；命中行保留在学员名单并标注“已申诉通过”，但不计入应发送、未发送和发送率分母" },
+    { 项目: "申诉公示规则", 值: "上传申诉文件后，按教师姓名+学生姓名匹配分母；无论申诉是否标记通过，命中行均保留在学员名单并标注“已申诉”、展示申诉原因，且不计入应发送、未发送和发送率分母；各汇总页单独公示申诉数" },
   ];
   Object.entries(listInfo.counts).forEach(([key, value]) => rows.push({ 项目: `分母_${key}`, 值: value }));
   Object.entries(chatInfo.counts).forEach(([key, value]) => rows.push({ 项目: `聊天_${key}`, 值: value }));
@@ -461,7 +503,7 @@ export function buildReminderOutput(
       rows: studentOutputRows(matchInfo.studentRows),
       columns: STUDENT_COLUMNS,
       widths: { 教研组: 18, 师训组长: 18, 助理主管: 18, 申诉情况说明: 32 },
-      rowStyle: (row) => row.是否发送 === "已申诉通过"
+      rowStyle: (row) => row.是否发送 === "已申诉" || row.是否发送 === "已申诉通过"
         ? 8
         : passFailStyle(row.是否发送 === "是", includeResultColors),
     },

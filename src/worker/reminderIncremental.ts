@@ -7,7 +7,7 @@ import {
   type ReminderMatchInfo,
 } from "./reminderMatching";
 import type { CellValue, ChatInfo, CountMap, DataRow, SourceNames } from "./types";
-import { text } from "./utils";
+import { normalizeMatchText, text } from "./utils";
 
 const STUDENT_REQUIRED_HEADERS = ["教师姓名", "学员姓名", "匹配学员姓名", "是否发送"];
 const EXCEPTION_REQUIRED_HEADERS = ["异常类型", "异常原因"];
@@ -52,6 +52,25 @@ function numberValue(value: unknown, fallback: number) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function normalizePersonName(value: unknown) {
+  return normalizeMatchText(value).replace(/\s+/g, "").replace(/[0-9０-９]+$/u, "");
+}
+
+function assistantSummarySourceRows(rows: DataRow[]) {
+  const ownGroups = new Map<string, unknown>();
+  rows.forEach((row) => {
+    const teacher = normalizePersonName(row.教师姓名 || row.授课教师);
+    const assistant = normalizePersonName(row.助理主管);
+    if (teacher && assistant && teacher === assistant && row.教研组) {
+      ownGroups.set(assistant, row.教研组);
+    }
+  });
+  return rows.map((row) => {
+    const ownGroup = ownGroups.get(normalizePersonName(row.助理主管));
+    return ownGroup ? { ...row, 教研组: ownGroup } : row;
+  });
+}
+
 function rowToTarget(row: DataRow, index: number): ReminderTarget {
   const id = numberValue(row.质检序号, index + 1);
   return {
@@ -75,22 +94,30 @@ function rowToTarget(row: DataRow, index: number): ReminderTarget {
 }
 
 function shouldTryIncrementalMatch(row: DataRow) {
-  return text(row.是否发送) !== "是";
+  const status = text(row.是否发送);
+  return status !== "是" && status !== "已申诉" && status !== "已申诉通过";
 }
 
 function buildCounts(rows: DataRow[], incrementalSent: number, eligible: number): CountMap {
   const counts: CountMap = {
-    应发送数: rows.length,
+    应发送数: 0,
     已发送数: 0,
     未发送数: 0,
+    申诉数: 0,
     待核对数: 0,
     本次可增量匹配数: eligible,
     本次新增发送数: incrementalSent,
     异常明细行数: 0,
   };
   rows.forEach((row) => {
-    if (text(row.是否发送) === "是") counts.已发送数 += 1;
-    else counts.未发送数 += 1;
+    const status = text(row.是否发送);
+    if (status === "已申诉" || status === "已申诉通过") {
+      counts.申诉数 += 1;
+    } else {
+      counts.应发送数 += 1;
+      if (status === "是") counts.已发送数 += 1;
+      else counts.未发送数 += 1;
+    }
     if (text(row.匹配状态).includes("核对")) counts.待核对数 += 1;
   });
   return counts;
@@ -155,7 +182,7 @@ export function buildIncrementalReminderOutput(
       ["教师姓名", "教师邮箱", "教研组", "师训组长", "助理主管", "校区"],
     ),
     trainingRows: buildReminderGroupSummary(finalRows, ["教研组", "师训组长"], ["教研组", "师训组长"]),
-    assistantRows: buildReminderGroupSummary(finalRows, ["教研组", "助理主管"], ["教研组", "助理主管"]),
+    assistantRows: buildReminderGroupSummary(assistantSummarySourceRows(finalRows), ["助理主管"], ["教研组", "助理主管"]),
     exceptionRows: [...exceptionRows, ...incrementalMatches.exceptionRows],
     counts,
   };
