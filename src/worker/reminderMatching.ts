@@ -1,4 +1,5 @@
 import { REMINDER_MATCH_RULES, REMINDER_PASS_RATE } from "./reminderConfig";
+import { isTeacherExempt, normalizeTeacherName } from "./teacherExemptions";
 import type { ChatRow, CountMap, DataRow } from "./types";
 import { displayValue, normalizeMatchText, sortDate } from "./utils";
 import { appealKey, type ReminderAppealInfo } from "./reminderAppealParser";
@@ -39,10 +40,6 @@ function isAppealed(row: DataRow) {
 
 function compactKey(parts: unknown[]) {
   return parts.map((part) => String(part || "")).join("\u0000");
-}
-
-function normalizeTeacherName(value: unknown) {
-  return normalizeMatchText(value).replace(/\s+/g, "").replace(/[0-9０-９]+$/u, "");
 }
 
 function studentKeywords(target: ReminderTarget) {
@@ -175,6 +172,45 @@ export function matchReminderData(
   };
 
   for (const target of listInfo.targets) {
+    if (isTeacherExempt(target.授课教师)) {
+      counts.应发送数 += 1;
+      counts.已发送数 += 1;
+      studentRows.push({
+        质检序号: target.id,
+        教师姓名: target.授课教师,
+        教师邮箱: target.教师邮箱,
+        学员号: target.学员号,
+        教研组: target.教研组,
+        师训组长: target.师训组长,
+        助理主管: target.助理主管,
+        学员姓名: target.学员姓名,
+        匹配学员姓名: target.匹配学员姓名,
+        白名单命中: target.白名单命中,
+        白名单说明: target.白名单说明,
+        姓名清洗说明: target.姓名清洗说明,
+        校区: target.校区,
+        年级: target.年级,
+        学管姓名: target.学管,
+        新老生季度: target.新老生季度,
+        课时: target.课时,
+        是否发送: "是",
+        匹配状态: "已发送",
+        匹配方式: "",
+        异常原因: "",
+        命中位置: "",
+        命中关键词: "",
+        命中群名: "",
+        命中聊天时间: "",
+        命中质检文件: "",
+        发送人名称: "",
+        发送人邮箱: "",
+        源名单行号: target.源名单行号,
+        去重合并行号: target.去重合并行号,
+        源聊天行号: "",
+        匹配消息数: 0,
+      });
+      continue;
+    }
     const appeal = appealInfo?.byKey.get(appealKey(target.授课教师, target.学员姓名)) ||
       appealInfo?.byKey.get(appealKey(target.授课教师, target.匹配学员姓名));
     if (appeal) {

@@ -1,4 +1,5 @@
 import type { ChatRow, DataRow, MatchInfo, TargetRow, Whitelist } from "./types";
+import { isTeacherExempt } from "./teacherExemptions";
 import { excelDate, normalizeMatchText, sortDate } from "./utils";
 import { findWhitelistEntry } from "./whitelist";
 
@@ -49,8 +50,9 @@ export function matchData(
     const automaticWeak = nameLength < 2;
     const weak = automaticWeak || useSingle ? weakSource.slice(-1) : "";
     const whitelistEntry = findWhitelistEntry(target, whitelist);
+    const teacherExempt = isTeacherExempt(target.教师姓名);
     const candidates =
-      whitelistEntry?.处理方式 === "免检" ? [] : chatsByEmail.get(target.教师邮箱) || [];
+      whitelistEntry?.处理方式 === "免检" || teacherExempt ? [] : chatsByEmail.get(target.教师邮箱) || [];
     const matches: MatchedChat[] = [];
     for (const chat of candidates) {
       const group = chat["群名/好友昵称"];
@@ -111,11 +113,11 @@ export function matchData(
         sortDate(a.聊天时间) - sortDate(b.聊天时间),
     );
     const best = matches[0];
-    const isExempt = whitelistEntry?.处理方式 === "免检";
-    const status = isExempt || Boolean(best) ? "已发送" : "未发送";
-    const conclusion = isExempt ? "白名单免检" : best?.匹配强度 || "无匹配";
+    const whitelistExempt = whitelistEntry?.处理方式 === "免检";
+    const status = whitelistExempt || teacherExempt || Boolean(best) ? "已发送" : "未发送";
+    const conclusion = whitelistExempt ? "白名单免检" : best?.匹配强度 || (teacherExempt ? "强匹配" : "无匹配");
     counts[status as "已发送" | "未发送"] += 1;
-    if (isExempt) counts.免检 += 1;
+    if (whitelistExempt) counts.免检 += 1;
     if (conclusion in counts) {
       counts[conclusion as "强匹配" | "弱匹配" | "别名匹配" | "白名单免检" | "无匹配"] += 1;
     }
