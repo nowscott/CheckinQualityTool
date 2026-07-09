@@ -86,7 +86,7 @@ export function Header({
           type="button"
           onClick={onOpenChangelog}
         >
-          v2.5.7
+          v2.5.8
         </button>
       </div>
     </header>
