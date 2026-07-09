@@ -79,6 +79,7 @@ export interface MatchInfo {
 export interface SourceNames {
   list: string;
   chat: string;
+  summary?: string;
 }
 
 export interface ProcessRequest {
@@ -97,6 +98,7 @@ export interface ReminderProcessRequest {
   reminderMode?: "full";
   denominatorFile: File;
   appealFile?: File | null;
+  summaryFiles: File[];
   chatFiles: File[];
   includeCleanChats: boolean;
   includeResultColors: boolean;
@@ -108,6 +110,7 @@ export interface ReminderIncrementalProcessRequest {
   mode: "reminder";
   reminderMode: "incremental";
   previousFile: File;
+  summaryFiles: File[];
   chatFiles: File[];
   includeCleanChats: boolean;
   includeResultColors: boolean;

@@ -15,6 +15,11 @@ const teacherSuffix = decodeURIComponent("%E8%80%81%E5%B8%88");
 const { buildReminderTargets } = await import("../worker/reminderListParser.js");
 const { buildReminderAppeals } = await import("../worker/reminderAppealParser.js");
 const { matchReminderData } = await import("../worker/reminderMatching.js");
+const {
+  applyReminderTouchSummary,
+  mergeReminderTouchInfos,
+  parseReminderTouchSummary,
+} = await import("../worker/reminderTouchSummary.js");
 const { reminderProjectGroup } = await import("../worker/reminderProjectGroup.js");
 const { buildWhitelist } = await import("../worker/whitelist.js");
 const { REMINDER_MATCH_RULES } = await import("../worker/reminderConfig.js");
@@ -38,6 +43,25 @@ function chat(overrides) {
     聊天内容: overrides.content || "",
     源聊天行号: overrides.row || 2,
   };
+}
+
+function summaryWorkbook(rows) {
+  return workbook([
+    ["姓名", "别名", "账号", "邮箱", "归属者", "部门", "员工触达客户数", "员工私聊总条数", "员工触达群数", "员工群聊总条数"],
+    ...rows,
+  ]);
+}
+
+function reminderRows(teacher, count, extra = {}) {
+  return Array.from({ length: count }, (_, index) => [
+    teacher,
+    extra.email || "",
+    extra.group || "益智组",
+    extra.training || "王组长",
+    extra.assistant || "李主管",
+    `学生${index + 1}`,
+    "12",
+  ]);
 }
 
 test("分母只按整行完全一致去重，同名同教师不同课时不误去重", () => {
@@ -369,4 +393,78 @@ test("开课提醒项目组归类将博文和实验字母组归入文理综", ()
   assert.equal(reminderProjectGroup("初中博文"), "博文项目");
   assert.equal(reminderProjectGroup("高中博文"), "博文项目");
   assert.equal(reminderProjectGroup("初中益智"), "益智项目");
+});
+
+test("汇总文件同一老师跨文件按邮箱累加触达数", () => {
+  const info = mergeReminderTouchInfos([
+    parseReminderTouchSummary(summaryWorkbook([
+      ["张老师", "", "zhang", "zhang@xdf.cn", "", "益智组", 2, 0, 3, 0],
+    ]), "关键词A.xlsx"),
+    parseReminderTouchSummary(summaryWorkbook([
+      ["张老师1", "", "zhang", "zhang@xdf.cn", "", "益智组", 1, 0, 4, 0],
+    ]), "关键词B.xlsx"),
+  ]);
+  const bucket = info.byEmail.get("zhang@xdf.cn");
+  assert.equal(bucket.totalTouches, 10);
+  assert.equal(bucket.customerTouches, 3);
+  assert.equal(bucket.groupTouches, 7);
+  assert.equal(info.counts.汇总文件数, 2);
+});
+
+test("触达完成率按应发送数封顶，超过 100% 仍按 100% 计算", () => {
+  const list = buildReminderTargets(workbook([
+    ["授课教师", "邮箱", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
+    ...reminderRows("张老师", 7, { email: "zhang@xdf.cn" }),
+  ]));
+  const base = matchReminderData(list, []);
+  const touchInfo = parseReminderTouchSummary(summaryWorkbook([
+    ["张老师", "", "zhang", "zhang@xdf.cn", "", "益智组", 3, 0, 5, 0],
+  ]), "汇总.xlsx");
+  const result = applyReminderTouchSummary(base, touchInfo);
+  assert.equal(result.teacherRows[0].汇总触达数, 8);
+  assert.equal(result.teacherRows[0].有效触达数, 7);
+  assert.equal(result.teacherRows[0].触达完成率, "100.0%");
+  assert.equal(result.teacherRows[0].是否达标, "是");
+  assert.equal(result.counts.有效触达数, 7);
+});
+
+test("汇总文件可在名单无邮箱时用去数字后缀姓名兜底匹配", () => {
+  const list = buildReminderTargets(workbook([
+    ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
+    ...reminderRows("王芳", 3),
+  ]));
+  const base = matchReminderData(list, []);
+  const touchInfo = parseReminderTouchSummary(summaryWorkbook([
+    ["王芳9", "", "wangfang", "wangfang@xdf.cn", "", "益智组", 1, 0, 1, 0],
+  ]), "汇总.xlsx");
+  const result = applyReminderTouchSummary(base, touchInfo);
+  assert.equal(result.teacherRows[0].汇总触达数, 2);
+  assert.equal(result.teacherRows[0].有效触达数, 2);
+  assert.equal(result.teacherRows[0].触达匹配方式, "姓名匹配");
+  assert.equal(result.counts.分母老师未匹配汇总记录数, 0);
+});
+
+test("汇总文件缺少必需字段时报清晰错误", () => {
+  assert.throws(
+    () => parseReminderTouchSummary(workbook([
+      ["姓名", "邮箱", "员工触达客户数"],
+      ["张老师", "zhang@xdf.cn", 1],
+    ]), "错误汇总.xlsx"),
+    /找不到包含字段“姓名、邮箱、员工触达客户数、员工触达群数”的工作表/,
+  );
+});
+
+test("未上传聊天明细时仍可用汇总文件生成教师维度触达完成率", () => {
+  const list = buildReminderTargets(workbook([
+    ["授课教师", "邮箱", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
+    ...reminderRows("李老师", 2, { email: "li@xdf.cn" }),
+  ]));
+  const base = matchReminderData(list, []);
+  assert.deepEqual(base.studentRows.map((row) => row.是否发送), ["否", "否"]);
+  const touchInfo = parseReminderTouchSummary(summaryWorkbook([
+    ["李老师", "", "li", "li@xdf.cn", "", "益智组", 0, 0, 1, 0],
+  ]), "汇总.xlsx");
+  const result = applyReminderTouchSummary(base, touchInfo);
+  assert.equal(result.teacherRows[0].有效触达数, 1);
+  assert.equal(result.teacherRows[0].触达完成率, "50.0%");
 });

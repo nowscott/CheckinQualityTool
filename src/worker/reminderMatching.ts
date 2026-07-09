@@ -21,6 +21,20 @@ export interface ReminderMatchInfo {
   counts: CountMap;
 }
 
+interface NormalizedReminderChat {
+  index: number;
+  chat: ChatRow;
+  group: string;
+  content: string;
+}
+
+interface StudentHit {
+  item: NormalizedReminderChat;
+  keyword: string;
+  group: boolean;
+  content: boolean;
+}
+
 function rate(sent: number, total: number) {
   return total ? sent / total : 0;
 }
@@ -57,16 +71,30 @@ function senderMatchesTarget(chat: ChatRow, target: ReminderTarget) {
   return Boolean(teacher && senderTeacher && senderTeacher === teacher);
 }
 
-function findStudentHit(
-  item: { group: string; content: string },
-  keywords: string[],
-) {
+function buildStudentHitIndex(chats: NormalizedReminderChat[], keywords: Iterable<string>) {
+  const index = new Map<string, StudentHit[]>();
   for (const keyword of keywords) {
-    const group = item.group.includes(keyword);
-    const content = item.content.includes(keyword);
-    if (group || content) return { keyword, group, content };
+    const hits: StudentHit[] = [];
+    for (const item of chats) {
+      const group = item.group.includes(keyword);
+      const content = item.content.includes(keyword);
+      if (group || content) hits.push({ item, keyword, group, content });
+    }
+    index.set(keyword, hits);
   }
-  return null;
+  return index;
+}
+
+function candidateStudentHits(keywords: string[], hitIndex: Map<string, StudentHit[]>) {
+  const byChat = new Map<number, StudentHit>();
+  for (const keyword of keywords) {
+    const hits = hitIndex.get(keyword);
+    if (!hits) continue;
+    for (const hit of hits) {
+      if (!byChat.has(hit.item.index)) byChat.set(hit.item.index, hit);
+    }
+  }
+  return [...byChat.values()];
 }
 
 function assistantOwnTeachingGroups(rows: DataRow[]) {
@@ -152,7 +180,8 @@ export function matchReminderData(
   chats: ChatRow[],
   appealInfo?: ReminderAppealInfo,
 ): ReminderMatchInfo {
-  const normalizedChats = chats.map((chat) => ({
+  const normalizedChats = chats.map((chat, index) => ({
+    index,
     chat,
     group: normalizeMatchText(chat["群名/好友昵称"]),
     content: normalizeMatchText(chat.聊天内容),
@@ -163,6 +192,7 @@ export function matchReminderData(
       studentCounts.set(student, (studentCounts.get(student) || 0) + 1);
     });
   });
+  const studentHitIndex = buildStudentHitIndex(normalizedChats, studentCounts.keys());
 
   const studentRows: DataRow[] = [];
   const exceptionRows: DataRow[] = [];
@@ -230,17 +260,17 @@ export function matchReminderData(
     const teacher = normalizeTeacherName(target.授课教师);
     const matches: ReminderMatchedChat[] = [];
 
-    for (const item of normalizedChats) {
-      const studentHit = findStudentHit(item, keywords);
-      const groupHasStudent = Boolean(studentHit?.group);
-      const contentHasStudent = Boolean(studentHit?.content);
+    for (const studentHit of candidateStudentHits(keywords, studentHitIndex)) {
+      const item = studentHit.item;
+      const groupHasStudent = studentHit.group;
+      const contentHasStudent = studentHit.content;
       const groupHasTeacher = Boolean(teacher && item.group.includes(teacher));
       const contentHasTeacher = Boolean(teacher && item.content.includes(teacher));
       const hasStudent = groupHasStudent || contentHasStudent;
       const hasTeacher = groupHasTeacher || contentHasTeacher;
-      const hitKeyword = studentHit?.keyword || target.匹配学员姓名;
-      const isAliasHit = Boolean(studentHit?.keyword && studentHit.keyword !== primaryKeyword);
-      const isUniqueStudent = Boolean(studentHit?.keyword && (studentCounts.get(studentHit.keyword) || 0) === 1);
+      const hitKeyword = studentHit.keyword || target.匹配学员姓名;
+      const isAliasHit = Boolean(studentHit.keyword && studentHit.keyword !== primaryKeyword);
+      const isUniqueStudent = Boolean(studentHit.keyword && (studentCounts.get(studentHit.keyword) || 0) === 1);
       const senderMatchesThisTeacher = senderMatchesTarget(item.chat, target);
       if (hasStudent && senderMatchesThisTeacher) {
         matches.push({

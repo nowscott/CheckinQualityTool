@@ -20,6 +20,7 @@ export interface ResultSummary {
   cleanChats: number;
   exceptions?: number;
   chatFiles?: number;
+  summaryFiles?: number;
   incrementalSent?: number;
 }
 

@@ -7,6 +7,7 @@ interface MultiUploadCardProps {
   title: string;
   description: string;
   files: File[];
+  required?: boolean;
   onChange: (files: File[]) => void;
 }
 
@@ -17,6 +18,7 @@ export function MultiUploadCard({
   title,
   description,
   files,
+  required = true,
   onChange,
 }: MultiUploadCardProps) {
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
@@ -39,7 +41,7 @@ export function MultiUploadCard({
         <strong>{title}</strong>
         <small>{description}</small>
       </span>
-      <input id={id} name={name} type="file" accept=".xlsx" multiple required onChange={handleChange} />
+      <input id={id} name={name} type="file" accept=".xlsx" multiple required={required} onChange={handleChange} />
       <span className="file-name" id={`${id.replace("-file", "")}-name`}>
         <span className="file-name-text" title={fileTitle}>
           {displayName}
@@ -49,4 +51,3 @@ export function MultiUploadCard({
     </label>
   );
 }
-

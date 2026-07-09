@@ -32,6 +32,27 @@ export function findSheet(workbook: SheetJsWorkbook, requiredHeaders: string[]):
   throw new Error(`找不到包含字段“${requiredHeaders.join("、")}”的工作表。`);
 }
 
+function isRecoverableZipSizeWarning(args: unknown[]) {
+  return args.some((arg) => /^Bad uncompressed size: \d+ != 0$/u.test(text(arg)));
+}
+
+function readXlsx(data: ArrayBuffer) {
+  const originalWarn = console.warn;
+  const originalError = console.error;
+  console.warn = (...args: unknown[]) => {
+    if (!isRecoverableZipSizeWarning(args)) originalWarn(...args);
+  };
+  console.error = (...args: unknown[]) => {
+    if (!isRecoverableZipSizeWarning(args)) originalError(...args);
+  };
+  try {
+    return XLSX.read(data, { type: "array", dense: true, cellDates: true });
+  } finally {
+    console.warn = originalWarn;
+    console.error = originalError;
+  }
+}
+
 export async function readWorkbook(
   file: File,
   stageStart: number,
@@ -49,7 +70,7 @@ export async function readWorkbook(
     "使用 dense 模式解析 Excel，此步骤耗时取决于文件大小。",
     stageStart + (stageEnd - stageStart) * 0.35,
   );
-  const workbook = XLSX.read(data, { type: "array", dense: true, cellDates: true });
+  const workbook = readXlsx(data);
   progress(`${label}解析完成`, "正在提取必要字段并释放原始工作簿。", stageEnd);
   return workbook;
 }

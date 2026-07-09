@@ -9,11 +9,127 @@ interface MatchedChat extends ChatRow {
   命中关键词: string;
 }
 
+interface NormalizedChat {
+  index: number;
+  chat: ChatRow;
+  group: string;
+  content: string;
+}
+
+interface KeywordHit {
+  item: NormalizedChat;
+  locations: string[];
+}
+
+interface TargetPlan {
+  target: TargetRow;
+  strong: string;
+  normalizedStrong: string;
+  weak: string;
+  normalizedWeak: string;
+  aliasKeywords: string[];
+  whitelistEntry: ReturnType<typeof findWhitelistEntry>;
+  teacherExempt: boolean;
+  whitelistExempt: boolean;
+}
+
 function listTeacherNameWithEmailSuffix(listTeacherName: string, listTeacherEmail: string) {
   const localPart = String(listTeacherEmail || "").split("@")[0];
   const emailDigits = localPart.match(/(\d+)$/)?.[1] || "";
   if (!emailDigits) return listTeacherName;
   return `${String(listTeacherName || "").replace(/[0-9０-９]+$/u, "")}${emailDigits}`;
+}
+
+function hitLocations(item: NormalizedChat, keyword: string) {
+  const locations: string[] = [];
+  if (!keyword) return locations;
+  if (item.group.includes(keyword)) locations.push("群名");
+  if (item.content.includes(keyword)) locations.push("聊天内容");
+  return locations;
+}
+
+function addKeyword(keywordsByEmail: Map<string, Set<string>>, email: string, keyword: string) {
+  if (!email || !keyword) return;
+  if (!keywordsByEmail.has(email)) keywordsByEmail.set(email, new Set<string>());
+  keywordsByEmail.get(email)!.add(keyword);
+}
+
+function collectShortKeywordHits(textValue: string, keywords: Set<string>, output: Set<string>) {
+  for (let index = 0; index < textValue.length; index += 1) {
+    const one = textValue[index];
+    if (keywords.has(one)) output.add(one);
+    if (index + 2 <= textValue.length) {
+      const two = textValue.slice(index, index + 2);
+      if (keywords.has(two)) output.add(two);
+    }
+  }
+}
+
+function buildHitIndex(targetPlans: TargetPlan[], chats: ChatRow[]) {
+  const keywordsByEmail = new Map<string, Set<string>>();
+  targetPlans.forEach((plan) => {
+    if (plan.whitelistExempt || plan.teacherExempt) return;
+    plan.aliasKeywords.forEach((keyword) => addKeyword(keywordsByEmail, plan.target.教师邮箱, keyword));
+    addKeyword(keywordsByEmail, plan.target.教师邮箱, plan.normalizedStrong);
+    addKeyword(keywordsByEmail, plan.target.教师邮箱, plan.normalizedWeak);
+  });
+
+  const chatsByEmail = new Map<string, NormalizedChat[]>();
+  chats.forEach((chat, index) => {
+    if (!keywordsByEmail.has(chat.有效教师邮箱)) return;
+    const item: NormalizedChat = {
+      index,
+      chat,
+      group: normalizeMatchText(chat["群名/好友昵称"]),
+      content: normalizeMatchText(chat.聊天内容),
+    };
+    if (!chatsByEmail.has(chat.有效教师邮箱)) chatsByEmail.set(chat.有效教师邮箱, []);
+    chatsByEmail.get(chat.有效教师邮箱)!.push(item);
+  });
+
+  const hitsByEmail = new Map<string, Map<string, KeywordHit[]>>();
+  for (const [email, items] of chatsByEmail) {
+    const keywords = keywordsByEmail.get(email);
+    if (!keywords?.size) continue;
+    const hitsByKeyword = new Map<string, KeywordHit[]>();
+    const longKeywords = [...keywords].filter((keyword) => keyword.length > 2);
+    for (const item of items) {
+      const matchedKeywords = new Set<string>();
+      collectShortKeywordHits(item.group, keywords, matchedKeywords);
+      collectShortKeywordHits(item.content, keywords, matchedKeywords);
+      longKeywords.forEach((keyword) => {
+        if (item.group.includes(keyword) || item.content.includes(keyword)) matchedKeywords.add(keyword);
+      });
+      for (const keyword of matchedKeywords) {
+        const locations = hitLocations(item, keyword);
+        if (!locations.length) continue;
+        if (!hitsByKeyword.has(keyword)) hitsByKeyword.set(keyword, []);
+        hitsByKeyword.get(keyword)!.push({ item, locations });
+      }
+    }
+    hitsByEmail.set(email, hitsByKeyword);
+  }
+  return hitsByEmail;
+}
+
+function addMatchesFromHits(
+  matchesByChat: Map<number, MatchedChat>,
+  hitsByKeyword: Map<string, KeywordHit[]> | undefined,
+  keyword: string,
+  displayKeyword: string,
+  strength: string,
+) {
+  const hits = hitsByKeyword?.get(keyword);
+  if (!hits?.length) return;
+  hits.forEach((hit) => {
+    if (matchesByChat.has(hit.item.index)) return;
+    matchesByChat.set(hit.item.index, {
+      ...hit.item.chat,
+      匹配强度: strength,
+      命中位置: hit.locations.join("+"),
+      命中关键词: displayKeyword,
+    });
+  });
 }
 
 export function matchData(
@@ -23,11 +139,27 @@ export function matchData(
   weekLabel: string,
   whitelist: Whitelist,
 ): MatchInfo {
-  const chatsByEmail = new Map<string, ChatRow[]>();
-  chats.forEach((chat) => {
-    if (!chatsByEmail.has(chat.有效教师邮箱)) chatsByEmail.set(chat.有效教师邮箱, []);
-    chatsByEmail.get(chat.有效教师邮箱)!.push(chat);
+  const targetPlans = targets.map((target): TargetPlan => {
+    const nameLength = [...target.学员姓名].length;
+    const strong = nameLength >= 2 ? target.学员姓名.slice(-2) : "";
+    const weakSource = target.学员姓名 || target.原始学员姓名;
+    const automaticWeak = nameLength < 2;
+    const weak = automaticWeak || useSingle ? weakSource.slice(-1) : "";
+    const whitelistEntry = findWhitelistEntry(target, whitelist);
+    const teacherExempt = isTeacherExempt(target.教师姓名);
+    return {
+      target,
+      strong,
+      normalizedStrong: normalizeMatchText(strong),
+      weak,
+      normalizedWeak: normalizeMatchText(weak),
+      aliasKeywords: whitelistEntry?.处理方式 === "别名" ? whitelistEntry.匹配别名关键词.filter(Boolean) : [],
+      whitelistEntry,
+      teacherExempt,
+      whitelistExempt: whitelistEntry?.处理方式 === "免检",
+    };
   });
+  const hitsByEmail = buildHitIndex(targetPlans, chats);
 
   const finalRows: DataRow[] = [];
   const detailRows: DataRow[] = [];
@@ -43,65 +175,16 @@ export function matchData(
     匹配明细行数: 0,
   };
 
-  targets.forEach((target, targetIndex) => {
-    const nameLength = [...target.学员姓名].length;
-    const strong = nameLength >= 2 ? target.学员姓名.slice(-2) : "";
-    const weakSource = target.学员姓名 || target.原始学员姓名;
-    const automaticWeak = nameLength < 2;
-    const weak = automaticWeak || useSingle ? weakSource.slice(-1) : "";
-    const whitelistEntry = findWhitelistEntry(target, whitelist);
-    const teacherExempt = isTeacherExempt(target.教师姓名);
-    const candidates =
-      whitelistEntry?.处理方式 === "免检" || teacherExempt ? [] : chatsByEmail.get(target.教师邮箱) || [];
-    const matches: MatchedChat[] = [];
-    for (const chat of candidates) {
-      const group = chat["群名/好友昵称"];
-      const content = chat.聊天内容;
-      const normalizedGroup = normalizeMatchText(group);
-      const normalizedContent = normalizeMatchText(content);
-      const normalizedStrong = normalizeMatchText(strong);
-      const normalizedWeak = normalizeMatchText(weak);
-      let keyword = "";
-      let strength = "";
-      const locations: string[] = [];
-      if (whitelistEntry?.处理方式 === "别名") {
-        const aliasKeyword = whitelistEntry.匹配别名关键词.find(
-          (value) => normalizedGroup.includes(value) || normalizedContent.includes(value),
-        );
-        if (aliasKeyword && normalizedGroup.includes(aliasKeyword)) locations.push("群名");
-        if (aliasKeyword && normalizedContent.includes(aliasKeyword)) locations.push("聊天内容");
-        if (locations.length) {
-          keyword = aliasKeyword || "";
-          strength = "别名匹配";
-        }
-      }
-      if (!locations.length) {
-        if (normalizedStrong && normalizedGroup.includes(normalizedStrong)) locations.push("群名");
-        if (normalizedStrong && normalizedContent.includes(normalizedStrong)) {
-          locations.push("聊天内容");
-        }
-        if (locations.length) {
-          keyword = strong;
-          strength = "强匹配";
-        }
-      }
-      if (!locations.length && weak) {
-        if (normalizedGroup.includes(normalizedWeak)) locations.push("群名");
-        if (normalizedContent.includes(normalizedWeak)) locations.push("聊天内容");
-        if (locations.length) {
-          keyword = weak;
-          strength = "弱匹配";
-        }
-      }
-      if (locations.length) {
-        matches.push({
-          ...chat,
-          匹配强度: strength,
-          命中位置: locations.join("+"),
-          命中关键词: keyword,
-        });
-      }
-    }
+  targetPlans.forEach((plan, targetIndex) => {
+    const { target, strong, weak, whitelistEntry, teacherExempt, whitelistExempt } = plan;
+    const hitsByKeyword = whitelistExempt || teacherExempt ? undefined : hitsByEmail.get(target.教师邮箱);
+    const matchesByChat = new Map<number, MatchedChat>();
+    plan.aliasKeywords.forEach((keyword) =>
+      addMatchesFromHits(matchesByChat, hitsByKeyword, keyword, keyword, "别名匹配"),
+    );
+    addMatchesFromHits(matchesByChat, hitsByKeyword, plan.normalizedStrong, strong, "强匹配");
+    addMatchesFromHits(matchesByChat, hitsByKeyword, plan.normalizedWeak, weak, "弱匹配");
+    const matches = [...matchesByChat.values()];
     const matchPriority: Record<string, number> = {
       别名匹配: 0,
       强匹配: 1,
@@ -113,7 +196,6 @@ export function matchData(
         sortDate(a.聊天时间) - sortDate(b.聊天时间),
     );
     const best = matches[0];
-    const whitelistExempt = whitelistEntry?.处理方式 === "免检";
     const status = whitelistExempt || teacherExempt || Boolean(best) ? "已发送" : "未发送";
     const conclusion = whitelistExempt ? "白名单免检" : best?.匹配强度 || (teacherExempt ? "强匹配" : "无匹配");
     counts[status as "已发送" | "未发送"] += 1;

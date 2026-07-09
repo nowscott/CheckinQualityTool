@@ -2,6 +2,10 @@ import { findSheet } from "./excelReader";
 import { buildReminderOutput } from "./reminderExcelWriter";
 import type { ReminderListInfo, ReminderTarget } from "./reminderListParser";
 import {
+  applyReminderTouchSummary,
+  type ReminderTouchInfo,
+} from "./reminderTouchSummary";
+import {
   buildReminderGroupSummary,
   matchReminderData,
   type ReminderMatchInfo,
@@ -150,6 +154,7 @@ export function buildIncrementalReminderOutput(
   includeCleanChats: boolean,
   includeResultColors = false,
   whitelist?: Whitelist,
+  touchInfo?: ReminderTouchInfo,
 ) {
   const studentSheet = findSheet(previousWorkbook, STUDENT_REQUIRED_HEADERS);
   const previousRows = rowsToObjects(studentSheet.rows);
@@ -183,7 +188,7 @@ export function buildIncrementalReminderOutput(
     return next;
   });
   const counts = buildCounts(finalRows, incrementalSent, eligibleTargets.length);
-  const matchInfo: ReminderMatchInfo = {
+  const baseMatchInfo: ReminderMatchInfo = {
     studentRows: finalRows,
     teacherRows: buildReminderGroupSummary(
       finalRows,
@@ -195,6 +200,7 @@ export function buildIncrementalReminderOutput(
     exceptionRows: [...exceptionRows, ...incrementalMatches.exceptionRows],
     counts,
   };
+  const matchInfo = touchInfo ? applyReminderTouchSummary(baseMatchInfo, touchInfo) : baseMatchInfo;
   matchInfo.counts.异常明细行数 = matchInfo.exceptionRows.length;
   return {
     output: buildReminderOutput(
@@ -207,8 +213,8 @@ export function buildIncrementalReminderOutput(
     ),
     summary: {
       targets: finalRows.length,
-      sent: counts.已发送数,
-      unsent: counts.未发送数,
+      sent: matchInfo.counts.有效触达数 || counts.已发送数,
+      unsent: Math.max(0, (matchInfo.counts.应发送数 || counts.应发送数) - (matchInfo.counts.有效触达数 || counts.已发送数)),
       exceptions: matchInfo.counts.异常明细行数,
       incrementalSent,
     },

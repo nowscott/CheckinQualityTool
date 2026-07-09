@@ -52,6 +52,7 @@ export default function App() {
   const [reminderListFile, setReminderListFile] = useState<File | null>(null);
   const [reminderAppealFile, setReminderAppealFile] = useState<File | null>(null);
   const [reminderPreviousFile, setReminderPreviousFile] = useState<File | null>(null);
+  const [reminderSummaryFiles, setReminderSummaryFiles] = useState<File[]>([]);
   const [reminderChatFiles, setReminderChatFiles] = useState<File[]>([]);
   const [includeReminderChats, setIncludeReminderChats] = useState(false);
   const [includeReminderColors, setIncludeReminderColors] = useState(false);
@@ -162,7 +163,7 @@ export default function App() {
 
   async function handleReminderSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!reminderChatFiles.length) return;
+    if (!reminderSummaryFiles.length) return;
     if (reminderMode === "full" && !reminderListFile) return;
     if (reminderMode === "incremental" && !reminderPreviousFile) return;
 
@@ -183,8 +184,8 @@ export default function App() {
         updateStatus(
           "处理完成，结果已下载",
           incremental
-            ? `开课提醒增量 ${data.summary.targets.toLocaleString()} 条：本次新增发送 ${Number(data.summary.incrementalSent || 0).toLocaleString()}，当前已发送 ${data.summary.sent.toLocaleString()}，未发送 ${data.summary.unsent.toLocaleString()}；聊天文件 ${Number(data.summary.chatFiles || 0).toLocaleString()} 个，清洗后聊天 ${data.summary.cleanChats.toLocaleString()} 条。`
-            : `开课提醒 ${data.summary.targets.toLocaleString()} 条：已发送 ${data.summary.sent.toLocaleString()}，未发送 ${data.summary.unsent.toLocaleString()}，异常核对 ${Number(data.summary.exceptions || 0).toLocaleString()}；聊天文件 ${Number(data.summary.chatFiles || 0).toLocaleString()} 个，清洗后聊天 ${data.summary.cleanChats.toLocaleString()} 条。`,
+            ? `开课提醒增量 ${data.summary.targets.toLocaleString()} 条：本次新增明细发送 ${Number(data.summary.incrementalSent || 0).toLocaleString()}，有效触达 ${data.summary.sent.toLocaleString()}，未触达 ${data.summary.unsent.toLocaleString()}；汇总文件 ${Number(data.summary.summaryFiles || 0).toLocaleString()} 个，聊天参考文件 ${Number(data.summary.chatFiles || 0).toLocaleString()} 个。`
+            : `开课提醒 ${data.summary.targets.toLocaleString()} 条：有效触达 ${data.summary.sent.toLocaleString()}，未触达 ${data.summary.unsent.toLocaleString()}，异常核对 ${Number(data.summary.exceptions || 0).toLocaleString()}；汇总文件 ${Number(data.summary.summaryFiles || 0).toLocaleString()} 个，聊天参考文件 ${Number(data.summary.chatFiles || 0).toLocaleString()} 个。`,
           100,
           "done",
         );
@@ -215,6 +216,7 @@ export default function App() {
         mode: "reminder",
         reminderMode: "incremental",
         previousFile: reminderPreviousFile,
+        summaryFiles: reminderSummaryFiles,
         chatFiles: reminderChatFiles,
         includeCleanChats: false,
         includeResultColors: includeReminderColors,
@@ -227,6 +229,7 @@ export default function App() {
         reminderMode: "full",
         denominatorFile: reminderListFile,
         appealFile: reminderAppealFile,
+        summaryFiles: reminderSummaryFiles,
         chatFiles: reminderChatFiles,
         includeCleanChats: includeReminderChats,
         includeResultColors: includeReminderColors,
@@ -241,10 +244,10 @@ export default function App() {
         <Header
           theme={theme}
           usesSystemTheme={usesSystemTheme}
-          title={activeMode === "reminder" ? "开课提醒发送率公示" : "打卡质检数据生成"}
+          title={activeMode === "reminder" ? "开课提醒触达完成率公示" : "打卡质检数据生成"}
           subtitle={
             activeMode === "reminder"
-              ? "上传开课提醒学员明细名单与企微聊天质检结果，在浏览器本地匹配群聊名称和聊天内容，生成发送率公示 Excel。文件不会上传服务器。"
+              ? "上传开课提醒学员明细名单与聊天质检汇总文件，在浏览器本地计算教师及以上维度触达完成率。文件不会上传服务器。"
               : undefined
           }
           showGuide={activeMode === "checkin"}
@@ -264,6 +267,7 @@ export default function App() {
             denominatorFile={reminderListFile}
             appealFile={reminderAppealFile}
             previousFile={reminderPreviousFile}
+            summaryFiles={reminderSummaryFiles}
             chatFiles={reminderChatFiles}
             includeCleanChats={includeReminderChats}
             includeResultColors={includeReminderColors}
@@ -272,6 +276,7 @@ export default function App() {
             onDenominatorFileChange={setReminderListFile}
             onAppealFileChange={setReminderAppealFile}
             onPreviousFileChange={setReminderPreviousFile}
+            onSummaryFilesChange={setReminderSummaryFiles}
             onChatFilesChange={setReminderChatFiles}
             onIncludeCleanChatsChange={setIncludeReminderChats}
             onIncludeResultColorsChange={setIncludeReminderColors}

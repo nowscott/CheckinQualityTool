@@ -11,6 +11,12 @@ import { buildIncrementalReminderOutput } from "./reminderIncremental";
 import { buildReminderOutput } from "./reminderExcelWriter";
 import { buildReminderTargets } from "./reminderListParser";
 import { matchReminderData } from "./reminderMatching";
+import {
+  applyReminderTouchSummary,
+  mergeReminderTouchInfos,
+  parseReminderTouchSummary,
+  type ReminderTouchInfo,
+} from "./reminderTouchSummary";
 import { ensureSheetJs } from "./sheetJsLoader";
 import type { ChatInfo, WorkerRequest } from "./types";
 import { inferServiceWeek } from "./utils";
@@ -37,6 +43,53 @@ function mergeChatInfos(infos: ChatInfo[]): ChatInfo {
   };
 }
 
+function emptyChatInfo(): ChatInfo {
+  return {
+    chats: [],
+    counts: {
+      原始聊天行数: 0,
+      清洗后聊天行数: 0,
+    },
+    sheetName: "",
+  };
+}
+
+async function readSummaryFiles(files: File[], stageStart: number, stageEnd: number): Promise<ReminderTouchInfo> {
+  if (!files.length) throw new Error("请至少上传 1 个聊天质检汇总文件。");
+  const infos: ReminderTouchInfo[] = [];
+  for (let index = 0; index < files.length; index += 1) {
+    const summaryFile = files[index];
+    const fileStart = stageStart + Math.floor((index * (stageEnd - stageStart)) / files.length);
+    const fileEnd = stageStart + Math.floor(((index + 1) * (stageEnd - stageStart)) / files.length);
+    const workbook = await readWorkbook(
+      summaryFile,
+      fileStart,
+      fileEnd,
+      `聊天汇总 ${index + 1}/${files.length}`,
+    );
+    infos.push(parseReminderTouchSummary(workbook, summaryFile.name));
+  }
+  return mergeReminderTouchInfos(infos);
+}
+
+async function readChatFiles(files: File[], stageStart: number, stageEnd: number): Promise<ChatInfo> {
+  if (!files.length) return emptyChatInfo();
+  const chatInfos: ChatInfo[] = [];
+  for (let index = 0; index < files.length; index += 1) {
+    const chatFile = files[index];
+    const fileStart = stageStart + Math.floor((index * (stageEnd - stageStart)) / files.length);
+    const fileEnd = stageStart + Math.floor(((index + 1) * (stageEnd - stageStart)) / files.length);
+    const chatWorkbook = await readWorkbook(
+      chatFile,
+      fileStart,
+      fileEnd,
+      `聊天明细 ${index + 1}/${files.length}`,
+    );
+    chatInfos.push(preprocessChats(chatWorkbook, chatFile.name));
+  }
+  return mergeChatInfos(chatInfos);
+}
+
 function localMonthDay(date = new Date()) {
   return `${date.getMonth() + 1}.${date.getDate()}`;
 }
@@ -47,40 +100,36 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
     await ensureSheetJs();
 
     if (data.mode === "reminder") {
-      if (!data.chatFiles.length) throw new Error("请至少上传 1 个企微聊天质检结果文件。");
       const whitelist = data.whitelistCsv ? buildWhitelist(data.whitelistCsv) : buildWhitelist("");
       if (data.reminderMode === "incremental") {
         const previousWorkbook = await readWorkbook(data.previousFile, 3, 22, "上次开课提醒结果");
         progress("上次结果读取完成", "正在从“学员名单”中识别未发送行。", 26);
 
-        const chatInfos: ChatInfo[] = [];
-        for (let index = 0; index < data.chatFiles.length; index += 1) {
-          const chatFile = data.chatFiles[index];
-          const stageStart = 30 + Math.floor((index * 26) / data.chatFiles.length);
-          const stageEnd = 30 + Math.floor(((index + 1) * 26) / data.chatFiles.length);
-          const chatWorkbook = await readWorkbook(
-            chatFile,
-            stageStart,
-            stageEnd,
-            `聊天明细 ${index + 1}/${data.chatFiles.length}`,
-          );
-          chatInfos.push(preprocessChats(chatWorkbook, chatFile.name));
-        }
-        const chatInfo = mergeChatInfos(chatInfos);
+        const touchInfo = await readSummaryFiles(data.summaryFiles, 28, 48);
         progress(
-          "聊天预处理完成",
-          `${data.chatFiles.length.toLocaleString()} 个文件，原始 ${chatInfo.counts.原始聊天行数.toLocaleString()} 条，清洗后 ${chatInfo.chats.length.toLocaleString()} 条。`,
-          60,
+          "汇总文件读取完成",
+          `${data.summaryFiles.length.toLocaleString()} 个文件，汇总触达 ${touchInfo.counts.汇总触达数.toLocaleString()} 次。`,
+          50,
+        );
+
+        const chatInfo = await readChatFiles(data.chatFiles, 50, 60);
+        progress(
+          data.chatFiles.length ? "聊天预处理完成" : "未上传聊天明细",
+          data.chatFiles.length
+            ? `${data.chatFiles.length.toLocaleString()} 个参考文件，原始 ${chatInfo.counts.原始聊天行数.toLocaleString()} 条，清洗后 ${chatInfo.chats.length.toLocaleString()} 条。`
+            : "将只按汇总文件计算教师及以上维度触达完成率。",
+          62,
         );
 
         progress("正在增量匹配开课提醒", "仅对上次结果中仍未发送的学员行尝试补齐命中信息。", 70);
         const result = buildIncrementalReminderOutput(previousWorkbook, chatInfo, {
           list: data.previousFile.name,
           chat: data.chatFiles.map((file) => file.name).join("；"),
-        }, data.includeCleanChats, data.includeResultColors, whitelist);
+          summary: data.summaryFiles.map((file) => file.name).join("；"),
+        }, data.includeCleanChats, data.includeResultColors, whitelist, touchInfo);
         progress(
-          "增量匹配完成",
-          `本次新增发送 ${result.summary.incrementalSent.toLocaleString()} 条，当前已发送 ${result.summary.sent.toLocaleString()} 条。`,
+          "增量处理完成",
+          `本次新增明细发送 ${result.summary.incrementalSent.toLocaleString()} 条，有效触达 ${result.summary.sent.toLocaleString()} 条。`,
           82,
         );
 
@@ -97,6 +146,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
             unsent: result.summary.unsent,
             exceptions: result.summary.exceptions,
             incrementalSent: result.summary.incrementalSent,
+            summaryFiles: data.summaryFiles.length,
             chatFiles: data.chatFiles.length,
             cleanChats: chatInfo.chats.length,
           },
@@ -121,31 +171,28 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
         );
       }
 
-      const chatInfos: ChatInfo[] = [];
-      for (let index = 0; index < data.chatFiles.length; index += 1) {
-        const chatFile = data.chatFiles[index];
-        const stageStart = 30 + Math.floor((index * 26) / data.chatFiles.length);
-        const stageEnd = 30 + Math.floor(((index + 1) * 26) / data.chatFiles.length);
-        const chatWorkbook = await readWorkbook(
-          chatFile,
-          stageStart,
-          stageEnd,
-          `聊天明细 ${index + 1}/${data.chatFiles.length}`,
-        );
-        chatInfos.push(preprocessChats(chatWorkbook, chatFile.name));
-      }
-      const chatInfo = mergeChatInfos(chatInfos);
+      const touchInfo = await readSummaryFiles(data.summaryFiles, 36, 58);
       progress(
-        "聊天预处理完成",
-        `${data.chatFiles.length.toLocaleString()} 个文件，原始 ${chatInfo.counts.原始聊天行数.toLocaleString()} 条，清洗后 ${chatInfo.chats.length.toLocaleString()} 条。`,
+        "汇总文件读取完成",
+        `${data.summaryFiles.length.toLocaleString()} 个文件，汇总触达 ${touchInfo.counts.汇总触达数.toLocaleString()} 次。`,
         60,
       );
 
-      progress("正在匹配开课提醒", "按群聊名称和聊天内容中的学员姓名执行三档优先级匹配。", 68);
-      const matchInfo = matchReminderData(listInfo, chatInfo.chats, appealInfo);
+      const chatInfo = await readChatFiles(data.chatFiles, 60, 68);
+      progress(
+        data.chatFiles.length ? "聊天预处理完成" : "未上传聊天明细",
+        data.chatFiles.length
+          ? `${data.chatFiles.length.toLocaleString()} 个参考文件，原始 ${chatInfo.counts.原始聊天行数.toLocaleString()} 条，清洗后 ${chatInfo.chats.length.toLocaleString()} 条。`
+          : "将只按汇总文件计算教师及以上维度触达完成率。",
+        68,
+      );
+
+      progress("正在匹配开课提醒", "聊天明细用于学员名单参考；教师汇总会按汇总文件触达数重算。", 72);
+      const baseMatchInfo = matchReminderData(listInfo, chatInfo.chats, appealInfo);
+      const matchInfo = applyReminderTouchSummary(baseMatchInfo, touchInfo);
       progress(
         "匹配完成",
-        `应发送 ${matchInfo.counts.应发送数.toLocaleString()}，已发送 ${matchInfo.counts.已发送数.toLocaleString()}，异常 ${matchInfo.counts.异常明细行数.toLocaleString()}。`,
+        `应发送 ${matchInfo.counts.应发送数.toLocaleString()}，有效触达 ${matchInfo.counts.有效触达数.toLocaleString()}，异常 ${matchInfo.counts.异常明细行数.toLocaleString()}。`,
         80,
       );
 
@@ -153,6 +200,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       const output = buildReminderOutput(listInfo, chatInfo, matchInfo, {
         list: data.denominatorFile.name,
         chat: data.chatFiles.map((file) => file.name).join("；"),
+        summary: data.summaryFiles.map((file) => file.name).join("；"),
       }, data.includeCleanChats, data.includeResultColors);
       const buffer = output.buffer as ArrayBuffer;
       workerScope.postMessage({
@@ -162,9 +210,10 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
         summary: {
           mode: "reminder",
           targets: listInfo.targets.length,
-          sent: matchInfo.counts.已发送数,
-          unsent: matchInfo.counts.未发送数,
+          sent: matchInfo.counts.有效触达数 || 0,
+          unsent: Math.max(0, (matchInfo.counts.应发送数 || 0) - (matchInfo.counts.有效触达数 || 0)),
           exceptions: matchInfo.counts.异常明细行数,
+          summaryFiles: data.summaryFiles.length,
           chatFiles: data.chatFiles.length,
           cleanChats: chatInfo.chats.length,
         },
