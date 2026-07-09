@@ -235,12 +235,13 @@ export function applyReminderTouchSummary(
     const matched = matchedBucket(row, touchInfo);
     if (!matched) {
       if (total > 0) teacherRowsWithoutSummary += 1;
-      const currentRate = total ? 0 : 0;
+      const existingSent = Number(row.已发送数) || 0;
+      const currentRate = total ? existingSent / total : 0;
       return {
         ...row,
-        汇总触达数: 0,
-        有效触达数: 0,
-        触达差额: total,
+        汇总触达数: existingSent,
+        有效触达数: existingSent,
+        触达差额: Math.max(0, total - existingSent),
         触达完成率: rateText(currentRate),
         触达匹配方式: "",
         触达来源文件: "",
