@@ -7,7 +7,6 @@ import { buildTargets } from "./listParser";
 import { matchData } from "./matching";
 import { progress } from "./progress";
 import { buildReminderAppeals } from "./reminderAppealParser";
-import { buildIncrementalReminderOutput } from "./reminderIncremental";
 import { buildReminderOutput } from "./reminderExcelWriter";
 import { buildReminderTargets } from "./reminderListParser";
 import { matchReminderData } from "./reminderMatching";
@@ -101,58 +100,6 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
 
     if (data.mode === "reminder") {
       const whitelist = data.whitelistCsv ? buildWhitelist(data.whitelistCsv) : buildWhitelist("");
-      if (data.reminderMode === "incremental") {
-        const previousWorkbook = await readWorkbook(data.previousFile, 3, 22, "上次开课提醒结果");
-        progress("上次结果读取完成", "正在从“学员名单”中识别未发送行。", 26);
-
-        const touchInfo = await readSummaryFiles(data.summaryFiles, 28, 48);
-        progress(
-          "汇总文件读取完成",
-          `${data.summaryFiles.length.toLocaleString()} 个文件，汇总触达 ${touchInfo.counts.汇总触达数.toLocaleString()} 次。`,
-          50,
-        );
-
-        const chatInfo = await readChatFiles(data.chatFiles, 50, 60);
-        progress(
-          data.chatFiles.length ? "聊天预处理完成" : "未上传聊天明细",
-          data.chatFiles.length
-            ? `${data.chatFiles.length.toLocaleString()} 个参考文件，原始 ${chatInfo.counts.原始聊天行数.toLocaleString()} 条，清洗后 ${chatInfo.chats.length.toLocaleString()} 条。`
-            : "将只按汇总文件计算教师及以上维度触达完成率。",
-          62,
-        );
-
-        progress("正在增量匹配开课提醒", "仅对上次结果中仍未发送的学员行尝试补齐命中信息。", 70);
-        const result = buildIncrementalReminderOutput(previousWorkbook, chatInfo, {
-          list: data.previousFile.name,
-          chat: data.chatFiles.map((file) => file.name).join("；"),
-          summary: data.summaryFiles.map((file) => file.name).join("；"),
-        }, data.includeCleanChats, data.includeResultColors, whitelist, touchInfo);
-        progress(
-          "增量处理完成",
-          `本次新增明细发送 ${result.summary.incrementalSent.toLocaleString()} 条，有效触达 ${result.summary.sent.toLocaleString()} 条。`,
-          82,
-        );
-
-        const buffer = result.output.buffer as ArrayBuffer;
-        workerScope.postMessage({
-          type: "complete",
-          buffer,
-          filename: `暑期开课提醒话术发送进度-增量（${localMonthDay()}）.xlsx`,
-          summary: {
-            mode: "reminder",
-            reminderMode: "incremental",
-            targets: result.summary.targets,
-            sent: result.summary.sent,
-            unsent: result.summary.unsent,
-            exceptions: result.summary.exceptions,
-            incrementalSent: result.summary.incrementalSent,
-            summaryFiles: data.summaryFiles.length,
-            chatFiles: data.chatFiles.length,
-            cleanChats: chatInfo.chats.length,
-          },
-        }, [buffer]);
-        return;
-      }
       const listWorkbook = await readWorkbook(data.denominatorFile, 3, 22, "开课提醒学员明细");
       const listInfo = buildReminderTargets(listWorkbook, whitelist);
       progress(

@@ -95,7 +95,6 @@ export interface ProcessRequest {
 export interface ReminderProcessRequest {
   type: "process";
   mode: "reminder";
-  reminderMode?: "full";
   denominatorFile: File;
   appealFile?: File | null;
   summaryFiles: File[];
@@ -105,19 +104,7 @@ export interface ReminderProcessRequest {
   whitelistCsv: string;
 }
 
-export interface ReminderIncrementalProcessRequest {
-  type: "process";
-  mode: "reminder";
-  reminderMode: "incremental";
-  previousFile: File;
-  summaryFiles: File[];
-  chatFiles: File[];
-  includeCleanChats: boolean;
-  includeResultColors: boolean;
-  whitelistCsv: string;
-}
-
-export type WorkerRequest = ProcessRequest | ReminderProcessRequest | ReminderIncrementalProcessRequest;
+export type WorkerRequest = ProcessRequest | ReminderProcessRequest;
 
 export interface SheetDefinition {
   name: string;

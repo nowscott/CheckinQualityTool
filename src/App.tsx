@@ -48,10 +48,8 @@ export default function App() {
   const [activeMode, setActiveMode] = useState<ToolMode>(modeFromPath);
   const [listFile, setListFile] = useState<File | null>(null);
   const [chatFile, setChatFile] = useState<File | null>(null);
-  const [reminderMode, setReminderMode] = useState<"full" | "incremental">("full");
   const [reminderListFile, setReminderListFile] = useState<File | null>(null);
   const [reminderAppealFile, setReminderAppealFile] = useState<File | null>(null);
-  const [reminderPreviousFile, setReminderPreviousFile] = useState<File | null>(null);
   const [reminderSummaryFiles, setReminderSummaryFiles] = useState<File[]>([]);
   const [reminderChatFiles, setReminderChatFiles] = useState<File[]>([]);
   const [includeReminderChats, setIncludeReminderChats] = useState(false);
@@ -164,8 +162,7 @@ export default function App() {
   async function handleReminderSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!reminderSummaryFiles.length) return;
-    if (reminderMode === "full" && !reminderListFile) return;
-    if (reminderMode === "incremental" && !reminderPreviousFile) return;
+    if (!reminderListFile) return;
 
     workerRef.current?.terminate();
     const worker = createProcessingWorker();
@@ -180,12 +177,9 @@ export default function App() {
       }
       if (data.type === "complete") {
         downloadResult(data.buffer, data.filename);
-        const incremental = data.summary.reminderMode === "incremental";
         updateStatus(
           "处理完成，结果已下载",
-          incremental
-            ? `开课提醒增量 ${data.summary.targets.toLocaleString()} 条：本次新增明细发送 ${Number(data.summary.incrementalSent || 0).toLocaleString()}，有效触达 ${data.summary.sent.toLocaleString()}，未触达 ${data.summary.unsent.toLocaleString()}；汇总文件 ${Number(data.summary.summaryFiles || 0).toLocaleString()} 个，聊天参考文件 ${Number(data.summary.chatFiles || 0).toLocaleString()} 个。`
-            : `开课提醒 ${data.summary.targets.toLocaleString()} 条：有效触达 ${data.summary.sent.toLocaleString()}，未触达 ${data.summary.unsent.toLocaleString()}，异常核对 ${Number(data.summary.exceptions || 0).toLocaleString()}；汇总文件 ${Number(data.summary.summaryFiles || 0).toLocaleString()} 个，聊天参考文件 ${Number(data.summary.chatFiles || 0).toLocaleString()} 个。`,
+          `开课提醒 ${data.summary.targets.toLocaleString()} 条：有效触达 ${data.summary.sent.toLocaleString()}，未触达 ${data.summary.unsent.toLocaleString()}，异常核对 ${Number(data.summary.exceptions || 0).toLocaleString()}；汇总文件 ${Number(data.summary.summaryFiles || 0).toLocaleString()} 个，聊天参考文件 ${Number(data.summary.chatFiles || 0).toLocaleString()} 个。`,
           100,
           "done",
         );
@@ -210,32 +204,17 @@ export default function App() {
       return;
     }
 
-    if (reminderMode === "incremental") {
-      worker.postMessage({
-        type: "process",
-        mode: "reminder",
-        reminderMode: "incremental",
-        previousFile: reminderPreviousFile,
-        summaryFiles: reminderSummaryFiles,
-        chatFiles: reminderChatFiles,
-        includeCleanChats: false,
-        includeResultColors: includeReminderColors,
-        whitelistCsv,
-      });
-    } else {
-      worker.postMessage({
-        type: "process",
-        mode: "reminder",
-        reminderMode: "full",
-        denominatorFile: reminderListFile,
-        appealFile: reminderAppealFile,
-        summaryFiles: reminderSummaryFiles,
-        chatFiles: reminderChatFiles,
-        includeCleanChats: includeReminderChats,
-        includeResultColors: includeReminderColors,
-        whitelistCsv,
-      });
-    }
+    worker.postMessage({
+      type: "process",
+      mode: "reminder",
+      denominatorFile: reminderListFile,
+      appealFile: reminderAppealFile,
+      summaryFiles: reminderSummaryFiles,
+      chatFiles: reminderChatFiles,
+      includeCleanChats: includeReminderChats,
+      includeResultColors: includeReminderColors,
+      whitelistCsv,
+    });
   }
 
   return (
@@ -263,19 +242,15 @@ export default function App() {
         />
         {activeMode === "reminder" ? (
           <ReminderForm
-            reminderMode={reminderMode}
             denominatorFile={reminderListFile}
             appealFile={reminderAppealFile}
-            previousFile={reminderPreviousFile}
             summaryFiles={reminderSummaryFiles}
             chatFiles={reminderChatFiles}
             includeCleanChats={includeReminderChats}
             includeResultColors={includeReminderColors}
             processing={processing}
-            onReminderModeChange={setReminderMode}
             onDenominatorFileChange={setReminderListFile}
             onAppealFileChange={setReminderAppealFile}
-            onPreviousFileChange={setReminderPreviousFile}
             onSummaryFilesChange={setReminderSummaryFiles}
             onChatFilesChange={setReminderChatFiles}
             onIncludeCleanChatsChange={setIncludeReminderChats}

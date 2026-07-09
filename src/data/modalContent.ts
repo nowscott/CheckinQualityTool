@@ -1,5 +1,13 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.5.14",
+    date: "2026-07-09 18:30",
+    items: [
+      "移除开课提醒增量更新功能，简化表单为纯全量生成模式。",
+      "删除 reminderIncremental 模块、ReminderIncrementalProcessRequest 类型及相关增量匹配逻辑。",
+    ],
+  },
+  {
     version: "v2.5.13",
     date: "2026-07-09 18:30",
     items: [
