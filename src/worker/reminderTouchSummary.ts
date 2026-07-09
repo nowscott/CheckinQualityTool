@@ -238,12 +238,13 @@ export function applyReminderTouchSummary(
       const currentRate = total ? 0 : 0;
       return {
         ...row,
-        已发送数: 0,
-        发送差额: total,
-        发送率: rateText(total ? 0 : 0),
+        汇总触达数: 0,
+        有效触达数: 0,
+        触达差额: total,
+        触达完成率: rateText(currentRate),
         触达匹配方式: "",
         触达来源文件: "",
-        是否达标: passText(total ? 0 : 0),
+        是否达标: passText(currentRate),
       };
     }
     if (matched.bucket.email) matchedEmails.add(matched.bucket.email);
@@ -256,8 +257,12 @@ export function applyReminderTouchSummary(
     return {
       ...row,
       已发送数: effective,
+      汇总触达数: rawTouches,
+      有效触达数: effective,
+      触达差额: Math.max(0, total - effective),
       发送差额: Math.max(0, total - effective),
       发送率: rateText(currentRate),
+      触达完成率: rateText(currentRate),
       触达匹配方式: matched.method,
       触达来源文件: [...matched.bucket.sourceFiles].sort((a, b) => a.localeCompare(b, "zh-CN")).join("；"),
       是否达标: passText(currentRate),
@@ -279,7 +284,7 @@ export function applyReminderTouchSummary(
       上传汇总有效行数: touchInfo.counts.有效汇总行数 || 0,
       上传汇总触达数: touchInfo.counts.汇总触达数 || 0,
       汇总触达数: summaryTouches,
-      已发送数: effectiveTouches,
+      有效触达数: effectiveTouches,
       未匹配到分母老师的汇总记录数: unmatchedSummaryRecords,
       分母老师未匹配汇总记录数: teacherRowsWithoutSummary,
     },

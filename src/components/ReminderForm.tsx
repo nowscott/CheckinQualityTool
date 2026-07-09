@@ -66,7 +66,7 @@ export function ReminderForm({
               name="reminder_summary_file"
               step="03"
               title="聊天质检汇总文件"
-              description="可同时选择多个关键词汇总 Excel，教师及以上维度按发送率计算"
+              description="可同时选择多个关键词汇总 Excel，教师及以上维度按触达完成率计算"
               files={summaryFiles}
               onChange={onSummaryFilesChange}
             />
@@ -120,7 +120,7 @@ export function ReminderForm({
         </div>
 
         <button id="reminder-submit-button" type="submit" disabled={processing}>
-          <span>生成发送率公示</span>
+          <span>生成触达完成率公示</span>
           <small>
             默认输出公示表、学员名单、维度汇总、匹配核对/异常明细和处理说明
           </small>
