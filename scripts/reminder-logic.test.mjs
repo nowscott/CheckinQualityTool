@@ -411,7 +411,7 @@ test("汇总文件同一老师跨文件按邮箱累加触达数", () => {
   assert.equal(info.counts.汇总文件数, 2);
 });
 
-test("触达完成率按应发送数封顶，超过 100% 仍按 100% 计算", () => {
+test("发送率按应发送数封顶，超过 100% 仍按 100% 计算", () => {
   const list = buildReminderTargets(workbook([
     ["授课教师", "邮箱", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
     ...reminderRows("张老师", 7, { email: "zhang@xdf.cn" }),
@@ -421,11 +421,10 @@ test("触达完成率按应发送数封顶，超过 100% 仍按 100% 计算", ()
     ["张老师", "", "zhang", "zhang@xdf.cn", "", "益智组", 3, 0, 5, 0],
   ]), "汇总.xlsx");
   const result = applyReminderTouchSummary(base, touchInfo);
-  assert.equal(result.teacherRows[0].汇总触达数, 8);
-  assert.equal(result.teacherRows[0].有效触达数, 7);
-  assert.equal(result.teacherRows[0].触达完成率, "100.0%");
+  assert.equal(result.teacherRows[0].已发送数, 7);
+  assert.equal(result.teacherRows[0].发送率, "100.0%");
   assert.equal(result.teacherRows[0].是否达标, "是");
-  assert.equal(result.counts.有效触达数, 7);
+  assert.equal(result.counts.已发送数, 7);
 });
 
 test("汇总文件可在名单无邮箱时用去数字后缀姓名兜底匹配", () => {
@@ -438,8 +437,7 @@ test("汇总文件可在名单无邮箱时用去数字后缀姓名兜底匹配",
     ["王芳9", "", "wangfang", "wangfang@xdf.cn", "", "益智组", 1, 0, 1, 0],
   ]), "汇总.xlsx");
   const result = applyReminderTouchSummary(base, touchInfo);
-  assert.equal(result.teacherRows[0].汇总触达数, 2);
-  assert.equal(result.teacherRows[0].有效触达数, 2);
+  assert.equal(result.teacherRows[0].已发送数, 2);
   assert.equal(result.teacherRows[0].触达匹配方式, "姓名匹配");
   assert.equal(result.counts.分母老师未匹配汇总记录数, 0);
 });
@@ -454,7 +452,7 @@ test("汇总文件缺少必需字段时报清晰错误", () => {
   );
 });
 
-test("未上传聊天明细时仍可用汇总文件生成教师维度触达完成率", () => {
+test("未上传聊天明细时仍可用汇总文件生成教师维度发送率", () => {
   const list = buildReminderTargets(workbook([
     ["授课教师", "邮箱", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
     ...reminderRows("李老师", 2, { email: "li@xdf.cn" }),
@@ -465,6 +463,6 @@ test("未上传聊天明细时仍可用汇总文件生成教师维度触达完�
     ["李老师", "", "li", "li@xdf.cn", "", "益智组", 0, 0, 1, 0],
   ]), "汇总.xlsx");
   const result = applyReminderTouchSummary(base, touchInfo);
-  assert.equal(result.teacherRows[0].有效触达数, 1);
-  assert.equal(result.teacherRows[0].触达完成率, "50.0%");
+  assert.equal(result.teacherRows[0].已发送数, 1);
+  assert.equal(result.teacherRows[0].发送率, "50.0%");
 });

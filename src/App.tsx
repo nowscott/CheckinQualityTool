@@ -179,7 +179,7 @@ export default function App() {
         downloadResult(data.buffer, data.filename);
         updateStatus(
           "处理完成，结果已下载",
-          `开课提醒 ${data.summary.targets.toLocaleString()} 条：有效触达 ${data.summary.sent.toLocaleString()}，未触达 ${data.summary.unsent.toLocaleString()}，异常核对 ${Number(data.summary.exceptions || 0).toLocaleString()}；汇总文件 ${Number(data.summary.summaryFiles || 0).toLocaleString()} 个，聊天参考文件 ${Number(data.summary.chatFiles || 0).toLocaleString()} 个。`,
+          `开课提醒 ${data.summary.targets.toLocaleString()} 条：已发送 ${data.summary.sent.toLocaleString()}，未发送 ${data.summary.unsent.toLocaleString()}，异常核对 ${Number(data.summary.exceptions || 0).toLocaleString()}；汇总文件 ${Number(data.summary.summaryFiles || 0).toLocaleString()} 个，聊天参考文件 ${Number(data.summary.chatFiles || 0).toLocaleString()} 个。`,
           100,
           "done",
         );
@@ -223,10 +223,10 @@ export default function App() {
         <Header
           theme={theme}
           usesSystemTheme={usesSystemTheme}
-          title={activeMode === "reminder" ? "开课提醒触达完成率公示" : "打卡质检数据生成"}
+          title={activeMode === "reminder" ? "开课提醒发送率公示" : "打卡质检数据生成"}
           subtitle={
             activeMode === "reminder"
-              ? "上传开课提醒学员明细名单与聊天质检汇总文件，在浏览器本地计算教师及以上维度触达完成率。文件不会上传服务器。"
+              ? "上传开课提醒学员明细名单与聊天质检汇总文件，在浏览器本地计算教师及以上维度发送率。文件不会上传服务器。"
               : undefined
           }
           showGuide={activeMode === "checkin"}

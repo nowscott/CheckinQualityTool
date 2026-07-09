@@ -130,7 +130,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
         data.chatFiles.length ? "聊天预处理完成" : "未上传聊天明细",
         data.chatFiles.length
           ? `${data.chatFiles.length.toLocaleString()} 个参考文件，原始 ${chatInfo.counts.原始聊天行数.toLocaleString()} 条，清洗后 ${chatInfo.chats.length.toLocaleString()} 条。`
-          : "将只按汇总文件计算教师及以上维度触达完成率。",
+          : "将只按汇总文件计算教师及以上维度发送率。",
         68,
       );
 
@@ -139,7 +139,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       const matchInfo = applyReminderTouchSummary(baseMatchInfo, touchInfo);
       progress(
         "匹配完成",
-        `应发送 ${matchInfo.counts.应发送数.toLocaleString()}，有效触达 ${matchInfo.counts.有效触达数.toLocaleString()}，异常 ${matchInfo.counts.异常明细行数.toLocaleString()}。`,
+        `应发送 ${matchInfo.counts.应发送数.toLocaleString()}，已发送 ${matchInfo.counts.已发送数.toLocaleString()}，异常 ${matchInfo.counts.异常明细行数.toLocaleString()}。`,
         80,
       );
 
@@ -157,8 +157,8 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
         summary: {
           mode: "reminder",
           targets: listInfo.targets.length,
-          sent: matchInfo.counts.有效触达数 || 0,
-          unsent: Math.max(0, (matchInfo.counts.应发送数 || 0) - (matchInfo.counts.有效触达数 || 0)),
+          sent: matchInfo.counts.已发送数 || 0,
+          unsent: Math.max(0, (matchInfo.counts.应发送数 || 0) - (matchInfo.counts.已发送数 || 0)),
           exceptions: matchInfo.counts.异常明细行数,
           summaryFiles: data.summaryFiles.length,
           chatFiles: data.chatFiles.length,
