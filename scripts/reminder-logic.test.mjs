@@ -17,6 +17,7 @@ const { buildReminderAppeals } = await import("../worker/reminderAppealParser.js
 const { matchReminderData } = await import("../worker/reminderMatching.js");
 const { reminderProjectGroup } = await import("../worker/reminderProjectGroup.js");
 const { buildWhitelist } = await import("../worker/whitelist.js");
+const { REMINDER_MATCH_RULES } = await import("../worker/reminderConfig.js");
 
 function workbook(rows) {
   return {
@@ -120,9 +121,25 @@ test("同名学员可按聊天发送人与授课教师自动定位到老师-学�
   const result = matchReminderData(list, [chat({ sender: "李老师", group: "陈一新东方学习群" })]);
   assert.equal(result.studentRows[0].是否发送, "否");
   assert.equal(result.studentRows[1].是否发送, "是");
-  assert.equal(result.studentRows[1].匹配方式, "聊天发送人与授课教师一致，且群聊名称或聊天内容包含学员姓名");
+  assert.equal(result.studentRows[1].匹配方式, REMINDER_MATCH_RULES.senderTeacherAndStudent);
   assert.equal(result.counts.发送人教师学员命中, 1);
   assert.equal(result.counts.无法唯一匹配, 0);
+});
+
+test("同名学员可按名单邮箱和聊天发送人邮箱自动定位，企微名称不必等于授课教师", () => {
+  const list = buildReminderTargets(workbook([
+    ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时", "邮箱"],
+    ["邹洁霖", "实验P", "孟淏", "陈利", "陈一", "12", "zoujielin@xdf.cn"],
+    ["朱晓丹", "实验P", "朱晓丹", "陈利", "陈一", "24", "zhuxiaodan1@xdf.cn"],
+  ]));
+  const result = matchReminderData(list, [
+    chat({ sender: "物理开课提醒", email: "zhuxiaodan1@xdf.cn", group: "陈一新东方学习群" }),
+  ]);
+  assert.equal(result.studentRows[0].是否发送, "否");
+  assert.equal(result.studentRows[1].是否发送, "是");
+  assert.equal(result.studentRows[1].匹配方式, REMINDER_MATCH_RULES.senderTeacherAndStudent);
+  assert.equal(result.studentRows[1].发送人邮箱, "zhuxiaodan1@xdf.cn");
+  assert.equal(result.counts.发送人教师学员命中, 1);
 });
 
 test("同名学员可按聊天内容中的授课教师和学员姓名自动定位", () => {
@@ -234,13 +251,32 @@ test("未标记通过的申诉同样公示并剔除分母", () => {
     ["教师姓名", "学生姓名", "申诉原因", "申诉原因描述", "申诉是否通过"],
     ["张老师", "陈一", "老师已私发", "待复核截图", "否"],
   ]));
-  const result = matchReminderData(list, [chat({ group: "张老师 陈一 新东方学习群" })], appeals);
+  const result = matchReminderData(list, [], appeals);
   assert.equal(appeals.counts.申诉行数, 1);
   assert.equal(result.counts.应发送数, 0);
   assert.equal(result.counts.已发送数, 0);
   assert.equal(result.counts.申诉数, 1);
   assert.equal(result.studentRows[0].是否发送, "已申诉");
   assert.equal(result.studentRows[0].申诉情况说明, "老师已私发：待复核截图");
+});
+
+test("同一记录既已发送又已申诉时优先展示已发送且不计入申诉数", () => {
+  const list = buildReminderTargets(workbook([
+    ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
+    ["张老师", "益智组", "王组长", "李主管", "陈一", "12"],
+  ]));
+  const appeals = buildReminderAppeals(workbook([
+    ["教师姓名", "学生姓名", "申诉原因", "申诉原因描述", "申诉是否通过"],
+    ["张老师", "陈一", "老师已私发", "待复核截图", "否"],
+  ]));
+  const result = matchReminderData(list, [chat({ group: "张老师 陈一 新东方学习群" })], appeals);
+  assert.equal(result.counts.应发送数, 1);
+  assert.equal(result.counts.已发送数, 1);
+  assert.equal(result.counts.申诉数, 0);
+  assert.equal(result.studentRows[0].是否发送, "是");
+  assert.equal(result.studentRows[0].匹配状态, "已发送");
+  assert.equal(result.studentRows[0].申诉情况说明, undefined);
+  assert.equal(result.teacherRows[0].申诉数, 0);
 });
 
 test("同一申诉记录填写多个学员时分别拆分匹配", () => {

@@ -26,7 +26,7 @@ export const REMINDER_CHAT_HEADERS = {
 export const REMINDER_REQUIRED_LIST_FIELDS = ["授课教师", "学员姓名"] as const;
 
 export const REMINDER_MATCH_RULES = {
-  senderTeacherAndStudent: "聊天发送人与授课教师一致，且群聊名称或聊天内容包含学员姓名",
+  senderTeacherAndStudent: "聊天发送人邮箱与名单邮箱一致，且群聊名称或聊天内容包含学员姓名",
   groupStudentAndTeacher: "群聊名称或聊天内容同时包含学员姓名和授课教师",
   uniqueStudentInGroup: "群聊名称包含学员姓名，且分母中该学员唯一",
   uniqueStudentInContent: "聊天内容包含学员姓名，且分母中该学员唯一",
