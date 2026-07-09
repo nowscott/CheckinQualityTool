@@ -200,6 +200,15 @@ export default function App() {
       finishWorker();
     };
 
+    let whitelistCsv: string;
+    try {
+      whitelistCsv = await loadWhitelistCsv();
+    } catch (error) {
+      updateStatus("处理失败", errorMessage(error), 100, "error");
+      finishWorker();
+      return;
+    }
+
     if (reminderMode === "incremental") {
       worker.postMessage({
         type: "process",
@@ -209,6 +218,7 @@ export default function App() {
         chatFiles: reminderChatFiles,
         includeCleanChats: false,
         includeResultColors: includeReminderColors,
+        whitelistCsv,
       });
     } else {
       worker.postMessage({
@@ -220,6 +230,7 @@ export default function App() {
         chatFiles: reminderChatFiles,
         includeCleanChats: includeReminderChats,
         includeResultColors: includeReminderColors,
+        whitelistCsv,
       });
     }
   }

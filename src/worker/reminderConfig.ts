@@ -2,6 +2,7 @@ export const REMINDER_PASS_RATE = 0.8;
 
 export const REMINDER_LIST_HEADERS = {
   teacher: ["授课教师", "教师姓名", "老师姓名"],
+  studentId: ["学员号", "学生编号", "学员编号", "学生ID", "学员ID"],
   teachingGroup: ["教研组"],
   trainingLead: ["师训组长"],
   assistantLead: ["师训助理主管/主管", "助理主管", "师训助理主管"],

@@ -45,6 +45,25 @@ function normalizeTeacherName(value: unknown) {
   return normalizeMatchText(value).replace(/\s+/g, "").replace(/[0-9０-９]+$/u, "");
 }
 
+function studentKeywords(target: ReminderTarget) {
+  return [
+    normalizeMatchText(target.匹配学员姓名),
+    ...target.匹配别名关键词.map(normalizeMatchText),
+  ].filter(Boolean);
+}
+
+function findStudentHit(
+  item: { group: string; content: string },
+  keywords: string[],
+) {
+  for (const keyword of keywords) {
+    const group = item.group.includes(keyword);
+    const content = item.content.includes(keyword);
+    if (group || content) return { keyword, group, content };
+  }
+  return null;
+}
+
 function assistantOwnTeachingGroups(rows: DataRow[]) {
   const groups = new Map<string, unknown>();
   rows.forEach((row) => {
@@ -131,8 +150,9 @@ export function matchReminderData(
   }));
   const studentCounts = new Map<string, number>();
   listInfo.targets.forEach((target) => {
-    const student = normalizeMatchText(target.匹配学员姓名);
-    studentCounts.set(student, (studentCounts.get(student) || 0) + 1);
+    studentKeywords(target).forEach((student) => {
+      studentCounts.set(student, (studentCounts.get(student) || 0) + 1);
+    });
   });
 
   const studentRows: DataRow[] = [];
@@ -148,6 +168,7 @@ export function matchReminderData(
     群名唯一学员命中: 0,
     内容唯一学员命中: 0,
     多条质检命中: 0,
+    白名单别名命中: 0,
     无法唯一匹配: 0,
     字段缺失: 0,
     异常明细行数: 0,
@@ -163,11 +184,14 @@ export function matchReminderData(
         质检序号: target.id,
         教师姓名: target.授课教师,
         教师邮箱: target.教师邮箱,
+        学员号: target.学员号,
         教研组: target.教研组,
         师训组长: target.师训组长,
         助理主管: target.助理主管,
         学员姓名: target.学员姓名,
         匹配学员姓名: target.匹配学员姓名,
+        白名单命中: target.白名单命中,
+        白名单说明: target.白名单说明,
         姓名清洗说明: target.姓名清洗说明,
         校区: target.校区,
         年级: target.年级,
@@ -196,18 +220,22 @@ export function matchReminderData(
       continue;
     }
     counts.应发送数 += 1;
-    const student = normalizeMatchText(target.匹配学员姓名);
+    const keywords = studentKeywords(target);
+    const primaryKeyword = keywords[0] || "";
     const teacher = normalizeTeacherName(target.授课教师);
-    const isUniqueStudent = (studentCounts.get(student) || 0) === 1;
     const matches: ReminderMatchedChat[] = [];
 
     for (const item of normalizedChats) {
-      const groupHasStudent = Boolean(student && item.group.includes(student));
-      const contentHasStudent = Boolean(student && item.content.includes(student));
+      const studentHit = findStudentHit(item, keywords);
+      const groupHasStudent = Boolean(studentHit?.group);
+      const contentHasStudent = Boolean(studentHit?.content);
       const groupHasTeacher = Boolean(teacher && item.group.includes(teacher));
       const contentHasTeacher = Boolean(teacher && item.content.includes(teacher));
       const hasStudent = groupHasStudent || contentHasStudent;
       const hasTeacher = groupHasTeacher || contentHasTeacher;
+      const hitKeyword = studentHit?.keyword || target.匹配学员姓名;
+      const isAliasHit = Boolean(studentHit?.keyword && studentHit.keyword !== primaryKeyword);
+      const isUniqueStudent = Boolean(studentHit?.keyword && (studentCounts.get(studentHit.keyword) || 0) === 1);
       const senderTeacher = normalizeTeacherName(item.chat.发送人名称);
       const senderMatchesThisTeacher = Boolean(teacher && senderTeacher && senderTeacher === teacher);
       if (hasStudent && senderMatchesThisTeacher) {
@@ -218,7 +246,7 @@ export function matchReminderData(
           命中位置: [groupHasStudent ? "群聊名称" : "", contentHasStudent ? "聊天内容" : ""]
             .filter(Boolean)
             .join("+"),
-          命中关键词: `${target.授课教师}+${target.匹配学员姓名}`,
+          命中关键词: `${target.授课教师}+${hitKeyword}${isAliasHit ? "（白名单别名）" : ""}`,
         });
         continue;
       }
@@ -231,7 +259,7 @@ export function matchReminderData(
             groupHasStudent || groupHasTeacher ? "群聊名称" : "",
             contentHasStudent || contentHasTeacher ? "聊天内容" : "",
           ].filter(Boolean).join("+"),
-          命中关键词: `${target.授课教师}+${target.匹配学员姓名}`,
+          命中关键词: `${target.授课教师}+${hitKeyword}${isAliasHit ? "（白名单别名）" : ""}`,
         });
         continue;
       }
@@ -241,7 +269,7 @@ export function matchReminderData(
           匹配优先级: 3,
           匹配方式: REMINDER_MATCH_RULES.uniqueStudentInGroup,
           命中位置: "群聊名称",
-          命中关键词: target.匹配学员姓名,
+          命中关键词: `${hitKeyword}${isAliasHit ? "（白名单别名）" : ""}`,
         });
         continue;
       }
@@ -251,7 +279,7 @@ export function matchReminderData(
           匹配优先级: 4,
           匹配方式: REMINDER_MATCH_RULES.uniqueStudentInContent,
           命中位置: "聊天内容",
-          命中关键词: target.匹配学员姓名,
+          命中关键词: `${hitKeyword}${isAliasHit ? "（白名单别名）" : ""}`,
         });
         continue;
       }
@@ -280,6 +308,7 @@ export function matchReminderData(
       if (best.匹配优先级 === 2) counts.群名教师学员命中 += 1;
       if (best.匹配优先级 === 3) counts.群名唯一学员命中 += 1;
       if (best.匹配优先级 === 4) counts.内容唯一学员命中 += 1;
+      if (String(best.命中关键词 || "").includes("白名单别名")) counts.白名单别名命中 += 1;
     } else {
       counts.未发送数 += 1;
     }
@@ -293,11 +322,14 @@ export function matchReminderData(
       质检序号: target.id,
       教师姓名: target.授课教师,
       教师邮箱: target.教师邮箱,
+      学员号: target.学员号,
       教研组: target.教研组,
       师训组长: target.师训组长,
       助理主管: target.助理主管,
       学员姓名: target.学员姓名,
       匹配学员姓名: target.匹配学员姓名,
+      白名单命中: target.白名单命中,
+      白名单说明: target.白名单说明,
       姓名清洗说明: target.姓名清洗说明,
       校区: target.校区,
       年级: target.年级,

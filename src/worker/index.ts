@@ -48,6 +48,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
 
     if (data.mode === "reminder") {
       if (!data.chatFiles.length) throw new Error("请至少上传 1 个企微聊天质检结果文件。");
+      const whitelist = data.whitelistCsv ? buildWhitelist(data.whitelistCsv) : buildWhitelist("");
       if (data.reminderMode === "incremental") {
         const previousWorkbook = await readWorkbook(data.previousFile, 3, 22, "上次开课提醒结果");
         progress("上次结果读取完成", "正在从“学员名单”中识别未发送行。", 26);
@@ -76,7 +77,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
         const result = buildIncrementalReminderOutput(previousWorkbook, chatInfo, {
           list: data.previousFile.name,
           chat: data.chatFiles.map((file) => file.name).join("；"),
-        }, data.includeCleanChats, data.includeResultColors);
+        }, data.includeCleanChats, data.includeResultColors, whitelist);
         progress(
           "增量匹配完成",
           `本次新增发送 ${result.summary.incrementalSent.toLocaleString()} 条，当前已发送 ${result.summary.sent.toLocaleString()} 条。`,
@@ -103,7 +104,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
         return;
       }
       const listWorkbook = await readWorkbook(data.denominatorFile, 3, 22, "开课提醒学员明细");
-      const listInfo = buildReminderTargets(listWorkbook);
+      const listInfo = buildReminderTargets(listWorkbook, whitelist);
       progress(
         "分母预处理完成",
         `原始 ${listInfo.counts.原始分母行数.toLocaleString()} 条，整行去重后 ${listInfo.targets.length.toLocaleString()} 条。`,

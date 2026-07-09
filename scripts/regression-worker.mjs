@@ -47,9 +47,7 @@ if (!workerFile) throw new Error("找不到构建后的 Worker，请先运行 np
 const listBuffer = await readFile(resolve(listPath));
 const chatBuffers = await Promise.all(chatPaths.map((path) => readFile(resolve(path))));
 const appealBuffer = appealPath ? await readFile(resolve(appealPath)) : null;
-const whitelistCsv = mode === "checkin"
-  ? await readFile(resolve(root, "public/data/whitelist.csv"), "utf8")
-  : "";
+const whitelistCsv = await readFile(resolve(root, "public/data/whitelist.csv"), "utf8");
 const workerSources = new Map([
   [
     resolve(root, "dist/vendor/xlsx.full.min.js"),
@@ -111,6 +109,8 @@ await context.self.onmessage({
         appealFile: appealPath && appealBuffer ? file(appealPath, appealBuffer) : null,
         chatFiles: chatPaths.map((path, index) => file(path, chatBuffers[index])),
         includeCleanChats,
+        includeResultColors: false,
+        whitelistCsv,
       }
     : {
         type: "process",

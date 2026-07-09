@@ -6,8 +6,9 @@ import {
   matchReminderData,
   type ReminderMatchInfo,
 } from "./reminderMatching";
-import type { CellValue, ChatInfo, CountMap, DataRow, SourceNames } from "./types";
+import type { CellValue, ChatInfo, CountMap, DataRow, SourceNames, Whitelist } from "./types";
 import { normalizeMatchText, text } from "./utils";
+import { findPreCleanWhitelistEntry } from "./whitelist";
 
 const STUDENT_REQUIRED_HEADERS = ["教师姓名", "学员姓名", "匹配学员姓名", "是否发送"];
 const EXCEPTION_REQUIRED_HEADERS = ["异常类型", "异常原因"];
@@ -71,17 +72,24 @@ function assistantSummarySourceRows(rows: DataRow[]) {
   });
 }
 
-function rowToTarget(row: DataRow, index: number): ReminderTarget {
+function rowToTarget(row: DataRow, index: number, whitelist?: Whitelist): ReminderTarget {
   const id = numberValue(row.质检序号, index + 1);
+  const studentId = text(row.学员号);
+  const rawStudent = text(row.学员姓名);
+  const whitelistEntry = whitelist ? findPreCleanWhitelistEntry(studentId, rawStudent, whitelist) : null;
   return {
     id,
     授课教师: text(row.教师姓名 || row.授课教师),
     教师邮箱: text(row.教师邮箱 || row.邮箱),
+    学员号: studentId,
     教研组: text(row.教研组),
     师训组长: text(row.师训组长),
     助理主管: text(row.助理主管),
-    学员姓名: text(row.学员姓名),
+    学员姓名: rawStudent,
     匹配学员姓名: text(row.匹配学员姓名 || row.学员姓名),
+    匹配别名关键词: whitelistEntry?.处理方式 === "别名" ? whitelistEntry.匹配别名关键词 : [],
+    白名单命中: whitelistEntry ? "是" : text(row.白名单命中),
+    白名单说明: whitelistEntry?.说明 || text(row.白名单说明),
     姓名清洗说明: text(row.姓名清洗说明),
     新老生季度: text(row.新老生季度),
     年级: text(row.年级),
@@ -124,7 +132,7 @@ function buildCounts(rows: DataRow[], incrementalSent: number, eligible: number)
 }
 
 function buildListInfoFromPrevious(rows: DataRow[], sheetName: string): ReminderListInfo {
-  const targets = rows.map(rowToTarget);
+  const targets = rows.map((row, index) => rowToTarget(row, index));
   return {
     targets,
     sheetName,
@@ -141,6 +149,7 @@ export function buildIncrementalReminderOutput(
   sourceNames: SourceNames,
   includeCleanChats: boolean,
   includeResultColors = false,
+  whitelist?: Whitelist,
 ) {
   const studentSheet = findSheet(previousWorkbook, STUDENT_REQUIRED_HEADERS);
   const previousRows = rowsToObjects(studentSheet.rows);
@@ -149,7 +158,7 @@ export function buildIncrementalReminderOutput(
     .map((row, index) => ({ row, target: rowToTarget(row, index) }))
     .filter(({ row, target }) => shouldTryIncrementalMatch(row) && target.授课教师 && target.匹配学员姓名);
   const listInfo: ReminderListInfo = {
-    targets: eligibleTargets.map((item) => item.target),
+    targets: eligibleTargets.map((item, index) => rowToTarget(item.row, index, whitelist)),
     counts: {
       上次结果行数: previousRows.length,
       本次增量候选行数: eligibleTargets.length,
@@ -163,7 +172,7 @@ export function buildIncrementalReminderOutput(
   let incrementalSent = 0;
   const finalRows = previousRows.map((row, index) => {
     if (!shouldTryIncrementalMatch(row)) return row;
-    const target = rowToTarget(row, index);
+    const target = rowToTarget(row, index, whitelist);
     const generated = generatedById.get(target.id);
     if (!generated || text(generated.是否发送) !== "是") return row;
     incrementalSent += 1;

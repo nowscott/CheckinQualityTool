@@ -100,6 +100,7 @@ export interface ReminderProcessRequest {
   chatFiles: File[];
   includeCleanChats: boolean;
   includeResultColors: boolean;
+  whitelistCsv: string;
 }
 
 export interface ReminderIncrementalProcessRequest {
@@ -110,6 +111,7 @@ export interface ReminderIncrementalProcessRequest {
   chatFiles: File[];
   includeCleanChats: boolean;
   includeResultColors: boolean;
+  whitelistCsv: string;
 }
 
 export type WorkerRequest = ProcessRequest | ReminderProcessRequest | ReminderIncrementalProcessRequest;

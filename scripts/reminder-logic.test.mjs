@@ -13,6 +13,7 @@ const { buildReminderTargets } = await import("../worker/reminderListParser.js")
 const { buildReminderAppeals } = await import("../worker/reminderAppealParser.js");
 const { matchReminderData } = await import("../worker/reminderMatching.js");
 const { reminderProjectGroup } = await import("../worker/reminderProjectGroup.js");
+const { buildWhitelist } = await import("../worker/whitelist.js");
 
 function workbook(rows) {
   return {
@@ -147,6 +148,38 @@ test("聊天发送人姓名末尾数字不影响教师匹配", () => {
   assert.equal(result.studentRows[0].是否发送, "是");
   assert.equal(result.studentRows[1].是否发送, "否");
   assert.equal(result.counts.发送人教师学员命中, 1);
+});
+
+test("开课提醒白名单别名可匹配系统登记名与实际群名不一致的学员", () => {
+  const whitelist = buildWhitelist([
+    "学员号,学员姓名,处理方式,匹配别名,说明",
+    "GZ5443556611,何喜,别名,何梦涵,系统名与企微群名不一致",
+  ].join("\n"));
+  const list = buildReminderTargets(workbook([
+    ["授课教师", "学员号", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
+    ["张老师", "GZ5443556611", "益智组", "王组长", "李主管", "何喜", "12"],
+  ]), whitelist);
+  const result = matchReminderData(list, [chat({ group: "张老师 何梦涵 新东方学习群" })]);
+  assert.equal(result.studentRows[0].是否发送, "是");
+  assert.equal(result.studentRows[0].白名单命中, "是");
+  assert.equal(result.studentRows[0].白名单说明, "系统名与企微群名不一致");
+  assert.equal(result.studentRows[0].命中关键词, "张老师+梦涵（白名单别名）");
+  assert.equal(result.counts.白名单别名命中, 1);
+});
+
+test("开课提醒白名单保留原名先于姓名后缀清洗生效", () => {
+  const whitelist = buildWhitelist([
+    "学员号,学员姓名,处理方式,匹配别名,说明",
+    "GZ6005060860,陈姜玉一,保留原名,,四字姓名末尾“一”为真实姓名，按学员号保留",
+  ].join("\n"));
+  const list = buildReminderTargets(workbook([
+    ["授课教师", "学员号", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
+    ["张老师", "GZ6005060860", "益智组", "王组长", "李主管", "陈姜玉一", "12"],
+  ]), whitelist);
+  assert.equal(list.targets[0].匹配学员姓名, "陈姜玉一");
+  assert.equal(list.targets[0].姓名清洗说明, "陈姜玉一（白名单保留原名）");
+  const result = matchReminderData(list, [chat({ group: "张老师 陈姜玉一 新东方学习群" })]);
+  assert.equal(result.studentRows[0].是否发送, "是");
 });
 
 test("申诉按教师和学生剔除分母并保留明细标注，不依赖是否通过", () => {
