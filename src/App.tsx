@@ -54,6 +54,8 @@ export default function App() {
   const [reminderChatFiles, setReminderChatFiles] = useState<File[]>([]);
   const [includeReminderChats, setIncludeReminderChats] = useState(false);
   const [includeReminderColors, setIncludeReminderColors] = useState(false);
+  const [includeReminderExceptionSheet, setIncludeReminderExceptionSheet] = useState(false);
+  const [includeReminderExplanationSheet, setIncludeReminderExplanationSheet] = useState(false);
   const [weekLabel, setWeekLabel] = useState<WeekLabel>("auto");
   const [useSingle, setUseSingle] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -213,6 +215,8 @@ export default function App() {
       chatFiles: reminderChatFiles,
       includeCleanChats: includeReminderChats,
       includeResultColors: includeReminderColors,
+      includeExceptionSheet: includeReminderExceptionSheet,
+      includeExplanationSheet: includeReminderExplanationSheet,
       whitelistCsv,
     });
   }
@@ -248,6 +252,8 @@ export default function App() {
             chatFiles={reminderChatFiles}
             includeCleanChats={includeReminderChats}
             includeResultColors={includeReminderColors}
+            includeExceptionSheet={includeReminderExceptionSheet}
+            includeExplanationSheet={includeReminderExplanationSheet}
             processing={processing}
             onDenominatorFileChange={setReminderListFile}
             onAppealFileChange={setReminderAppealFile}
@@ -255,6 +261,8 @@ export default function App() {
             onChatFilesChange={setReminderChatFiles}
             onIncludeCleanChatsChange={setIncludeReminderChats}
             onIncludeResultColorsChange={setIncludeReminderColors}
+            onIncludeExceptionSheetChange={setIncludeReminderExceptionSheet}
+            onIncludeExplanationSheetChange={setIncludeReminderExplanationSheet}
             onSubmit={handleReminderSubmit}
           />
         ) : (

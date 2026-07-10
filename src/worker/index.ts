@@ -143,12 +143,12 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
         80,
       );
 
-      progress("正在生成 Excel", "写入公示表、学员名单、维度汇总、异常明细和处理说明。", 84);
+      progress("正在生成 Excel", "写入公示表、学员名单及维度汇总。", 84);
       const output = buildReminderOutput(listInfo, chatInfo, matchInfo, {
         list: data.denominatorFile.name,
         chat: data.chatFiles.map((file) => file.name).join("；"),
         summary: data.summaryFiles.map((file) => file.name).join("；"),
-      }, data.includeCleanChats, data.includeResultColors);
+      }, data.includeCleanChats, data.includeResultColors, data.includeExceptionSheet, data.includeExplanationSheet);
       const buffer = output.buffer as ArrayBuffer;
       workerScope.postMessage({
         type: "complete",

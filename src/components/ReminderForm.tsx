@@ -9,6 +9,8 @@ interface ReminderFormProps {
   chatFiles: File[];
   includeCleanChats: boolean;
   includeResultColors: boolean;
+  includeExceptionSheet: boolean;
+  includeExplanationSheet: boolean;
   processing: boolean;
   onDenominatorFileChange: (file: File | null) => void;
   onAppealFileChange: (file: File | null) => void;
@@ -16,6 +18,8 @@ interface ReminderFormProps {
   onChatFilesChange: (files: File[]) => void;
   onIncludeCleanChatsChange: (value: boolean) => void;
   onIncludeResultColorsChange: (value: boolean) => void;
+  onIncludeExceptionSheetChange: (value: boolean) => void;
+  onIncludeExplanationSheetChange: (value: boolean) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
 
@@ -26,6 +30,8 @@ export function ReminderForm({
   chatFiles,
   includeCleanChats,
   includeResultColors,
+  includeExceptionSheet,
+  includeExplanationSheet,
   processing,
   onDenominatorFileChange,
   onAppealFileChange,
@@ -33,6 +39,8 @@ export function ReminderForm({
   onChatFilesChange,
   onIncludeCleanChatsChange,
   onIncludeResultColorsChange,
+  onIncludeExceptionSheetChange,
+  onIncludeExplanationSheetChange,
   onSubmit,
 }: ReminderFormProps) {
   return (
@@ -108,6 +116,30 @@ export function ReminderForm({
               onChange={(event) => onIncludeResultColorsChange(event.target.checked)}
             />
           </label>
+          <label className="switch-row">
+            <span>
+              <strong>异常明细</strong>
+              <small>默认关闭；异常匹配的行写入单独 Sheet 便于核查</small>
+            </span>
+            <input
+              id="include-reminder-exceptions"
+              type="checkbox"
+              checked={includeExceptionSheet}
+              onChange={(event) => onIncludeExceptionSheetChange(event.target.checked)}
+            />
+          </label>
+          <label className="switch-row">
+            <span>
+              <strong>处理说明</strong>
+              <small>默认关闭；输出数据来源、匹配规则口径及处理统计</small>
+            </span>
+            <input
+              id="include-reminder-explanation"
+              type="checkbox"
+              checked={includeExplanationSheet}
+              onChange={(event) => onIncludeExplanationSheetChange(event.target.checked)}
+            />
+          </label>
         </div>
 
         <div className="rules reminder-rules">
@@ -122,7 +154,7 @@ export function ReminderForm({
         <button id="reminder-submit-button" type="submit" disabled={processing}>
           <span>生成触达完成率公示</span>
           <small>
-            默认输出公示表、学员名单、维度汇总、匹配核对/异常明细和处理说明
+            默认输出公示表、学员名单及维度汇总，异常明细和处理说明按需勾选
           </small>
         </button>
       </form>

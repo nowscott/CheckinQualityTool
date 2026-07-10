@@ -101,6 +101,8 @@ export interface ReminderProcessRequest {
   chatFiles: File[];
   includeCleanChats: boolean;
   includeResultColors: boolean;
+  includeExceptionSheet: boolean;
+  includeExplanationSheet: boolean;
   whitelistCsv: string;
 }
 
