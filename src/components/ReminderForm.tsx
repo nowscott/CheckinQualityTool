@@ -94,8 +94,8 @@ export function ReminderForm({
         <div className="options reminder-options">
           <label className="switch-row">
             <span>
-              <strong>包含聊天记录明细</strong>
-              <small>默认不输出；需要核查命中来源时再勾选追加"清洗后聊天"Sheet</small>
+              <strong>聊天明细</strong>
+              <small>追加清洗后聊天 Sheet</small>
             </span>
             <input
               id="include-reminder-chats"
@@ -106,8 +106,8 @@ export function ReminderForm({
           </label>
           <label className="switch-row">
             <span>
-              <strong>结果颜色标注</strong>
-              <small>默认关闭；勾选后按通过、未通过、汇总行保留底色提示</small>
+              <strong>颜色标注</strong>
+              <small>通过/未通过底色提示</small>
             </span>
             <input
               id="include-reminder-colors"
@@ -119,7 +119,7 @@ export function ReminderForm({
           <label className="switch-row">
             <span>
               <strong>异常明细</strong>
-              <small>默认关闭；异常匹配的行写入单独 Sheet 便于核查</small>
+              <small>异常匹配单独 Sheet</small>
             </span>
             <input
               id="include-reminder-exceptions"
@@ -131,7 +131,7 @@ export function ReminderForm({
           <label className="switch-row">
             <span>
               <strong>处理说明</strong>
-              <small>默认关闭；输出数据来源、匹配规则口径及处理统计</small>
+              <small>来源、口径与统计</small>
             </span>
             <input
               id="include-reminder-explanation"

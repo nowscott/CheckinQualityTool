@@ -320,7 +320,7 @@ h1 { margin: 0; font-family: var(--serif); font-size: clamp(42px, 5vw, 62px); li
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .switch-row small { display: block; margin-top: 4px; color: var(--muted); line-height: 1.4; }
 .switch-row input { width: 46px; height: 24px; accent-color: var(--accent); }
-.reminder-options { grid-template-columns: minmax(0, 1fr); }
+.reminder-options { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .rules { display: flex; align-items: center; gap: 7px; margin: 14px 0; color: var(--muted); font-size: 11px; }
 .rules span { margin-right: 5px; color: var(--ink); font-weight: 700; }
 .rules b { padding: 4px 8px; color: var(--green); border: 1px solid var(--green-line); font-weight: 500; }
