@@ -530,6 +530,8 @@ export function buildReminderOutput(
   sourceNames: SourceNames,
   includeCleanChats: boolean,
   includeResultColors = false,
+  includeExceptionSheet = false,
+  includeExplanationSheet = false,
 ) {
   const publicTable = buildPublicTable(matchInfo);
   const sheets: SheetDefinition[] = [
@@ -578,14 +580,16 @@ export function buildReminderOutput(
       widths: { 教研组: 24, 负责人: 42 },
       rowStyle: (row) => summaryAwareStyle(row, includeResultColors),
     },
-    {
+  ];
+  if (includeExceptionSheet) {
+    sheets.push({
       name: "匹配核对-异常明细",
       rows: matchInfo.exceptionRows,
       columns: EXCEPTION_COLUMNS,
       widths: { 异常原因: 48, 命中群名: 38, 命中聊天内容: 80, 命中质检文件: 36 },
       rowStyle: () => 8,
-    },
-  ];
+    });
+  }
   if (includeCleanChats) {
     sheets.push(
       {
@@ -596,13 +600,13 @@ export function buildReminderOutput(
       },
     );
   }
-  sheets.push(
-    {
+  if (includeExplanationSheet) {
+    sheets.push({
       name: "处理说明",
       rows: explanationRows(listInfo, chatInfo, matchInfo, sourceNames, includeCleanChats),
       columns: ["项目", "值"],
       widths: { 项目: 34, 值: 100 },
-    },
-  );
+    });
+  }
   return buildWorkbook(sheets);
 }
