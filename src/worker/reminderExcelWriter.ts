@@ -301,7 +301,7 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
   const grandBucket = createBucket();
   rows.forEach((row) => {
     if (row.__rowType !== "projectTotal") return;
-    grandBucket.total += Number(row.应发送数) || 0;
+    grandBucket.total += Number(row["应发送数（剔除特殊情况申诉）"]) || 0;
     grandBucket.rawTouch += Number(row.汇总触达数) || 0;
     grandBucket.effectiveTouch += Number(row.有效触达数) || 0;
     grandBucket.appealed += Number(row.申诉数) || 0;
@@ -404,7 +404,7 @@ function buildTrainingRows(teacherRows: DataRow[]) {
   const grandBucket = createBucket();
   rows.forEach((row) => {
     if (row.__rowType !== "projectTotal") return;
-    grandBucket.total += Number(row.应发送数) || 0;
+    grandBucket.total += Number(row["应发送数（剔除特殊情况申诉）"]) || 0;
     grandBucket.rawTouch += Number(row.汇总触达数) || 0;
     grandBucket.effectiveTouch += Number(row.有效触达数) || 0;
     grandBucket.appealed += Number(row.申诉数) || 0;
@@ -471,7 +471,7 @@ function buildProjectRows(teacherRows: DataRow[]) {
   const grandBucket = createBucket();
   rows.forEach((row) => {
     if (row.__rowType !== "projectTotal") return;
-    grandBucket.total += Number(row.应发送数) || 0;
+    grandBucket.total += Number(row["应发送数（剔除特殊情况申诉）"]) || 0;
     grandBucket.rawTouch += Number(row.汇总触达数) || 0;
     grandBucket.effectiveTouch += Number(row.有效触达数) || 0;
     grandBucket.appealed += Number(row.申诉数) || 0;
