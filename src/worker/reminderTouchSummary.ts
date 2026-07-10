@@ -71,9 +71,9 @@ function emptyTouchInfo(): ReminderTouchInfo {
 }
 
 function mergeBucket(target: ReminderTouchBucket, record: ReminderTouchRecord) {
-  target.customerTouches += record.触达客户数;
-  target.groupTouches += record.触达群聊数;
-  target.totalTouches += record.汇总触达数;
+  target.customerTouches = Math.max(target.customerTouches, record.触达客户数);
+  target.groupTouches = Math.max(target.groupTouches, record.触达群聊数);
+  target.totalTouches = target.customerTouches + target.groupTouches;
   target.sourceFiles.add(record.来源文件);
   target.records.push(record);
 }
@@ -251,7 +251,7 @@ export function applyReminderTouchSummary(
     if (matched.bucket.email) matchedEmails.add(matched.bucket.email);
     if (matched.bucket.normalizedName) matchedNames.add(matched.bucket.normalizedName);
     const rawTouches = matched.bucket.totalTouches;
-    const effective = Math.min(rawTouches, total);
+    const effective = Math.min(Math.max(rawTouches, Number(row.已发送数) || 0), total);
     const currentRate = total ? effective / total : 0;
     summaryTouches += rawTouches;
     effectiveTouches += effective;
