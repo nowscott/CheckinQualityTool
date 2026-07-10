@@ -236,7 +236,7 @@ export function applyReminderTouchSummary(
     if (!matched) {
       if (total > 0) teacherRowsWithoutSummary += 1;
       const existingSent = Number(row.已发送数) || 0;
-      const currentRate = total ? existingSent / total : 0;
+      const currentRate = total ? existingSent / total : 1;
       return {
         ...row,
         汇总触达数: existingSent,
@@ -252,7 +252,7 @@ export function applyReminderTouchSummary(
     if (matched.bucket.normalizedName) matchedNames.add(matched.bucket.normalizedName);
     const rawTouches = matched.bucket.totalTouches;
     const effective = Math.min(Math.max(rawTouches, Number(row.已发送数) || 0), total);
-    const currentRate = total ? effective / total : 0;
+    const currentRate = total ? effective / total : 1;
     summaryTouches += rawTouches;
     effectiveTouches += effective;
     return {

@@ -78,7 +78,7 @@ function addTeacher(bucket: SummaryBucket, row: DataRow) {
 }
 
 function rate(effectiveTouch: number, total: number) {
-  return total ? effectiveTouch / total : 0;
+  return total ? effectiveTouch / total : 1;
 }
 
 function rateText(effectiveTouch: number, total: number) {

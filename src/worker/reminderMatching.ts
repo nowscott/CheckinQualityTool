@@ -36,7 +36,7 @@ interface StudentHit {
 }
 
 function rate(sent: number, total: number) {
-  return total ? sent / total : 0;
+  return total ? sent / total : 1;
 }
 
 function rateText(value: number) {

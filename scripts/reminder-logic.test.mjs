@@ -367,6 +367,22 @@ test("助理主管维度按主管自身汇总，跨教研组不重复主管分�
   assert.equal(result.assistantRows[0].是否达标, "否");
 });
 
+test("全部申诉导致应发送数为零时按 100% 达标", () => {
+  const list = buildReminderTargets(workbook([
+    ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
+    ["向景昕", "高中益智", "邓晓君", "蔡逸俊", "陈一", "12"],
+  ]));
+  const appeals = buildReminderAppeals(workbook([
+    ["教师姓名", "学生姓名", "申诉原因", "情况说明", "是否通过"],
+    ["向景昕", "陈一", "其他特殊情况", "无需发送", "是"],
+  ]));
+  const result = matchReminderData(list, [], appeals);
+  assert.equal(result.teacherRows[0].应发送数, 0);
+  assert.equal(result.teacherRows[0].申诉数, 1);
+  assert.equal(result.teacherRows[0].发送率, "100.0%");
+  assert.equal(result.teacherRows[0].是否达标, "是");
+});
+
 test("助理主管维度使用主管本人教研组归属其管辖老师", () => {
   const list = buildReminderTargets(workbook([
     ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],

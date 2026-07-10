@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.5.20",
+    date: "2026-07-10 15:31",
+    items: [
+      "开课提醒应发送数为 0 时，触达完成率按 100% 计算并判定为达标。",
+    ],
+  },
+  {
     version: "v2.5.18",
     date: "2026-07-10 00:40",
     items: [
