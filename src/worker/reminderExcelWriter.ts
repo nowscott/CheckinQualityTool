@@ -13,19 +13,19 @@ const STUDENT_COLUMNS = [
 
 const TEACHER_COLUMNS = [
   "教师姓名", "教研组", "师训组长", "助理主管",
-  "应发送条数", "汇总触达数", "有效触达数", "触达差额", "申诉数", "触达完成率", "是否达标",
+  "应发送数（剔除特殊情况申诉）", "汇总触达数", "有效触达数", "触达差额", "申诉数", "触达完成率", "是否达标",
 ] as const;
 
 const TRAINING_COLUMNS = [
-  "教研组", "应发送数", "汇总触达数", "有效触达数", "申诉数", "触达完成率", "是否达标（80%）",
+  "教研组", "应发送数（剔除特殊情况申诉）", "汇总触达数", "有效触达数", "申诉数", "触达完成率", "是否达标（80%）",
 ] as const;
 
 const ASSISTANT_COLUMNS = [
-  "教研组", "助理主管", "应发送数", "汇总触达数", "有效触达数", "申诉数", "触达完成率", "是否达标（80%）",
+  "教研组", "助理主管", "应发送数（剔除特殊情况申诉）", "汇总触达数", "有效触达数", "申诉数", "触达完成率", "是否达标（80%）",
 ] as const;
 
 const PROJECT_COLUMNS = [
-  "教研组", "负责人", "应发送数", "汇总触达数", "有效触达数", "申诉数", "触达完成率", "是否达标（80%）",
+  "教研组", "负责人", "应发送数（剔除特殊情况申诉）", "汇总触达数", "有效触达数", "申诉数", "触达完成率", "是否达标（80%）",
 ] as const;
 
 const EXCEPTION_COLUMNS = [
@@ -123,7 +123,7 @@ function teacherOutputRows(rows: DataRow[]) {
     教研组: row.教研组 || "",
     师训组长: row.师训组长 || "",
     助理主管: row.助理主管 || "",
-    应发送条数: row.应发送数 || 0,
+    "应发送数（剔除特殊情况申诉）": row.应发送数 || 0,
     汇总触达数: row.汇总触达数 ?? row.已发送数 ?? 0,
     有效触达数: row.有效触达数 ?? row.已发送数 ?? 0,
     触达差额: row.触达差额 ?? row.发送差额 ?? 0,
@@ -141,7 +141,7 @@ function mergeRef(columnIndex: number, startRow: number, endRow: number) {
 function pushTotalRow(rows: DataRow[], labelColumn: string, label: string, bucket: SummaryBucket, rowType: string) {
   rows.push({
     [labelColumn]: label,
-    应发送数: bucket.total,
+    "应发送数（剔除特殊情况申诉）": bucket.total,
     汇总触达数: bucket.rawTouch,
     有效触达数: bucket.effectiveTouch,
     申诉数: bucket.appealed,
@@ -252,7 +252,7 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
         rows.push({
           教研组: rows.length === groupStart ? teachingGroup : "",
           助理主管: assistant,
-          应发送数: item.total,
+          "应发送数（剔除特殊情况申诉）": item.total,
           汇总触达数: item.rawTouch,
           有效触达数: item.effectiveTouch,
           申诉数: item.appealed,
@@ -268,7 +268,7 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
       rows.push({
         教研组: displayTeachingGroup(teachingGroup),
         助理主管: "",
-        应发送数: groupBucket.total,
+        "应发送数（剔除特殊情况申诉）": groupBucket.total,
         汇总触达数: groupBucket.rawTouch,
         有效触达数: groupBucket.effectiveTouch,
         申诉数: groupBucket.appealed,
@@ -288,7 +288,7 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
     rows.push({
       教研组: project,
       助理主管: "",
-      应发送数: projectBucket.total,
+      "应发送数（剔除特殊情况申诉）": projectBucket.total,
       汇总触达数: projectBucket.rawTouch,
       有效触达数: projectBucket.effectiveTouch,
       申诉数: projectBucket.appealed,
@@ -311,7 +311,7 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
   rows.push({
     教研组: "总计",
     助理主管: "",
-    应发送数: grandBucket.total,
+    "应发送数（剔除特殊情况申诉）": grandBucket.total,
     汇总触达数: grandBucket.rawTouch,
     有效触达数: grandBucket.effectiveTouch,
     申诉数: grandBucket.appealed,
@@ -362,7 +362,7 @@ function buildTrainingRows(teacherRows: DataRow[]) {
           groupBucket.counselorSent += item.counselorSent;
           detailRows.push({
             教研组: lead,
-            应发送数: item.total,
+            "应发送数（剔除特殊情况申诉）": item.total,
             汇总触达数: item.rawTouch,
             有效触达数: item.effectiveTouch,
             申诉数: item.appealed,
@@ -379,7 +379,7 @@ function buildTrainingRows(teacherRows: DataRow[]) {
         projectBucket.counselorSent += groupBucket.counselorSent;
         projectRows.push({
           教研组: displayTeachingGroup(group),
-          应发送数: groupBucket.total,
+          "应发送数（剔除特殊情况申诉）": groupBucket.total,
           汇总触达数: groupBucket.rawTouch,
           有效触达数: groupBucket.effectiveTouch,
           申诉数: groupBucket.appealed,
@@ -391,7 +391,7 @@ function buildTrainingRows(teacherRows: DataRow[]) {
       });
       rows.push({
         教研组: project,
-        应发送数: projectBucket.total,
+        "应发送数（剔除特殊情况申诉）": projectBucket.total,
         汇总触达数: projectBucket.rawTouch,
         有效触达数: projectBucket.effectiveTouch,
         申诉数: projectBucket.appealed,
@@ -446,7 +446,7 @@ function buildProjectRows(teacherRows: DataRow[]) {
         rows.push({
           教研组: displayTeachingGroup(group),
           负责人: [...item.assistants].sort(compareText).join("、") || "/",
-          应发送数: item.total,
+          "应发送数（剔除特殊情况申诉）": item.total,
           汇总触达数: item.rawTouch,
           有效触达数: item.effectiveTouch,
           申诉数: item.appealed,
@@ -459,7 +459,7 @@ function buildProjectRows(teacherRows: DataRow[]) {
       rows.push({
         教研组: project,
         负责人: [...projectBucket.assistants].sort(compareText).join("、") || "/",
-        应发送数: projectBucket.total,
+        "应发送数（剔除特殊情况申诉）": projectBucket.total,
         汇总触达数: projectBucket.rawTouch,
         有效触达数: projectBucket.effectiveTouch,
         申诉数: projectBucket.appealed,
@@ -480,7 +480,7 @@ function buildProjectRows(teacherRows: DataRow[]) {
   rows.push({
     教研组: "总计",
     负责人: [...grandBucket.assistants].sort(compareText).join("、") || "/",
-    应发送数: grandBucket.total,
+    "应发送数（剔除特殊情况申诉）": grandBucket.total,
     汇总触达数: grandBucket.rawTouch,
     有效触达数: grandBucket.effectiveTouch,
     申诉数: grandBucket.appealed,
@@ -564,7 +564,7 @@ export function buildReminderOutput(
       title: "开课提醒话术发送进度（助理主管维度）",
       rows: publicTable.rows,
       columns: ASSISTANT_COLUMNS,
-      widths: { 教研组: 14, 助理主管: 18, 应发送数: 10, 汇总触达数: 12, 有效触达数: 12, 触达完成率: 13, "是否达标（80%）": 15 },
+      widths: { 教研组: 14, 助理主管: 18, "应发送数（剔除特殊情况申诉）": 10, 汇总触达数: 12, 有效触达数: 12, 触达完成率: 13, "是否达标（80%）": 15 },
       mergeCells: publicTable.mergeCells,
       rowStyle: (row) => assistantStyle(row, includeResultColors),
       cellStyle: assistantCellStyle,

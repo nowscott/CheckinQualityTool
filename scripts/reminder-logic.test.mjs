@@ -395,7 +395,7 @@ test("开课提醒项目组归类将博文和实验字母组归入文理综", ()
   assert.equal(reminderProjectGroup("初中益智"), "益智项目");
 });
 
-test("汇总文件同一老师跨文件按邮箱累加触达数", () => {
+test("汇总文件同一老师跨文件按邮箱取最大触达数，避免多关键词重复计数", () => {
   const info = mergeReminderTouchInfos([
     parseReminderTouchSummary(summaryWorkbook([
       ["张老师", "", "zhang", "zhang@xdf.cn", "", "益智组", 2, 0, 3, 0],
@@ -405,9 +405,9 @@ test("汇总文件同一老师跨文件按邮箱累加触达数", () => {
     ]), "关键词B.xlsx"),
   ]);
   const bucket = info.byEmail.get("zhang@xdf.cn");
-  assert.equal(bucket.totalTouches, 10);
-  assert.equal(bucket.customerTouches, 3);
-  assert.equal(bucket.groupTouches, 7);
+  assert.equal(bucket.totalTouches, 6);
+  assert.equal(bucket.customerTouches, 2);
+  assert.equal(bucket.groupTouches, 4);
   assert.equal(info.counts.汇总文件数, 2);
 });
 
