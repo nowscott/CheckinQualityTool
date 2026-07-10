@@ -13,19 +13,19 @@ const STUDENT_COLUMNS = [
 
 const TEACHER_COLUMNS = [
   "教师姓名", "教研组", "师训组长", "助理主管",
-  "应发送数（剔除特殊情况申诉）", "汇总触达数", "有效触达数", "触达差额", "申诉数", "触达完成率", "是否达标",
+  "应发送数（剔除特殊情况申诉）", "汇总触达数（含不在分母的学生）", "有效触达数\n（仅开课分母学生）", "触达差额", "申诉数", "触达完成率\n（仅开课提醒分母学生）", "是否达标",
 ] as const;
 
 const TRAINING_COLUMNS = [
-  "教研组", "应发送数（剔除特殊情况申诉）", "汇总触达数", "有效触达数", "申诉数", "触达完成率", "是否达标（80%）",
+  "教研组", "应发送数（剔除特殊情况申诉）", "汇总触达数（含不在分母的学生）", "有效触达数\n（仅开课分母学生）", "申诉数", "触达完成率\n（仅开课提醒分母学生）", "是否达标（80%）",
 ] as const;
 
 const ASSISTANT_COLUMNS = [
-  "教研组", "助理主管", "应发送数（剔除特殊情况申诉）", "汇总触达数", "有效触达数", "申诉数", "触达完成率", "是否达标（80%）",
+  "教研组", "助理主管", "应发送数（剔除特殊情况申诉）", "汇总触达数（含不在分母的学生）", "有效触达数\n（仅开课分母学生）", "申诉数", "触达完成率\n（仅开课提醒分母学生）", "是否达标（80%）",
 ] as const;
 
 const PROJECT_COLUMNS = [
-  "教研组", "负责人", "应发送数（剔除特殊情况申诉）", "汇总触达数", "有效触达数", "申诉数", "触达完成率", "是否达标（80%）",
+  "教研组", "负责人", "应发送数（剔除特殊情况申诉）", "汇总触达数（含不在分母的学生）", "有效触达数\n（仅开课分母学生）", "申诉数", "触达完成率\n（仅开课提醒分母学生）", "是否达标（80%）",
 ] as const;
 
 const EXCEPTION_COLUMNS = [
@@ -124,11 +124,11 @@ function teacherOutputRows(rows: DataRow[]) {
     师训组长: row.师训组长 || "",
     助理主管: row.助理主管 || "",
     "应发送数（剔除特殊情况申诉）": row.应发送数 || 0,
-    汇总触达数: row.汇总触达数 ?? row.已发送数 ?? 0,
-    有效触达数: row.有效触达数 ?? row.已发送数 ?? 0,
+    "汇总触达数（含不在分母的学生）": row.汇总触达数 ?? row.已发送数 ?? 0,
+    "有效触达数\n（仅开课分母学生）": row.有效触达数 ?? row.已发送数 ?? 0,
     触达差额: row.触达差额 ?? row.发送差额 ?? 0,
     申诉数: row.申诉数 || 0,
-    触达完成率: row.触达完成率 || row.发送率 || "0.0%",
+    "触达完成率\n（仅开课提醒分母学生）": row.触达完成率 || row.发送率 || "0.0%",
     是否达标: row.是否达标 || "否",
   }));
 }
@@ -142,10 +142,10 @@ function pushTotalRow(rows: DataRow[], labelColumn: string, label: string, bucke
   rows.push({
     [labelColumn]: label,
     "应发送数（剔除特殊情况申诉）": bucket.total,
-    汇总触达数: bucket.rawTouch,
-    有效触达数: bucket.effectiveTouch,
+    "汇总触达数（含不在分母的学生）": bucket.rawTouch,
+    "有效触达数\n（仅开课分母学生）": bucket.effectiveTouch,
     申诉数: bucket.appealed,
-    触达完成率: rateText(bucket.effectiveTouch, bucket.total),
+    "触达完成率\n（仅开课提醒分母学生）": rateText(bucket.effectiveTouch, bucket.total),
     "是否达标（80%）": passText(bucket.effectiveTouch, bucket.total),
     __rowType: rowType,
   });
@@ -170,7 +170,7 @@ function assistantStyle(row: DataRow, includeResultColors: boolean) {
 }
 
 function assistantCellStyle(row: DataRow, column: string, baseStyle: number) {
-  if (column !== "触达完成率") return baseStyle;
+  if (column !== "触达完成率\n（仅开课提醒分母学生）") return baseStyle;
   if (row.__rowType === "projectTotal" || row.__rowType === "grandTotal") return 13;
   if (row.__rowType === "groupTotal") return 15;
   return 12;
@@ -253,10 +253,10 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
           教研组: rows.length === groupStart ? teachingGroup : "",
           助理主管: assistant,
           "应发送数（剔除特殊情况申诉）": item.total,
-          汇总触达数: item.rawTouch,
-          有效触达数: item.effectiveTouch,
+          "汇总触达数（含不在分母的学生）": item.rawTouch,
+          "有效触达数\n（仅开课分母学生）": item.effectiveTouch,
           申诉数: item.appealed,
-          触达完成率: rate(item.effectiveTouch, item.total),
+          "触达完成率\n（仅开课提醒分母学生）": rate(item.effectiveTouch, item.total),
           "是否达标（80%）": passText(item.effectiveTouch, item.total),
           __rowType: "detail",
         });
@@ -269,10 +269,10 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
         教研组: displayTeachingGroup(teachingGroup),
         助理主管: "",
         "应发送数（剔除特殊情况申诉）": groupBucket.total,
-        汇总触达数: groupBucket.rawTouch,
-        有效触达数: groupBucket.effectiveTouch,
+        "汇总触达数（含不在分母的学生）": groupBucket.rawTouch,
+        "有效触达数\n（仅开课分母学生）": groupBucket.effectiveTouch,
         申诉数: groupBucket.appealed,
-        触达完成率: rate(groupBucket.effectiveTouch, groupBucket.total),
+        "触达完成率\n（仅开课提醒分母学生）": rate(groupBucket.effectiveTouch, groupBucket.total),
         "是否达标（80%）": passText(groupBucket.effectiveTouch, groupBucket.total),
         __rowType: "groupTotal",
       });
@@ -289,10 +289,10 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
       教研组: project,
       助理主管: "",
       "应发送数（剔除特殊情况申诉）": projectBucket.total,
-      汇总触达数: projectBucket.rawTouch,
-      有效触达数: projectBucket.effectiveTouch,
+      "汇总触达数（含不在分母的学生）": projectBucket.rawTouch,
+      "有效触达数\n（仅开课分母学生）": projectBucket.effectiveTouch,
       申诉数: projectBucket.appealed,
-      触达完成率: rate(projectBucket.effectiveTouch, projectBucket.total),
+      "触达完成率\n（仅开课提醒分母学生）": rate(projectBucket.effectiveTouch, projectBucket.total),
       "是否达标（80%）": passText(projectBucket.effectiveTouch, projectBucket.total),
       __rowType: "projectTotal",
     });
@@ -302,8 +302,8 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
   rows.forEach((row) => {
     if (row.__rowType !== "projectTotal") return;
     grandBucket.total += Number(row["应发送数（剔除特殊情况申诉）"]) || 0;
-    grandBucket.rawTouch += Number(row.汇总触达数) || 0;
-    grandBucket.effectiveTouch += Number(row.有效触达数) || 0;
+    grandBucket.rawTouch += Number(row["汇总触达数（含不在分母的学生）"]) || 0;
+    grandBucket.effectiveTouch += Number(row["有效触达数\n（仅开课分母学生）"]) || 0;
     grandBucket.appealed += Number(row.申诉数) || 0;
   });
   const grandSummaryRow = actualRow(rows.length);
@@ -312,10 +312,10 @@ function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
     教研组: "总计",
     助理主管: "",
     "应发送数（剔除特殊情况申诉）": grandBucket.total,
-    汇总触达数: grandBucket.rawTouch,
-    有效触达数: grandBucket.effectiveTouch,
+    "汇总触达数（含不在分母的学生）": grandBucket.rawTouch,
+    "有效触达数\n（仅开课分母学生）": grandBucket.effectiveTouch,
     申诉数: grandBucket.appealed,
-    触达完成率: rate(grandBucket.effectiveTouch, grandBucket.total),
+    "触达完成率\n（仅开课提醒分母学生）": rate(grandBucket.effectiveTouch, grandBucket.total),
     "是否达标（80%）": passText(grandBucket.effectiveTouch, grandBucket.total),
     __rowType: "grandTotal",
   });
@@ -363,10 +363,10 @@ function buildTrainingRows(teacherRows: DataRow[]) {
           detailRows.push({
             教研组: lead,
             "应发送数（剔除特殊情况申诉）": item.total,
-            汇总触达数: item.rawTouch,
-            有效触达数: item.effectiveTouch,
+            "汇总触达数（含不在分母的学生）": item.rawTouch,
+            "有效触达数\n（仅开课分母学生）": item.effectiveTouch,
             申诉数: item.appealed,
-            触达完成率: rateText(item.effectiveTouch, item.total),
+            "触达完成率\n（仅开课提醒分母学生）": rateText(item.effectiveTouch, item.total),
             "是否达标（80%）": passText(item.effectiveTouch, item.total),
             __rowType: "detail",
           });
@@ -380,10 +380,10 @@ function buildTrainingRows(teacherRows: DataRow[]) {
         projectRows.push({
           教研组: displayTeachingGroup(group),
           "应发送数（剔除特殊情况申诉）": groupBucket.total,
-          汇总触达数: groupBucket.rawTouch,
-          有效触达数: groupBucket.effectiveTouch,
+          "汇总触达数（含不在分母的学生）": groupBucket.rawTouch,
+          "有效触达数\n（仅开课分母学生）": groupBucket.effectiveTouch,
           申诉数: groupBucket.appealed,
-          触达完成率: rateText(groupBucket.effectiveTouch, groupBucket.total),
+          "触达完成率\n（仅开课提醒分母学生）": rateText(groupBucket.effectiveTouch, groupBucket.total),
           "是否达标（80%）": passText(groupBucket.effectiveTouch, groupBucket.total),
           __rowType: "groupTotal",
         });
@@ -392,10 +392,10 @@ function buildTrainingRows(teacherRows: DataRow[]) {
       rows.push({
         教研组: project,
         "应发送数（剔除特殊情况申诉）": projectBucket.total,
-        汇总触达数: projectBucket.rawTouch,
-        有效触达数: projectBucket.effectiveTouch,
+        "汇总触达数（含不在分母的学生）": projectBucket.rawTouch,
+        "有效触达数\n（仅开课分母学生）": projectBucket.effectiveTouch,
         申诉数: projectBucket.appealed,
-        触达完成率: rateText(projectBucket.effectiveTouch, projectBucket.total),
+        "触达完成率\n（仅开课提醒分母学生）": rateText(projectBucket.effectiveTouch, projectBucket.total),
         "是否达标（80%）": passText(projectBucket.effectiveTouch, projectBucket.total),
         __rowType: "projectTotal",
       });
@@ -405,8 +405,8 @@ function buildTrainingRows(teacherRows: DataRow[]) {
   rows.forEach((row) => {
     if (row.__rowType !== "projectTotal") return;
     grandBucket.total += Number(row["应发送数（剔除特殊情况申诉）"]) || 0;
-    grandBucket.rawTouch += Number(row.汇总触达数) || 0;
-    grandBucket.effectiveTouch += Number(row.有效触达数) || 0;
+    grandBucket.rawTouch += Number(row["汇总触达数（含不在分母的学生）"]) || 0;
+    grandBucket.effectiveTouch += Number(row["有效触达数\n（仅开课分母学生）"]) || 0;
     grandBucket.appealed += Number(row.申诉数) || 0;
   });
   pushTotalRow(rows, "教研组", "总计", grandBucket, "grandTotal");
@@ -447,10 +447,10 @@ function buildProjectRows(teacherRows: DataRow[]) {
           教研组: displayTeachingGroup(group),
           负责人: [...item.assistants].sort(compareText).join("、") || "/",
           "应发送数（剔除特殊情况申诉）": item.total,
-          汇总触达数: item.rawTouch,
-          有效触达数: item.effectiveTouch,
+          "汇总触达数（含不在分母的学生）": item.rawTouch,
+          "有效触达数\n（仅开课分母学生）": item.effectiveTouch,
           申诉数: item.appealed,
-          触达完成率: rateText(item.effectiveTouch, item.total),
+          "触达完成率\n（仅开课提醒分母学生）": rateText(item.effectiveTouch, item.total),
           "是否达标（80%）": passText(item.effectiveTouch, item.total),
           __rowType: "detail",
         });
@@ -460,10 +460,10 @@ function buildProjectRows(teacherRows: DataRow[]) {
         教研组: project,
         负责人: [...projectBucket.assistants].sort(compareText).join("、") || "/",
         "应发送数（剔除特殊情况申诉）": projectBucket.total,
-        汇总触达数: projectBucket.rawTouch,
-        有效触达数: projectBucket.effectiveTouch,
+        "汇总触达数（含不在分母的学生）": projectBucket.rawTouch,
+        "有效触达数\n（仅开课分母学生）": projectBucket.effectiveTouch,
         申诉数: projectBucket.appealed,
-        触达完成率: rateText(projectBucket.effectiveTouch, projectBucket.total),
+        "触达完成率\n（仅开课提醒分母学生）": rateText(projectBucket.effectiveTouch, projectBucket.total),
         "是否达标（80%）": passText(projectBucket.effectiveTouch, projectBucket.total),
         __rowType: "projectTotal",
       });
@@ -472,8 +472,8 @@ function buildProjectRows(teacherRows: DataRow[]) {
   rows.forEach((row) => {
     if (row.__rowType !== "projectTotal") return;
     grandBucket.total += Number(row["应发送数（剔除特殊情况申诉）"]) || 0;
-    grandBucket.rawTouch += Number(row.汇总触达数) || 0;
-    grandBucket.effectiveTouch += Number(row.有效触达数) || 0;
+    grandBucket.rawTouch += Number(row["汇总触达数（含不在分母的学生）"]) || 0;
+    grandBucket.effectiveTouch += Number(row["有效触达数\n（仅开课分母学生）"]) || 0;
     grandBucket.appealed += Number(row.申诉数) || 0;
     text(row.负责人).split("、").filter((item) => item && item !== "/").forEach((item) => grandBucket.assistants.add(item));
   });
@@ -481,10 +481,10 @@ function buildProjectRows(teacherRows: DataRow[]) {
     教研组: "总计",
     负责人: [...grandBucket.assistants].sort(compareText).join("、") || "/",
     "应发送数（剔除特殊情况申诉）": grandBucket.total,
-    汇总触达数: grandBucket.rawTouch,
-    有效触达数: grandBucket.effectiveTouch,
+    "汇总触达数（含不在分母的学生）": grandBucket.rawTouch,
+    "有效触达数\n（仅开课分母学生）": grandBucket.effectiveTouch,
     申诉数: grandBucket.appealed,
-    触达完成率: rateText(grandBucket.effectiveTouch, grandBucket.total),
+    "触达完成率\n（仅开课提醒分母学生）": rateText(grandBucket.effectiveTouch, grandBucket.total),
     "是否达标（80%）": passText(grandBucket.effectiveTouch, grandBucket.total),
     __rowType: "grandTotal",
   });
@@ -564,11 +564,11 @@ export function buildReminderOutput(
       title: "开课提醒话术发送进度（助理主管维度）",
       rows: publicTable.rows,
       columns: ASSISTANT_COLUMNS,
-      widths: { 教研组: 14, 助理主管: 18, "应发送数（剔除特殊情况申诉）": 10, 汇总触达数: 12, 有效触达数: 12, 触达完成率: 13, "是否达标（80%）": 15 },
+      widths: { 教研组: 14, 助理主管: 18, "应发送数（剔除特殊情况申诉）": 10, "汇总触达数（含不在分母的学生）": 12, "有效触达数\n（仅开课分母学生）": 12, "触达完成率\n（仅开课提醒分母学生）": 13, "是否达标（80%）": 15 },
       mergeCells: publicTable.mergeCells,
       rowStyle: (row) => assistantStyle(row, includeResultColors),
       cellStyle: assistantCellStyle,
-      dataBarColumns: ["触达完成率"],
+      dataBarColumns: ["触达完成率\n（仅开课提醒分母学生）"],
     },
     {
       name: "项目组维度",
