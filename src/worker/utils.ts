@@ -47,7 +47,8 @@ export function normalizeMatchText(value: unknown) {
 
 export function excelDate(value: CellValue) {
   if (value instanceof Date && !Number.isNaN(value.valueOf())) {
-    return value.toISOString().slice(0, 10);
+    const pad = (number: number) => String(number).padStart(2, "0");
+    return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
   }
   if (typeof value === "number") {
     const parsed = XLSX.SSF.parse_date_code(value);

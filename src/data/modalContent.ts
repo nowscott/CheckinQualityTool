@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.5.21",
+    date: "2026-07-23 18:59",
+    items: [
+      "修复课次开始日期在 Excel 日期单元格为当天零点时被按 UTC 转换、导致结果提前一天的问题。",
+    ],
+  },
+  {
     version: "v2.5.20",
     date: "2026-07-10 15:31",
     items: [
