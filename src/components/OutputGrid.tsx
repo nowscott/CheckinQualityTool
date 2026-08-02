@@ -16,12 +16,22 @@ const REMINDER_OUTPUT_SHEETS = [
   ["可选", "清洗后聊天", "默认不输出；勾选后追加聊天来源、群名、时间、内容和源行号。"],
 ] as const;
 
+const STAGE_REPORT_OUTPUT_SHEETS = [
+  ["Sheet 1", "阶段性报告检查明细", "保留分母原列，追加本次检查结论和聊天证据。"],
+  ["Sheet 2", "教师发送汇总", "按教师姓名和邮箱统计应发、已发、未发、发送率和申诉数。"],
+  ["Sheet 3", "处理说明", "记录来源、表头识别、去重、聊天清洗和检查口径。"],
+] as const;
+
 interface OutputGridProps {
-  mode?: "checkin" | "reminder";
+  mode?: "checkin" | "reminder" | "stageReport";
 }
 
 export function OutputGrid({ mode = "checkin" }: OutputGridProps) {
-  const sheets = mode === "reminder" ? REMINDER_OUTPUT_SHEETS : OUTPUT_SHEETS;
+  const sheets = mode === "reminder"
+    ? REMINDER_OUTPUT_SHEETS
+    : mode === "stageReport"
+      ? STAGE_REPORT_OUTPUT_SHEETS
+      : OUTPUT_SHEETS;
   return (
     <section className="output-grid">
       {sheets.map(([sheet, title, description]) => (

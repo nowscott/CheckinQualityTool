@@ -4,6 +4,7 @@ import { Header } from "./components/Header";
 import { MatchingGuideDialog } from "./components/MatchingGuideDialog";
 import { OutputGrid } from "./components/OutputGrid";
 import { ReminderForm } from "./components/ReminderForm";
+import { StageReportForm } from "./components/StageReportForm";
 import { StatusCard } from "./components/StatusCard";
 import { UploadForm } from "./components/UploadForm";
 import { downloadResult } from "./lib/download";
@@ -12,7 +13,7 @@ import { useTheme } from "./hooks/useTheme";
 import type { ProcessingStatus, WeekLabel, WorkerResponse } from "./types/worker";
 
 type ActiveModal = "guide" | "changelog" | null;
-type ToolMode = "checkin" | "reminder";
+type ToolMode = "checkin" | "reminder" | "stageReport";
 
 const INITIAL_STATUS: ProcessingStatus = {
   visible: false,
@@ -37,7 +38,10 @@ function errorMessage(error: unknown) {
 }
 
 function modeFromPath(): ToolMode {
-  return window.location.pathname.replace(/\/+$/, "") === "/remind" ? "reminder" : "checkin";
+  const path = window.location.pathname.replace(/\/+$/, "");
+  if (path === "/remind") return "reminder";
+  if (path === "/stage-report") return "stageReport";
+  return "checkin";
 }
 
 function createProcessingWorker() {
@@ -52,6 +56,8 @@ export default function App() {
   const [reminderAppealFile, setReminderAppealFile] = useState<File | null>(null);
   const [reminderSummaryFiles, setReminderSummaryFiles] = useState<File[]>([]);
   const [reminderChatFiles, setReminderChatFiles] = useState<File[]>([]);
+  const [stageReportDenominatorFile, setStageReportDenominatorFile] = useState<File | null>(null);
+  const [stageReportChatFiles, setStageReportChatFiles] = useState<File[]>([]);
   const [includeReminderChats, setIncludeReminderChats] = useState(false);
   const [includeReminderColors, setIncludeReminderColors] = useState(false);
   const [includeReminderExceptionSheet, setIncludeReminderExceptionSheet] = useState(false);
@@ -98,13 +104,19 @@ export default function App() {
   function changeMode(mode: ToolMode) {
     setActiveMode(mode);
     setStatus(INITIAL_STATUS);
-    const path = mode === "reminder" ? "/remind" : "/";
+    const path = mode === "reminder" ? "/remind" : mode === "stageReport" ? "/stage-report" : "/";
     if (window.location.pathname !== path) window.history.pushState(null, "", path);
   }
 
   function handleSecondaryLinkClick(event: MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
-    changeMode(activeMode === "reminder" ? "checkin" : "reminder");
+    changeMode(modeFromHref(event.currentTarget.getAttribute("href")));
+  }
+
+  function modeFromHref(href: string | null): ToolMode {
+    if (href === "/remind") return "reminder";
+    if (href === "/stage-report") return "stageReport";
+    return "checkin";
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -221,24 +233,67 @@ export default function App() {
     });
   }
 
+  async function handleStageReportSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!stageReportDenominatorFile || !stageReportChatFiles.length) return;
+    workerRef.current?.terminate();
+    const worker = createProcessingWorker();
+    workerRef.current = worker;
+    setProcessing(true);
+    updateStatus("正在启动本地处理引擎", "所有文件只在当前浏览器中处理，不会上传。", 2);
+    worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
+      if (data.type === "progress") {
+        updateStatus(data.title, data.message, data.progress);
+        return;
+      }
+      if (data.type === "complete") {
+        downloadResult(data.buffer, data.filename);
+        updateStatus(
+          "处理完成，结果已下载",
+          `阶段性报告 ${data.summary.targets.toLocaleString()} 条：已发送 ${data.summary.sent.toLocaleString()}，未发送 ${data.summary.unsent.toLocaleString()}；清洗后聊天 ${data.summary.cleanChats.toLocaleString()} 条。`,
+          100,
+          "done",
+        );
+        finishWorker();
+        return;
+      }
+      updateStatus("处理失败", data.message, 100, "error");
+      finishWorker();
+    };
+    worker.onerror = (event) => {
+      updateStatus("处理失败", event.message || "浏览器工作线程发生错误。", 100, "error");
+      finishWorker();
+    };
+    worker.postMessage({
+      type: "process",
+      mode: "stageReport",
+      denominatorFile: stageReportDenominatorFile,
+      chatFiles: stageReportChatFiles,
+    });
+  }
+
+  const secondaryLinks = activeMode === "checkin"
+    ? [{ href: "/remind", label: "开课提醒" }, { href: "/stage-report", label: "阶段性报告" }]
+    : activeMode === "reminder"
+      ? [{ href: "/", label: "打卡质检" }, { href: "/stage-report", label: "阶段性报告" }]
+      : [{ href: "/", label: "打卡质检" }, { href: "/remind", label: "开课提醒" }];
+
   return (
     <>
       <main className="shell">
         <Header
           theme={theme}
           usesSystemTheme={usesSystemTheme}
-          title={activeMode === "reminder" ? "开课提醒触达完成率公示" : "打卡质检数据生成"}
+          title={activeMode === "reminder" ? "开课提醒触达完成率公示" : activeMode === "stageReport" ? "阶段性报告发送检查" : "打卡质检数据生成"}
           subtitle={
             activeMode === "reminder"
               ? "上传开课提醒学员明细名单与聊天质检汇总文件，在浏览器本地计算教师及以上维度触达完成率。文件不会上传服务器。"
-              : undefined
+              : activeMode === "stageReport"
+                ? "上传阶段性报告分母与企微聊天质检结果，在浏览器本地核验每位学员的发送证据。文件不会上传服务器。"
+                : undefined
           }
           showGuide={activeMode === "checkin"}
-          secondaryLink={
-            activeMode === "reminder"
-              ? { href: "/", label: "返回打卡质检" }
-              : { href: "/remind", label: "开课提醒" }
-          }
+          secondaryLinks={secondaryLinks}
           onToggleTheme={toggleTheme}
           onOpenGuide={() => setActiveModal("guide")}
           onOpenChangelog={() => setActiveModal("changelog")}
@@ -264,6 +319,15 @@ export default function App() {
             onIncludeExceptionSheetChange={setIncludeReminderExceptionSheet}
             onIncludeExplanationSheetChange={setIncludeReminderExplanationSheet}
             onSubmit={handleReminderSubmit}
+          />
+        ) : activeMode === "stageReport" ? (
+          <StageReportForm
+            denominatorFile={stageReportDenominatorFile}
+            chatFiles={stageReportChatFiles}
+            processing={processing}
+            onDenominatorFileChange={setStageReportDenominatorFile}
+            onChatFilesChange={setStageReportChatFiles}
+            onSubmit={handleStageReportSubmit}
           />
         ) : (
           <UploadForm

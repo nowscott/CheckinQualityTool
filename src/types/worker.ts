@@ -11,7 +11,7 @@ export interface ProcessingStatus {
 }
 
 export interface ResultSummary {
-  mode?: "checkin" | "reminder";
+  mode?: "checkin" | "reminder" | "stageReport";
   targets: number;
   sent: number;
   unsent: number;

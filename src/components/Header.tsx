@@ -12,7 +12,7 @@ interface HeaderProps {
   title?: string;
   subtitle?: string;
   showGuide?: boolean;
-  secondaryLink?: HeaderLink;
+  secondaryLinks?: HeaderLink[];
   onToggleTheme: () => void;
   onOpenGuide: () => void;
   onOpenChangelog: () => void;
@@ -25,7 +25,7 @@ export function Header({
   title = "打卡质检数据生成",
   subtitle = "上传课堂反馈名单与聊天导出数据，在浏览器本地完成清洗、匹配并生成可追溯的多 Sheet Excel。文件不会上传服务器。",
   showGuide = true,
-  secondaryLink,
+  secondaryLinks,
   onToggleTheme,
   onOpenGuide,
   onOpenChangelog,
@@ -54,11 +54,11 @@ export function Header({
             查看匹配规则
           </button>
         ) : null}
-        {secondaryLink ? (
-          <a className="secondary-tool-link" href={secondaryLink.href} onClick={onSecondaryLinkClick}>
-            {secondaryLink.label}
+        {secondaryLinks?.map((link) => (
+          <a className="secondary-tool-link" href={link.href} onClick={onSecondaryLinkClick} key={link.href}>
+            {link.label}
           </a>
-        ) : null}
+        ))}
       </p>
       <div className="header-controls">
         <button

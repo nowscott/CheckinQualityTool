@@ -17,6 +17,9 @@ import {
   type ReminderTouchInfo,
 } from "./reminderTouchSummary";
 import { ensureSheetJs } from "./sheetJsLoader";
+import { buildStageReportOutput } from "./stageReportExcelWriter";
+import { buildStageReportTargets } from "./stageReportListParser";
+import { matchStageReportData } from "./stageReportMatching";
 import type { ChatInfo, WorkerRequest } from "./types";
 import { inferServiceWeek } from "./utils";
 import { buildWhitelist } from "./whitelist";
@@ -163,6 +166,51 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
           summaryFiles: data.summaryFiles.length,
           chatFiles: data.chatFiles.length,
           cleanChats: chatInfo.chats.length,
+        },
+      }, [buffer]);
+      return;
+    }
+
+    if (data.mode === "stageReport") {
+      const listWorkbook = await readWorkbook(data.denominatorFile, 3, 28, "阶段性报告分母");
+      const listInfo = buildStageReportTargets(listWorkbook);
+      progress(
+        "分母预处理完成",
+        `原始 ${listInfo.counts.原始分母行数.toLocaleString()} 条，整行去重后 ${listInfo.targets.length.toLocaleString()} 条。`,
+        32,
+      );
+      const chatInfo = await readChatFiles(data.chatFiles, 34, 66);
+      progress(
+        "聊天预处理完成",
+        `${data.chatFiles.length.toLocaleString()} 个文件，原始 ${chatInfo.counts.原始聊天行数.toLocaleString()} 条，清洗后 ${chatInfo.chats.length.toLocaleString()} 条。`,
+        68,
+      );
+      progress("正在检查阶段性报告", "按教师邮箱匹配；同条聊天须同时命中“阶段性报告”和学员姓名。", 74);
+      const matchInfo = matchStageReportData(listInfo, chatInfo.chats);
+      progress(
+        "检查完成",
+        `已发送 ${matchInfo.counts.已发送数.toLocaleString()}，未发送 ${matchInfo.counts.未发送数.toLocaleString()}，字段缺失 ${matchInfo.counts.字段缺失数.toLocaleString()}。`,
+        82,
+      );
+      progress("正在生成 Excel", "写入检查明细、教师发送汇总和处理说明。", 86);
+      const output = buildStageReportOutput(listInfo, chatInfo, matchInfo, {
+        list: data.denominatorFile.name,
+        chats: data.chatFiles.map((file) => file.name).join("；"),
+      });
+      const buffer = output.buffer as ArrayBuffer;
+      const stamp = new Date();
+      const date = `${stamp.getFullYear()}${String(stamp.getMonth() + 1).padStart(2, "0")}${String(stamp.getDate()).padStart(2, "0")}`;
+      workerScope.postMessage({
+        type: "complete",
+        buffer,
+        filename: `阶段性报告发送检查结果（${date}）.xlsx`,
+        summary: {
+          mode: "stageReport",
+          targets: listInfo.targets.length,
+          sent: matchInfo.counts.已发送数,
+          unsent: matchInfo.counts.未发送数 + matchInfo.counts.字段缺失数,
+          cleanChats: chatInfo.chats.length,
+          chatFiles: data.chatFiles.length,
         },
       }, [buffer]);
       return;

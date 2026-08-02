@@ -14,8 +14,12 @@ const modeArg = args[0]?.startsWith("--mode=") ? args.shift() : "";
 const mode = modeArg ? modeArg.split("=")[1] : "checkin";
 let listPath = "";
 let chatPaths = [];
-let outputPath = mode === "reminder" ? "/tmp/reminder-worker-result.xlsx" : "/tmp/typescript-worker-result.xlsx";
-if (mode === "reminder") {
+let outputPath = mode === "reminder"
+  ? "/tmp/reminder-worker-result.xlsx"
+  : mode === "stageReport"
+    ? "/tmp/stage-report-worker-result.xlsx"
+    : "/tmp/typescript-worker-result.xlsx";
+if (["reminder", "stageReport"].includes(mode)) {
   listPath = args.shift() || "";
   if (args.length > 1) outputPath = args.pop();
   chatPaths = args;
@@ -27,9 +31,9 @@ if (mode === "reminder") {
 }
 
 if (!listPath || !chatPaths.length) {
-  throw new Error("用法：node scripts/regression-worker.mjs [--mode=checkin|reminder] <名单.xlsx> <聊天.xlsx>... [输出.xlsx]");
+  throw new Error("用法：node scripts/regression-worker.mjs [--mode=checkin|reminder|stageReport] <名单.xlsx> <聊天.xlsx>... [输出.xlsx]");
 }
-if (!["checkin", "reminder"].includes(mode)) throw new Error(`不支持的 mode：${mode}`);
+if (!["checkin", "reminder", "stageReport"].includes(mode)) throw new Error(`不支持的 mode：${mode}`);
 
 const assets = await import("node:fs/promises").then(({ readdir }) =>
   readdir(resolve(root, "dist/assets")),
@@ -112,7 +116,14 @@ await context.self.onmessage({
         includeResultColors: false,
         whitelistCsv,
       }
-    : {
+    : mode === "stageReport"
+      ? {
+          type: "process",
+          mode: "stageReport",
+          denominatorFile: file(listPath, listBuffer),
+          chatFiles: chatPaths.map((path, index) => file(path, chatBuffers[index])),
+        }
+      : {
         type: "process",
         listFile: file(listPath, listBuffer),
         chatFile: file(chatPaths[0], chatBuffers[0]),

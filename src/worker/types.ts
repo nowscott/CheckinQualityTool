@@ -106,7 +106,14 @@ export interface ReminderProcessRequest {
   whitelistCsv: string;
 }
 
-export type WorkerRequest = ProcessRequest | ReminderProcessRequest;
+export interface StageReportProcessRequest {
+  type: "process";
+  mode: "stageReport";
+  denominatorFile: File;
+  chatFiles: File[];
+}
+
+export type WorkerRequest = ProcessRequest | ReminderProcessRequest | StageReportProcessRequest;
 
 export interface SheetDefinition {
   name: string;
