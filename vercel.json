@@ -13,6 +13,14 @@
     {
       "source": "/remind/:path*",
       "destination": "/"
+    },
+    {
+      "source": "/stage-report",
+      "destination": "/"
+    },
+    {
+      "source": "/stage-report/:path*",
+      "destination": "/"
     }
   ],
   "headers": [

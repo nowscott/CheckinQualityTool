@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.5.23",
+    date: "2026-08-02 22:22",
+    items: [
+      "补齐阶段性报告发送检查的线上路由重写，支持直接打开 /stage-report。",
+    ],
+  },
+  {
     version: "v2.5.22",
     date: "2026-08-02 22:18",
     items: [
