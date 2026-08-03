@@ -10,6 +10,12 @@ if (includeCleanChats) args.splice(includeCleanChatsIndex, 1);
 const appealArgIndex = args.findIndex((arg) => arg.startsWith("--appeal="));
 const appealPath = appealArgIndex >= 0 ? args[appealArgIndex].slice("--appeal=".length) : "";
 if (appealArgIndex >= 0) args.splice(appealArgIndex, 1);
+const summaryPaths = args
+  .filter((arg) => arg.startsWith("--summary="))
+  .map((arg) => arg.slice("--summary=".length));
+for (let index = args.length - 1; index >= 0; index -= 1) {
+  if (args[index].startsWith("--summary=")) args.splice(index, 1);
+}
 const modeArg = args[0]?.startsWith("--mode=") ? args.shift() : "";
 const mode = modeArg ? modeArg.split("=")[1] : "checkin";
 let listPath = "";
@@ -51,6 +57,7 @@ if (!workerFile) throw new Error("找不到构建后的 Worker，请先运行 np
 const listBuffer = await readFile(resolve(listPath));
 const chatBuffers = await Promise.all(chatPaths.map((path) => readFile(resolve(path))));
 const appealBuffer = appealPath ? await readFile(resolve(appealPath)) : null;
+const summaryBuffers = await Promise.all(summaryPaths.map((path) => readFile(resolve(path))));
 const whitelistCsv = await readFile(resolve(root, "public/data/whitelist.csv"), "utf8");
 const workerSources = new Map([
   [
@@ -111,6 +118,7 @@ await context.self.onmessage({
         mode: "reminder",
         denominatorFile: file(listPath, listBuffer),
         appealFile: appealPath && appealBuffer ? file(appealPath, appealBuffer) : null,
+        summaryFiles: summaryPaths.map((path, index) => file(path, summaryBuffers[index])),
         chatFiles: chatPaths.map((path, index) => file(path, chatBuffers[index])),
         includeCleanChats,
         includeResultColors: false,

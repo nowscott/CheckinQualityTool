@@ -57,12 +57,12 @@ function findStageReportSheet(workbook: SheetJsWorkbook): FoundSheet {
     if (!rows.length) continue;
     seen.push(name);
     const map = headerMap(rows[0]);
-    if ([HEADERS.teacher, HEADERS.email, HEADERS.studentId, HEADERS.student].every((aliases) => hasHeader(map, aliases))) {
+    if ([HEADERS.teacher, HEADERS.studentId, HEADERS.student].every((aliases) => hasHeader(map, aliases))) {
       return { name, rows };
     }
   }
   throw new Error(
-    "找不到阶段性报告分母工作表：需要包含教师姓名、邮箱、学号、学员姓名（支持常见别名）。" +
+    "找不到阶段性报告分母工作表：需要包含教师姓名、学号、学员姓名（支持常见别名）；邮箱可选。" +
       `已检查 Sheet：${seen.join("、") || "无"}`,
   );
 }

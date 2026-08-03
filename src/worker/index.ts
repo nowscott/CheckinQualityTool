@@ -17,7 +17,7 @@ import {
   type ReminderTouchInfo,
 } from "./reminderTouchSummary";
 import { ensureSheetJs } from "./sheetJsLoader";
-import { buildStageReportOutput } from "./stageReportExcelWriter";
+import { buildStageReportDingTalkOutput } from "./stageReportDingTalkWriter";
 import { buildStageReportTargets } from "./stageReportListParser";
 import { matchStageReportData } from "./stageReportMatching";
 import type { ChatInfo, WorkerRequest } from "./types";
@@ -185,25 +185,21 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
         `${data.chatFiles.length.toLocaleString()} 个文件，原始 ${chatInfo.counts.原始聊天行数.toLocaleString()} 条，清洗后 ${chatInfo.chats.length.toLocaleString()} 条。`,
         68,
       );
-      progress("正在检查阶段性报告", "按教师邮箱匹配；同条聊天须同时命中“阶段性报告”和学员姓名。", 74);
+      progress("正在检查阶段性报告", "教师邮箱优先、缺邮箱按教师姓名兜底；学员按后两字口径匹配。", 74);
       const matchInfo = matchStageReportData(listInfo, chatInfo.chats);
       progress(
         "检查完成",
         `已发送 ${matchInfo.counts.已发送数.toLocaleString()}，未发送 ${matchInfo.counts.未发送数.toLocaleString()}，字段缺失 ${matchInfo.counts.字段缺失数.toLocaleString()}。`,
         82,
       );
-      progress("正在生成 Excel", "写入检查明细、教师发送汇总和处理说明。", 86);
-      const output = buildStageReportOutput(listInfo, chatInfo, matchInfo, {
-        list: data.denominatorFile.name,
-        chats: data.chatFiles.map((file) => file.name).join("；"),
-      });
+      progress("正在生成公示表", "复刻暑假督课层级和样式，写入管理维度、教师维度及钉钉明细。", 90);
+      const dingTalk = buildStageReportDingTalkOutput(listInfo, matchInfo);
+      const output = dingTalk.output;
       const buffer = output.buffer as ArrayBuffer;
-      const stamp = new Date();
-      const date = `${stamp.getFullYear()}${String(stamp.getMonth() + 1).padStart(2, "0")}${String(stamp.getDate()).padStart(2, "0")}`;
       workerScope.postMessage({
         type: "complete",
         buffer,
-        filename: `阶段性报告发送检查结果（${date}）.xlsx`,
+        filename: `阶段性报告发送进度（${localMonthDay()}）.xlsx`,
         summary: {
           mode: "stageReport",
           targets: listInfo.targets.length,

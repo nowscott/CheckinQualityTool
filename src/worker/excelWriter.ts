@@ -81,6 +81,7 @@ function* worksheetChunks(
   dataRowHeight = 0,
   mergeCells: string[] = [],
   dataBarColumns: readonly string[] = [],
+  dataBarColor = "00B050",
 ) {
   const headerRowIndex = title ? 2 : 1;
   const dataStartRow = headerRowIndex + 1;
@@ -100,7 +101,7 @@ function* worksheetChunks(
       if (columnIndex < 0 || rows.length === 0) return "";
       const col = excelColumn(columnIndex);
       const range = `${col}${dataStartRow}:${col}${rows.length + headerRowIndex}`;
-      return `<conditionalFormatting sqref="${range}"><cfRule type="dataBar" priority="${index + 1}"><dataBar showValue="1"><cfvo type="num" val="0"/><cfvo type="num" val="1"/><color rgb="FF00B050"/></dataBar></cfRule></conditionalFormatting>`;
+      return `<conditionalFormatting sqref="${range}"><cfRule type="dataBar" priority="${index + 1}"><dataBar showValue="1"><cfvo type="num" val="0"/><cfvo type="num" val="1"/><color rgb="FF${dataBarColor}"/></dataBar></cfRule></conditionalFormatting>`;
     })
     .join("");
   yield (
@@ -262,11 +263,19 @@ export function buildWorkbook(sheets: SheetDefinition[]) {
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
     `<numFmts count="1"><numFmt numFmtId="164" formatCode="0.0%"/></numFmts>` +
-    `<fonts count="5"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font>` +
+    `<fonts count="13"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font>` +
     `<font><b/><color rgb="FFFFFFFF"/><sz val="22"/><name val="Microsoft YaHei"/></font>` +
     `<font><b/><color rgb="FFFFFFFF"/><sz val="13"/><name val="Microsoft YaHei"/></font>` +
-    `<font><b/><color rgb="FF000000"/><sz val="12"/><name val="Microsoft YaHei"/></font></fonts>` +
-    `<fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>` +
+    `<font><b/><color rgb="FF000000"/><sz val="12"/><name val="Microsoft YaHei"/></font>` +
+    `<font><b/><color rgb="FFFFFFFF"/><sz val="22"/><name val="PingFang SC"/></font>` +
+    `<font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="PingFang SC"/></font>` +
+    `<font><color rgb="FF0F172A"/><sz val="11"/><name val="PingFang SC"/></font>` +
+    `<font><b/><color rgb="FF16324F"/><sz val="11"/><name val="PingFang SC"/></font>` +
+    `<font><b/><color rgb="FF1F4E6D"/><sz val="12"/><name val="PingFang SC"/></font>` +
+    `<font><b/><color rgb="FFFFFFFF"/><sz val="12"/><name val="PingFang SC"/></font>` +
+    `<font><b/><color rgb="FF166534"/><sz val="11"/><name val="PingFang SC"/></font>` +
+    `<font><b/><color rgb="FFB42318"/><sz val="11"/><name val="PingFang SC"/></font></fonts>` +
+    `<fills count="19"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>` +
     `<fill><patternFill patternType="solid"><fgColor rgb="FF1F4E78"/><bgColor indexed="64"/></patternFill></fill>` +
     `<fill><patternFill patternType="solid"><fgColor rgb="FFC6EFCE"/><bgColor indexed="64"/></patternFill></fill>` +
     `<fill><patternFill patternType="solid"><fgColor rgb="FFFFC7CE"/><bgColor indexed="64"/></patternFill></fill>` +
@@ -274,11 +283,21 @@ export function buildWorkbook(sheets: SheetDefinition[]) {
     `<fill><patternFill patternType="solid"><fgColor rgb="FF009C82"/><bgColor indexed="64"/></patternFill></fill>` +
     `<fill><patternFill patternType="solid"><fgColor rgb="FFFFE9A6"/><bgColor indexed="64"/></patternFill></fill>` +
     `<fill><patternFill patternType="solid"><fgColor rgb="FFC6D9F1"/><bgColor indexed="64"/></patternFill></fill>` +
-    `<fill><patternFill patternType="solid"><fgColor rgb="FFEDEDED"/><bgColor indexed="64"/></patternFill></fill></fills>` +
-    `<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>` +
-    `<border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="thin"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border></borders>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FFEDEDED"/><bgColor indexed="64"/></patternFill></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FF123B5D"/><bgColor indexed="64"/></patternFill></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FF1F6D8C"/><bgColor indexed="64"/></patternFill></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FFF5F8FB"/><bgColor indexed="64"/></patternFill></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FFF7FAFC"/><bgColor indexed="64"/></patternFill></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FFEAF2F8"/><bgColor indexed="64"/></patternFill></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FFDDEBF4"/><bgColor indexed="64"/></patternFill></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FF2F5F7C"/><bgColor indexed="64"/></patternFill></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FFD9F0E2"/><bgColor indexed="64"/></patternFill></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FFFDE2E2"/><bgColor indexed="64"/></patternFill></fill></fills>` +
+    `<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border>` +
+    `<border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="thin"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border>` +
+    `<border><left style="thin"><color rgb="FFA9C1D5"/></left><right style="thin"><color rgb="FFA9C1D5"/></right><top style="thin"><color rgb="FFA9C1D5"/></top><bottom style="thin"><color rgb="FFA9C1D5"/></bottom><diagonal/></border></borders>` +
     `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
-    `<cellXfs count="16"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
+    `<cellXfs count="30"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
     `<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>` +
     `<xf numFmtId="0" fontId="0" fillId="3" borderId="0" xfId="0" applyFill="1"/>` +
     `<xf numFmtId="0" fontId="0" fillId="4" borderId="0" xfId="0" applyFill="1"/>` +
@@ -293,7 +312,21 @@ export function buildWorkbook(sheets: SheetDefinition[]) {
     `<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
     `<xf numFmtId="164" fontId="4" fillId="8" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
     `<xf numFmtId="0" fontId="4" fillId="9" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
-    `<xf numFmtId="164" fontId="4" fillId="9" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs>` +
+    `<xf numFmtId="164" fontId="4" fillId="9" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
+    `<xf numFmtId="0" fontId="5" fillId="10" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+    `<xf numFmtId="0" fontId="6" fillId="11" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+    `<xf numFmtId="0" fontId="7" fillId="12" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+    `<xf numFmtId="164" fontId="8" fillId="12" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+    `<xf numFmtId="0" fontId="7" fillId="13" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+    `<xf numFmtId="164" fontId="8" fillId="13" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+    `<xf numFmtId="0" fontId="9" fillId="14" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+    `<xf numFmtId="164" fontId="9" fillId="14" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+    `<xf numFmtId="0" fontId="9" fillId="15" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+    `<xf numFmtId="164" fontId="9" fillId="15" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+    `<xf numFmtId="0" fontId="10" fillId="16" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+    `<xf numFmtId="164" fontId="10" fillId="16" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+    `<xf numFmtId="0" fontId="11" fillId="17" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
+    `<xf numFmtId="0" fontId="12" fillId="18" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs>` +
     `<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>` +
     `</styleSheet>`,
   );
@@ -320,6 +353,7 @@ export function buildWorkbook(sheets: SheetDefinition[]) {
         sheet.dataRowHeight,
         sheet.mergeCells,
         sheet.dataBarColumns,
+        sheet.dataBarColor,
       ),
     );
   });
