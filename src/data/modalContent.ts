@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.5.25",
+    date: "2026-08-04 23:29",
+    items: [
+      "阶段性报告师训组长维度的教研组列只展示组长本人所属教研组，不再展开该组长负责教师的其他教研组。",
+    ],
+  },
+  {
     version: "v2.5.24",
     date: "2026-08-03 23:30",
     items: [

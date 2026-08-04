@@ -1,7 +1,7 @@
 {
   "name": "checkin-quality-tool",
   "private": true,
-  "version": "2.5.24",
+  "version": "2.5.25",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,7 @@
     "typecheck": "tsc -b",
     "test:checkin": "rm -rf /tmp/checkin-date-tests && npx tsc --ignoreConfig --target ES2022 --module ESNext --moduleResolution Bundler --outDir /tmp/checkin-date-tests --skipLibCheck src/worker/utils.ts src/worker/types.ts src/worker/sheetjs.d.ts && mkdir -p /tmp/checkin-date-tests/scripts && cp scripts/checkin-date.test.mjs /tmp/checkin-date-tests/scripts/checkin-date.test.mjs && node --test /tmp/checkin-date-tests/scripts/checkin-date.test.mjs",
     "test:reminder": "rm -rf /tmp/checkin-reminder-tests && npx tsc --ignoreConfig --target ES2022 --module ESNext --moduleResolution Bundler --outDir /tmp/checkin-reminder-tests --skipLibCheck src/worker/reminderListParser.ts src/worker/reminderMatching.ts src/worker/reminderTouchSummary.ts src/worker/reminderAppealParser.ts src/worker/reminderProjectGroup.ts src/worker/reminderConfig.ts src/worker/chatCleaner.ts src/worker/excelReader.ts src/worker/progress.ts src/worker/whitelist.ts src/worker/teacherExemptions.ts src/worker/utils.ts src/worker/sheetjs.d.ts && perl -0pi -e 's/from \"(\\.\\/[^\".]+)\"/from \"$1.js\"/g' /tmp/checkin-reminder-tests/worker/*.js && mkdir -p /tmp/checkin-reminder-tests/scripts && cp scripts/reminder-logic.test.mjs /tmp/checkin-reminder-tests/scripts/reminder-logic.test.mjs && node --test /tmp/checkin-reminder-tests/scripts/reminder-logic.test.mjs",
-    "test:stage-report": "rm -rf /tmp/checkin-stage-report-tests && npx tsc --ignoreConfig --target ES2022 --module ESNext --moduleResolution Bundler --outDir /tmp/checkin-stage-report-tests --skipLibCheck src/worker/stageReportListParser.ts src/worker/stageReportMatching.ts src/worker/teacherExemptions.ts src/worker/excelReader.ts src/worker/types.ts src/worker/utils.ts src/worker/sheetjs.d.ts && perl -0pi -e 's/from \"(\\.\\/[^\".]+)\"/from \"$1.js\"/g' /tmp/checkin-stage-report-tests/worker/*.js && mkdir -p /tmp/checkin-stage-report-tests/scripts && cp scripts/stage-report.test.mjs /tmp/checkin-stage-report-tests/scripts/stage-report.test.mjs && node --test /tmp/checkin-stage-report-tests/scripts/stage-report.test.mjs"
+    "test:stage-report": "rm -rf /tmp/checkin-stage-report-tests && npx tsc --ignoreConfig --target ES2022 --module ESNext --moduleResolution Bundler --outDir /tmp/checkin-stage-report-tests --skipLibCheck src/worker/stageReportListParser.ts src/worker/stageReportMatching.ts src/worker/stageReportGroups.ts src/worker/teacherExemptions.ts src/worker/excelReader.ts src/worker/types.ts src/worker/utils.ts src/worker/sheetjs.d.ts && perl -0pi -e 's/from \"(\\.\\/[^\".]+)\"/from \"$1.js\"/g' /tmp/checkin-stage-report-tests/worker/*.js && mkdir -p /tmp/checkin-stage-report-tests/scripts && cp scripts/stage-report.test.mjs /tmp/checkin-stage-report-tests/scripts/stage-report.test.mjs && node --test /tmp/checkin-stage-report-tests/scripts/stage-report.test.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3",
