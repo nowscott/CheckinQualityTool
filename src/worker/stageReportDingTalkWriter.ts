@@ -1,6 +1,6 @@
 import { buildWorkbook } from "./excelWriter";
 import { REMINDER_PASS_RATE } from "./reminderConfig";
-import { findTrainingLeadGroups } from "./stageReportGroups";
+import { findTrainingLeadGroups, trainingPersonKey } from "./stageReportGroups";
 import type { DataRow, SheetDefinition } from "./types";
 import { normalizeMatchText, text } from "./utils";
 import type { StageReportListInfo } from "./stageReportListParser";
@@ -200,7 +200,7 @@ function buildTeacherRows(detailRows: DataRow[], sentColumn: string) {
     .sort((a, b) => Number(b.发送率) - Number(a.发送率) || compareText(a.教师姓名, b.教师姓名));
 }
 
-function buildTrainingRows(teacherRows: DataRow[]) {
+function buildTrainingRows(teacherRows: DataRow[], fallbackLeadGroups: Map<string, string[]> = new Map()) {
   const grouped = new Map<string, SummaryBucket>();
   teacherRows.forEach((row) => {
     const lead = text(row.师训组长) || "未填写";
@@ -210,7 +210,7 @@ function buildTrainingRows(teacherRows: DataRow[]) {
   return [...grouped.entries()]
     .map(([lead, bucket]): DataRow => ({
       师训组长: lead,
-      教研组: findTrainingLeadGroups(teacherRows, lead).join("、") || "/",
+      教研组: fallbackLeadGroups.get(trainingPersonKey(lead))?.join("、") || findTrainingLeadGroups(teacherRows, lead).join("、") || "/",
       ...metrics(bucket),
     }))
     .sort((a, b) => Number(b.发送率) - Number(a.发送率) || compareText(a.师训组长, b.师训组长));
@@ -376,7 +376,7 @@ export function buildStageReportDingTalkOutput(
   const sentColumn = findSentColumn(listInfo.columns);
   const detailRows = buildDetailRows(listInfo, matchInfo, sentColumn);
   const teacherRows = buildTeacherRows(detailRows, sentColumn);
-  const trainingRows = buildTrainingRows(teacherRows);
+  const trainingRows = buildTrainingRows(teacherRows, listInfo.trainingLeadGroups);
   const assistantTable = buildAssistantTable(teacherRows);
   const researchGroupTable = buildResearchGroupTable(teacherRows);
   const sheets: SheetDefinition[] = [

@@ -17,6 +17,13 @@ function workbook(rows) {
   return { SheetNames: ["分母"], Sheets: { 分母: { __rows: rows } } };
 }
 
+function workbookWithSheets(sheets) {
+  return {
+    SheetNames: Object.keys(sheets),
+    Sheets: Object.fromEntries(Object.entries(sheets).map(([name, rows]) => [name, { __rows: rows }])),
+  };
+}
+
 function chat(overrides = {}) {
   return {
     有效教师邮箱: overrides.email || "teacher@xdf.cn",
@@ -42,6 +49,65 @@ test("分母支持常见表头别名，整行重复只保留一次", () => {
   assert.equal(list.targets[0].duplicateRows, "3");
   assert.equal(list.targets[1].appeal, true);
   assert.deepEqual(list.columns.slice(0, 5), ["校区", "授课教师", "教师邮箱", "学员号", "学生姓名"]);
+});
+
+test("多 Sheet 文件按阶段性报告主列选择分母，不误选窗口期发送明细", () => {
+  const list = buildStageReportTargets(workbookWithSheets({
+    "窗口期报告发送明细": [
+      ["教师姓名", "学生姓名", "学号", "师训组长", "助理主管", "是否发送窗口期报告"],
+      ["张老师", "陈一", "GZ1", "张老师", "李老师", "否"],
+    ],
+    "教师维度明细（截至8_7）": [
+      ["教师姓名", "师训组长", "助理主管", "教研组", "阶段性报告需发送"],
+      ["张老师", "张老师", "李老师", "高中双语", "1"],
+    ],
+    "非窗口期暑期在读学员阶段性报告发送明细": [
+      ["教师姓名", "学生姓名", "学号", "暑假最后一节课时间", "师训组长", "助理主管", "教研组", "是否发送阶段性报告", "是否需要发送"],
+      ["张老师", "陈一", "GZ1", "2026-08-05 18:30-20:30", "张老师", "李老师", "高中双语", "否", "是"],
+    ],
+    "组长维度汇总": [
+      ["师训组长", "助理主管", "教研组", "窗口期报告需发送数", "窗口期报告已发送数"],
+      ["张老师", "李老师", "高中双语", "1", "0"],
+    ],
+  }));
+  assert.equal(list.sheetName, "非窗口期暑期在读学员阶段性报告发送明细");
+  assert.equal(list.targets.length, 1);
+  assert.equal(list.targets[0].original.教研组, "高中双语");
+  assert.equal(list.targets[0].original["是否发送阶段性报告"], "否");
+  assert.deepEqual(list.trainingLeadGroups.get("张"), ["高中双语"]);
+});
+
+test("组长不在阶段性报告分母时，使用同文件组长维度汇总的自身教研组", () => {
+  const list = buildStageReportTargets(workbookWithSheets({
+    "阶段性报告分母": [
+      ["教师姓名", "学生姓名", "学号", "师训组长", "教研组", "是否发送阶段性报告"],
+      ["李老师", "陈一", "GZ1", "张组长", "初中双语", "否"],
+    ],
+    "组长维度汇总": [
+      ["师训组长", "教研组", "非窗口期暑期在读阶段性报告需发送数"],
+      ["张组长", "高中双语", "5"],
+    ],
+  }));
+  assert.deepEqual(list.trainingLeadGroups.get("张组长"), ["高中双语"]);
+});
+
+test("完整教师明细中的组长本人教研组优先于其负责范围汇总", () => {
+  const list = buildStageReportTargets(workbookWithSheets({
+    "阶段性报告分母": [
+      ["教师姓名", "学生姓名", "学号", "师训组长", "教研组", "是否发送阶段性报告"],
+      ["李老师", "陈一", "GZ1", "张组长", "初中双语", "否"],
+    ],
+    "教师维度明细": [
+      ["教师姓名", "师训组长", "教研组", "阶段性报告需发送"],
+      ["张组长", "张组长", "初中双语", "1"],
+      ["李老师", "张组长", "高中双语", "1"],
+    ],
+    "组长维度汇总": [
+      ["师训组长", "教研组", "非窗口期暑期在读阶段性报告需发送数"],
+      ["张组长", "高中双语", "5"],
+    ],
+  }));
+  assert.deepEqual(list.trainingLeadGroups.get("张组长"), ["初中双语"]);
 });
 
 test("同一教师下，学员后两字命中即可判已发送，不重复审核导出关键词", () => {
@@ -103,10 +169,18 @@ test("没有学员命中或邮箱不一致均不能判已发送", () => {
 
 test("师训组长维度只展示组长本人所属教研组，不展开其负责教师的其他教研组", () => {
   const teacherRows = [
-    { 教师姓名: "张组长1", 教研组: "高中双语" },
+    { 教师姓名: "张组长", 教研组: "高中双语" },
     { 教师姓名: "李老师", 教研组: "初中双语" },
     { 教师姓名: "王老师", 教研组: "高中双语" },
   ];
   assert.deepEqual(findTrainingLeadGroups(teacherRows, "张组长"), ["高中双语"]);
   assert.deepEqual(findTrainingLeadGroups(teacherRows, "未授课组长"), []);
+});
+
+test("组长本人姓名末尾数字不同于其他教师时，不串用其他人的教研组", () => {
+  const teacherRows = [
+    { 教师姓名: "黄磊44", 教研组: "实验P" },
+    { 教师姓名: "黄磊23", 教研组: "初中益智" },
+  ];
+  assert.deepEqual(findTrainingLeadGroups(teacherRows, "黄磊23"), ["初中益智"]);
 });
