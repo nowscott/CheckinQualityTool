@@ -1,5 +1,6 @@
 import { buildWorkbook } from "./excelWriter";
 import { REMINDER_PASS_RATE } from "./reminderConfig";
+import { findTrainingLeadGroups } from "./stageReportGroups";
 import type { DataRow, SheetDefinition } from "./types";
 import { normalizeMatchText, text } from "./utils";
 import type { StageReportListInfo } from "./stageReportListParser";
@@ -209,7 +210,7 @@ function buildTrainingRows(teacherRows: DataRow[]) {
   return [...grouped.entries()]
     .map(([lead, bucket]): DataRow => ({
       师训组长: lead,
-      教研组: [...bucket.groups].sort(compareText).join("、") || "/",
+      教研组: findTrainingLeadGroups(teacherRows, lead).join("、") || "/",
       ...metrics(bucket),
     }))
     .sort((a, b) => Number(b.发送率) - Number(a.发送率) || compareText(a.师训组长, b.师训组长));

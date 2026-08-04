@@ -11,6 +11,7 @@ globalThis.XLSX = {
 
 const { buildStageReportTargets } = await import("../worker/stageReportListParser.js");
 const { matchStageReportData } = await import("../worker/stageReportMatching.js");
+const { findTrainingLeadGroups } = await import("../worker/stageReportGroups.js");
 
 function workbook(rows) {
   return { SheetNames: ["分母"], Sheets: { 分母: { __rows: rows } } };
@@ -98,4 +99,14 @@ test("没有学员命中或邮箱不一致均不能判已发送", () => {
   assert.equal(result.counts.已发送数, 0);
   assert.equal(result.counts.未发送数, 1);
   assert.equal(result.detailRows[0].本次检查结论, "未发送");
+});
+
+test("师训组长维度只展示组长本人所属教研组，不展开其负责教师的其他教研组", () => {
+  const teacherRows = [
+    { 教师姓名: "张组长1", 教研组: "高中双语" },
+    { 教师姓名: "李老师", 教研组: "初中双语" },
+    { 教师姓名: "王老师", 教研组: "高中双语" },
+  ];
+  assert.deepEqual(findTrainingLeadGroups(teacherRows, "张组长"), ["高中双语"]);
+  assert.deepEqual(findTrainingLeadGroups(teacherRows, "未授课组长"), []);
 });
