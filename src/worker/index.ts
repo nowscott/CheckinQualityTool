@@ -222,7 +222,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       workerScope.postMessage({
         type: "complete",
         buffer,
-        filename: `阶段性报告公示版（${localMonthDay()}）.xlsx`,
+        filename: `窗口期报告+非窗口期暑期在读阶段性报告明细（${output.dataTime}）.xlsx`,
         summary: {
           mode: "stageReportBeautify",
           targets: output.counts.stageRows,
