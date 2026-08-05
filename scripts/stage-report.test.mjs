@@ -243,6 +243,17 @@ test("教研组汇总按项目排序并去重负责人尾号", () => {
   assert.deepEqual(projectRows.map((row) => row.教研组), ["双语项目", "益智项目"]);
 });
 
+test("教研组美化汇总可隐藏负责人且不跨指标合并", () => {
+  const table = buildResearchGroupHierarchy([
+    { 教师姓名: "甲", 助理主管: "李主管12", 教研组: "初中益智", 阶段应发: 2, 阶段已发: 1, 阶段申诉: 0, 窗口应发: 3, 窗口已发: 2 },
+  ], dualMetrics, false);
+  assert.ok(table.rows.every((row) => !("负责人" in row)));
+  assert.deepEqual(table.mergeCells, []);
+  const total = table.rows.find((row) => row.__rowType === "grandTotal");
+  assert.equal(total.阶段应发, 2);
+  assert.equal(total.窗口应发, 3);
+});
+
 test("申诉判定与零应发发送率口径保持一致", () => {
   assert.equal(isStageReportAppealed({ 是否申诉: "否", 申诉情况详情: "" }), false);
   assert.equal(isStageReportAppealed({ 是否申诉: "短期冲刺课/三次课内学员" }), true);

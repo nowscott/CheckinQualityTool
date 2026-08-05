@@ -216,6 +216,7 @@ export function buildAssistantHierarchy(
 export function buildResearchGroupHierarchy(
   teacherRows: DataRow[],
   metricSpecs: readonly HierarchyMetricSpec[],
+  includeOwner = true,
 ): HierarchyTable {
   const projects = new Map<string, Map<string, HierarchyBucket>>();
   teacherRows.forEach((row) => {
@@ -239,26 +240,26 @@ export function buildResearchGroupHierarchy(
       mergeBucket(projectBucket, item);
       rows.push({
         教研组: group,
-        负责人: displayPersonNames(item.assistants),
+        ...(includeOwner ? { 负责人: displayPersonNames(item.assistants) } : {}),
         ...metricValues(item, metricSpecs),
         __rowType: "detail",
       });
     });
     const projectRow = actualRow(rows.length);
-    mergeCells.push(`A${projectRow}:B${projectRow}`);
+    if (includeOwner) mergeCells.push(`A${projectRow}:B${projectRow}`);
     rows.push({
       教研组: project,
-      负责人: "",
+      ...(includeOwner ? { 负责人: "" } : {}),
       ...metricValues(projectBucket, metricSpecs),
       __rowType: "projectTotal",
     });
     mergeBucket(totalBucket, projectBucket);
   });
   const totalRow = actualRow(rows.length);
-  mergeCells.push(`A${totalRow}:B${totalRow}`);
+  if (includeOwner) mergeCells.push(`A${totalRow}:B${totalRow}`);
   rows.push({
     教研组: "总计",
-    负责人: "",
+    ...(includeOwner ? { 负责人: "" } : {}),
     ...metricValues(totalBucket, metricSpecs),
     __rowType: "grandTotal",
   });

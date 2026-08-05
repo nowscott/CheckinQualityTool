@@ -62,7 +62,6 @@ const ASSISTANT_COLUMNS = [
 
 const RESEARCH_GROUP_COLUMNS = [
   "教研组",
-  "负责人",
   ...ASSISTANT_COLUMNS.slice(2),
 ] as const;
 
@@ -426,17 +425,13 @@ export function buildStageReportBeautifyOutput(workbook: SheetJsWorkbook) {
   const stageDetailRows = rowObjects(stageDetail).rows;
   const hierarchyTeacherRows = buildHierarchyTeacherRows(teacherFound, stageDetailRows);
   const assistant = buildAssistantHierarchy(hierarchyTeacherRows, HIERARCHY_METRICS);
-  const group = buildResearchGroupHierarchy(hierarchyTeacherRows, HIERARCHY_METRICS);
+  const group = buildResearchGroupHierarchy(hierarchyTeacherRows, HIERARCHY_METRICS, false);
   const appeal = rowObjects(findAppealSheet(workbook));
   const sheets: SheetDefinition[] = [
     makeDetailSheet("阶段性报告明细", stageDetail),
-    makeSummarySheet(teacher),
-    makeSummarySheet(training),
-    makeHierarchySheet("助理主管维度", assistant, ASSISTANT_COLUMNS),
-    makeHierarchySheet("教研组维度", group, RESEARCH_GROUP_COLUMNS),
     makeDetailSheet("窗口期报告明细", windowDetail),
     {
-      name: "申诉情况",
+      name: "阶段性报告申诉情况",
       title: `阶段性报告申诉情况（数据生成 ${generatedDate()}）`,
       rows: appeal.rows,
       columns: appeal.columns,
@@ -448,6 +443,10 @@ export function buildStageReportBeautifyOutput(workbook: SheetJsWorkbook) {
       dataRowHeight: 24,
       rowStyle: () => STYLE.detail,
     },
+    makeHierarchySheet("教研组维度", group, RESEARCH_GROUP_COLUMNS),
+    makeHierarchySheet("助理主管维度", assistant, ASSISTANT_COLUMNS),
+    makeSummarySheet(training),
+    makeSummarySheet(teacher),
   ];
   const buffer = buildWorkbook(sheets);
   return {
