@@ -60,6 +60,16 @@ export function excelDate(value: CellValue) {
   return match ? match[0].replace(/[/.]/g, "-") : text(value);
 }
 
+export function excelTime(value: CellValue) {
+  const pad = (number: number) => String(number).padStart(2, "0");
+  if (value instanceof Date && !Number.isNaN(value.valueOf())) {
+    return `${pad(value.getHours())}:${pad(value.getMinutes())}`;
+  }
+  const match = text(value).match(/(?:^|\s)(\d{1,2}):(\d{2})(?::\d{2})?(?:\s|$)/);
+  if (!match) return text(value);
+  return `${pad(Number(match[1]))}:${match[2]}`;
+}
+
 export function displayValue(value: unknown) {
   if (!(value instanceof Date) || Number.isNaN(value.valueOf())) return text(value);
   const pad = (number: number) => String(number).padStart(2, "0");

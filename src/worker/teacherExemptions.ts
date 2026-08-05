@@ -1,7 +1,7 @@
 import { normalizeMatchText } from "./utils";
 
 const TEACHER_SUFFIX = decodeURIComponent("%E8%80%81%E5%B8%88");
-const EXEMPT_TEACHERS = new Set(["%E7%89%9B%E6%96%BD%E6%A1%A5"].map(decodeURIComponent).map(normalizeTeacherName));
+const EXEMPT_TEACHERS = new Set<string>();
 
 export function normalizeTeacherName(value: unknown) {
   return normalizeMatchText(value)

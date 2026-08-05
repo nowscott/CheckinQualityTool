@@ -88,7 +88,7 @@ test("群聊名称同时命中学员和教师时自动判定已发送", () => {
   assert.equal(result.counts.群名教师学员命中, 1);
 });
 
-test("指定教师开课提醒无需聊天命中也按已发送统计", () => {
+test("牛施桥没有聊天证据时不再免检", () => {
   const list = buildReminderTargets(workbook([
     ["授课教师", "教研组", "师训组长", "师训助理主管/主管", "学员姓名", "课时"],
     [`${exemptTeacher}${teacherSuffix}`, "益智组", "王组长", "李主管", "陈一", "12"],
@@ -96,11 +96,11 @@ test("指定教师开课提醒无需聊天命中也按已发送统计", () => {
     ["张老师", "益智组", "王组长", "赵主管", "赵三", "24"],
   ]));
   const result = matchReminderData(list, []);
-  assert.deepEqual(result.studentRows.map((row) => row.是否发送), ["是", "是", "否"]);
+  assert.deepEqual(result.studentRows.map((row) => row.是否发送), ["否", "否", "否"]);
   assert.equal(result.counts.应发送数, 3);
-  assert.equal(result.counts.已发送数, 2);
-  assert.equal(result.counts.未发送数, 1);
-  assert.equal(result.teacherRows.find((row) => row.教师姓名 === `${exemptTeacher}${teacherSuffix}`).发送率, "100.0%");
+  assert.equal(result.counts.已发送数, 0);
+  assert.equal(result.counts.未发送数, 3);
+  assert.equal(result.teacherRows.find((row) => row.教师姓名 === `${exemptTeacher}${teacherSuffix}`).发送率, "0.0%");
 });
 
 test("群聊名称命中唯一学员时自动判定已发送", () => {
