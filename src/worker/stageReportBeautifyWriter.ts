@@ -86,6 +86,49 @@ function generatedDate() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
+function formatDataTime(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function parseDataTime(value: unknown) {
+  if (value instanceof Date && !Number.isNaN(value.valueOf())) {
+    return { timestamp: value.valueOf(), label: formatDataTime(value) };
+  }
+  if (typeof value === "number") {
+    const parsed = XLSX.SSF.parse_date_code(value) as {
+      y: number;
+      m: number;
+      d: number;
+      H?: number;
+      M?: number;
+      S?: number;
+    } | null;
+    if (parsed) {
+      const date = new Date(parsed.y, parsed.m - 1, parsed.d, parsed.H || 0, parsed.M || 0, Math.floor(parsed.S || 0));
+      return { timestamp: date.valueOf(), label: formatDataTime(date) };
+    }
+  }
+  const raw = text(value);
+  const match = raw.match(/^(\d{4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?(?:[ T]+(\d{1,2})[:：](\d{2})(?::(\d{2}))?)?\s*$/u);
+  if (!match) return null;
+  const date = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+    Number(match[4] || 0),
+    Number(match[5] || 0),
+    Number(match[6] || 0),
+  );
+  if (
+    Number.isNaN(date.valueOf()) ||
+    date.getFullYear() !== Number(match[1]) ||
+    date.getMonth() !== Number(match[2]) - 1 ||
+    date.getDate() !== Number(match[3])
+  ) return null;
+  return { timestamp: date.valueOf(), label: formatDataTime(date) };
+}
+
 function rowsForSheet(workbook: SheetJsWorkbook, name: string): CellValue[][] {
   return XLSX.utils.sheet_to_json(workbook.Sheets[name], {
     header: 1,
@@ -93,6 +136,28 @@ function rowsForSheet(workbook: SheetJsWorkbook, name: string): CellValue[][] {
     blankrows: false,
     defval: "",
   });
+}
+
+function latestUpdateTime(workbook: SheetJsWorkbook) {
+  let latestTimestamp = Number.NEGATIVE_INFINITY;
+  let latestLabel = "";
+  workbook.SheetNames.forEach((name) => {
+    const rows = rowsForSheet(workbook, name);
+    if (!rows.length) return;
+    const updateColumns = rows[0]
+      .map((value, index) => /更新时间/u.test(text(value)) ? index : -1)
+      .filter((index) => index >= 0);
+    rows.slice(1).forEach((row) => {
+      updateColumns.forEach((columnIndex) => {
+        const parsed = parseDataTime(row[columnIndex]);
+        if (parsed && parsed.timestamp > latestTimestamp) {
+          latestTimestamp = parsed.timestamp;
+          latestLabel = parsed.label;
+        }
+      });
+    });
+  });
+  return latestLabel || generatedDate();
 }
 
 function findSheet(
@@ -198,7 +263,7 @@ function requiredColumn(columns: string[], aliases: readonly string[], label: st
   return column;
 }
 
-function transformSummary(found: FoundSheet, titleLabel: string) {
+function transformSummary(found: FoundSheet, titleLabel: string, dataTime: string) {
   const { columns: sourceColumns, rows: sourceRows } = rowObjects(found);
   const columns = sourceColumns.filter((column) => !/是否达标/u.test(column));
 
@@ -220,7 +285,7 @@ function transformSummary(found: FoundSheet, titleLabel: string) {
   });
   return {
     name: titleLabel,
-    title: `阶段性报告与窗口期报告发送率【${titleLabel}】（数据生成 ${generatedDate()}）`,
+    title: `阶段性报告与窗口期报告发送率【${titleLabel}】（数据时间 ${dataTime}）`,
     rows,
     columns,
   };
@@ -381,10 +446,11 @@ function makeHierarchySheet(
   name: "助理主管维度" | "教研组维度",
   table: HierarchyTable,
   columns: readonly string[],
+  dataTime: string,
 ): SheetDefinition {
   return {
     name,
-    title: `阶段性报告与窗口期报告发送率【${name}】（数据生成 ${generatedDate()}）`,
+    title: `阶段性报告与窗口期报告发送率【${name}】（数据时间 ${dataTime}）`,
     rows: table.rows,
     columns,
     widths: summaryWidths(columns),
@@ -417,11 +483,12 @@ function makeDetailSheet(name: string, found: FoundSheet): SheetDefinition {
 }
 
 export function buildStageReportBeautifyOutput(workbook: SheetJsWorkbook) {
+  const dataTime = latestUpdateTime(workbook);
   const stageDetail = findDetailSheet(workbook, STAGE_SENT_ALIASES, /非窗口期|暑期在读|阶段性报告发送明细/u);
   const windowDetail = findDetailSheet(workbook, WINDOW_SENT_ALIASES, /窗口期报告发送明细/u);
   const teacherFound = findSummarySheet(workbook, "teacher");
-  const teacher = transformSummary(teacherFound, "教师维度");
-  const training = transformSummary(findSummarySheet(workbook, "training"), "师训组长维度");
+  const teacher = transformSummary(teacherFound, "教师维度", dataTime);
+  const training = transformSummary(findSummarySheet(workbook, "training"), "师训组长维度", dataTime);
   const stageDetailRows = rowObjects(stageDetail).rows;
   const hierarchyTeacherRows = buildHierarchyTeacherRows(teacherFound, stageDetailRows);
   const assistant = buildAssistantHierarchy(hierarchyTeacherRows, HIERARCHY_METRICS);
@@ -432,7 +499,7 @@ export function buildStageReportBeautifyOutput(workbook: SheetJsWorkbook) {
     makeDetailSheet("窗口期报告明细", windowDetail),
     {
       name: "阶段性报告申诉情况",
-      title: `阶段性报告申诉情况（数据生成 ${generatedDate()}）`,
+      title: `阶段性报告申诉情况（数据时间 ${dataTime}）`,
       rows: appeal.rows,
       columns: appeal.columns,
       widths: detailWidths(appeal.columns),
@@ -443,14 +510,15 @@ export function buildStageReportBeautifyOutput(workbook: SheetJsWorkbook) {
       dataRowHeight: 24,
       rowStyle: () => STYLE.detail,
     },
-    makeHierarchySheet("教研组维度", group, RESEARCH_GROUP_COLUMNS),
-    makeHierarchySheet("助理主管维度", assistant, ASSISTANT_COLUMNS),
+    makeHierarchySheet("教研组维度", group, RESEARCH_GROUP_COLUMNS, dataTime),
+    makeHierarchySheet("助理主管维度", assistant, ASSISTANT_COLUMNS, dataTime),
     makeSummarySheet(training),
     makeSummarySheet(teacher),
   ];
   const buffer = buildWorkbook(sheets);
   return {
     buffer,
+    dataTime,
     counts: {
       stageRows: stageDetailRows.length,
       windowRows: rowObjects(windowDetail).rows.length,
