@@ -24,8 +24,13 @@ let outputPath = mode === "reminder"
   ? "/tmp/reminder-worker-result.xlsx"
   : mode === "stageReport"
     ? "/tmp/stage-report-worker-result.xlsx"
-    : "/tmp/typescript-worker-result.xlsx";
-if (["reminder", "stageReport"].includes(mode)) {
+    : mode === "stageReportBeautify"
+      ? "/tmp/stage-report-beautify-worker-result.xlsx"
+      : "/tmp/typescript-worker-result.xlsx";
+if (mode === "stageReportBeautify") {
+  listPath = args.shift() || "";
+  if (args.length) outputPath = args.shift();
+} else if (["reminder", "stageReport"].includes(mode)) {
   listPath = args.shift() || "";
   if (args.length > 1) outputPath = args.pop();
   chatPaths = args;
@@ -36,10 +41,10 @@ if (["reminder", "stageReport"].includes(mode)) {
   outputPath = currentOutputPath;
 }
 
-if (!listPath || !chatPaths.length) {
-  throw new Error("用法：node scripts/regression-worker.mjs [--mode=checkin|reminder|stageReport] <名单.xlsx> <聊天.xlsx>... [输出.xlsx]");
+if (!listPath || (mode !== "stageReportBeautify" && !chatPaths.length)) {
+  throw new Error("用法：node scripts/regression-worker.mjs [--mode=checkin|reminder|stageReport|stageReportBeautify] <名单或源表.xlsx> [聊天.xlsx...] [输出.xlsx]");
 }
-if (!["checkin", "reminder", "stageReport"].includes(mode)) throw new Error(`不支持的 mode：${mode}`);
+if (!["checkin", "reminder", "stageReport", "stageReportBeautify"].includes(mode)) throw new Error(`不支持的 mode：${mode}`);
 
 const assets = await import("node:fs/promises").then(({ readdir }) =>
   readdir(resolve(root, "dist/assets")),
@@ -112,7 +117,13 @@ const file = (path, buffer) => ({
 });
 
 await context.self.onmessage({
-  data: mode === "reminder"
+  data: mode === "stageReportBeautify"
+    ? {
+        type: "process",
+        mode: "stageReportBeautify",
+        sourceFile: file(listPath, listBuffer),
+      }
+    : mode === "reminder"
     ? {
         type: "process",
         mode: "reminder",

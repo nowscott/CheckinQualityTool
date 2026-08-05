@@ -113,7 +113,13 @@ export interface StageReportProcessRequest {
   chatFiles: File[];
 }
 
-export type WorkerRequest = ProcessRequest | ReminderProcessRequest | StageReportProcessRequest;
+export interface StageReportBeautifyProcessRequest {
+  type: "process";
+  mode: "stageReportBeautify";
+  sourceFile: File;
+}
+
+export type WorkerRequest = ProcessRequest | ReminderProcessRequest | StageReportProcessRequest | StageReportBeautifyProcessRequest;
 
 export interface SheetDefinition {
   name: string;

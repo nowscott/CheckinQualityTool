@@ -185,6 +185,15 @@ h1 { margin: 0; font-family: var(--serif); font-size: clamp(42px, 5vw, 62px); li
 .card { padding: 18px; }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .grid > * { min-width: 0; }
+.beautify-note {
+  min-height: 138px;
+  padding: 16px;
+  border: 1px solid var(--green-line);
+  background: var(--green-soft);
+}
+.beautify-note strong { display: block; margin-top: 13px; font-size: 19px; }
+.beautify-note p { margin: 6px 0 0; color: var(--muted); line-height: 1.55; }
+.beautify-note .rules { margin-bottom: 0; }
 .reminder-upload-layout {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -544,6 +553,7 @@ button small { opacity: .78; }
   .card { padding: 16px; }
   .grid, .reminder-upload-layout, .options, .output-grid { grid-template-columns: 1fr; }
   .upload { min-height: 168px; }
+  .beautify-note { min-height: 168px; padding: 18px; }
   .upload-copy { margin-top: 20px; }
   .upload-copy strong { font-size: 19px; line-height: 1.35; }
   .upload-copy small { margin-top: 6px; line-height: 1.55; }

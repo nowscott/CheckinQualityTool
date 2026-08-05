@@ -24,8 +24,17 @@ const STAGE_REPORT_OUTPUT_SHEETS = [
   ["Sheet 5", "教研组维度", "按教研组及项目汇总，负责人沿用助理主管口径。"],
 ] as const;
 
+const STAGE_REPORT_BEAUTIFY_OUTPUT_SHEETS = [
+  ["Sheet 1", "阶段性报告明细", "保留原始非窗口期明细与发送结论，统一表头、列宽和发送状态颜色。"],
+  ["Sheet 2", "教师维度", "保留阶段性报告与窗口期报告双口径，以及原始完成和通知字段。"],
+  ["Sheet 3", "师训组长维度", "按师训组长整理两类报告发送率，附发送率数据条。"],
+  ["Sheet 4", "助理主管维度", "按项目、教研组、助理主管分层汇总两类报告，保留各级小计和总计。"],
+  ["Sheet 5", "教研组维度", "按项目、教研组分层汇总两类报告，负责人自动去重合并。"],
+  ["补充", "窗口期报告明细 / 申诉情况", "保留窗口期明细和申诉原始信息，不覆盖任何业务结论。"],
+] as const;
+
 interface OutputGridProps {
-  mode?: "checkin" | "reminder" | "stageReport";
+  mode?: "checkin" | "reminder" | "stageReport" | "stageReportBeautify";
 }
 
 export function OutputGrid({ mode = "checkin" }: OutputGridProps) {
@@ -33,7 +42,9 @@ export function OutputGrid({ mode = "checkin" }: OutputGridProps) {
     ? REMINDER_OUTPUT_SHEETS
     : mode === "stageReport"
       ? STAGE_REPORT_OUTPUT_SHEETS
-      : OUTPUT_SHEETS;
+      : mode === "stageReportBeautify"
+        ? STAGE_REPORT_BEAUTIFY_OUTPUT_SHEETS
+        : OUTPUT_SHEETS;
   return (
     <section className="output-grid">
       {sheets.map(([sheet, title, description]) => (

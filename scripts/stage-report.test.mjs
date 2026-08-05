@@ -12,6 +12,27 @@ globalThis.XLSX = {
 const { buildStageReportTargets } = await import("../worker/stageReportListParser.js");
 const { matchStageReportData } = await import("../worker/stageReportMatching.js");
 const { findTrainingLeadGroups } = await import("../worker/stageReportGroups.js");
+const {
+  buildAssistantHierarchy,
+  buildResearchGroupHierarchy,
+  isStageReportAppealed,
+} = await import("../worker/stageReportHierarchy.js");
+
+const dualMetrics = [
+  {
+    totalColumn: "阶段应发",
+    sentColumn: "阶段已发",
+    rateColumn: "阶段发送率",
+    unsentColumn: "阶段未发",
+    appealColumn: "阶段申诉",
+  },
+  {
+    totalColumn: "窗口应发",
+    sentColumn: "窗口已发",
+    rateColumn: "窗口发送率",
+    unsentColumn: "窗口未发",
+  },
+];
 
 function workbook(rows) {
   return { SheetNames: ["分母"], Sheets: { 分母: { __rows: rows } } };
@@ -183,4 +204,53 @@ test("组长本人姓名末尾数字不同于其他教师时，不串用其他�
     { 教师姓名: "黄磊23", 教研组: "初中益智" },
   ];
   assert.deepEqual(findTrainingLeadGroups(teacherRows, "黄磊23"), ["初中益智"]);
+});
+
+test("双口径助理主管汇总保留本人教研组、小计、项目小计和总计", () => {
+  const rows = [
+    { 教师姓名: "张主管", 助理主管: "张主管1", 教研组: "高中双语", 阶段应发: 2, 阶段已发: 1, 阶段申诉: 1, 窗口应发: 4, 窗口已发: 3 },
+    { 教师姓名: "李教师", 助理主管: "张主管1", 教研组: "初中益智", 阶段应发: 3, 阶段已发: 3, 阶段申诉: 2, 窗口应发: 1, 窗口已发: 0 },
+    { 教师姓名: "王教师", 助理主管: "王主管2", 教研组: "初中益智", 阶段应发: 5, 阶段已发: 4, 阶段申诉: 0, 窗口应发: 5, 窗口已发: 5 },
+  ];
+  const table = buildAssistantHierarchy(rows, dualMetrics);
+  const manager = table.rows.find((row) => row["师训主管/助理主管"] === "张主管");
+  const total = table.rows.find((row) => row.__rowType === "grandTotal");
+  assert.equal(manager.教研组, "高中双语");
+  assert.equal(manager.阶段应发, 5);
+  assert.equal(manager.阶段申诉, 3);
+  assert.equal(total.阶段应发, 10);
+  assert.equal(total.阶段已发, 8);
+  assert.equal(total.阶段发送率, 0.8);
+  assert.equal(total.窗口应发, 10);
+  assert.equal(total.窗口已发, 8);
+  assert.ok(table.rows.some((row) => row.__rowType === "groupTotal"));
+  assert.ok(table.rows.some((row) => row.__rowType === "projectTotal"));
+  assert.ok(table.mergeCells.some((range) => /^A\d+:B\d+$/u.test(range)));
+});
+
+test("教研组汇总按项目排序并去重负责人尾号", () => {
+  const rows = [
+    { 教师姓名: "甲", 助理主管: "李主管12", 教研组: "初中益智", 阶段应发: 2, 阶段已发: 1, 阶段申诉: 0, 窗口应发: 3, 窗口已发: 2 },
+    { 教师姓名: "乙", 助理主管: "李主管12", 教研组: "初中益智", 阶段应发: 1, 阶段已发: 1, 阶段申诉: 1, 窗口应发: 1, 窗口已发: 1 },
+    { 教师姓名: "丙", 助理主管: "王主管3", 教研组: "高中双语", 阶段应发: 4, 阶段已发: 0, 阶段申诉: 0, 窗口应发: 4, 窗口已发: 0 },
+  ];
+  const table = buildResearchGroupHierarchy(rows, dualMetrics);
+  const group = table.rows.find((row) => row.教研组 === "初中益智" && row.__rowType === "detail");
+  const projectRows = table.rows.filter((row) => row.__rowType === "projectTotal");
+  assert.equal(group.负责人, "李主管");
+  assert.equal(group.阶段应发, 3);
+  assert.equal(group.阶段申诉, 1);
+  assert.deepEqual(projectRows.map((row) => row.教研组), ["双语项目", "益智项目"]);
+});
+
+test("申诉判定与零应发发送率口径保持一致", () => {
+  assert.equal(isStageReportAppealed({ 是否申诉: "否", 申诉情况详情: "" }), false);
+  assert.equal(isStageReportAppealed({ 是否申诉: "短期冲刺课/三次课内学员" }), true);
+  assert.equal(isStageReportAppealed({ 是否申诉: "", 申诉情况详情: "已提交说明" }), true);
+  const table = buildResearchGroupHierarchy([
+    { 教师姓名: "甲", 助理主管: "主管1", 教研组: "高中双语", 阶段应发: 0, 阶段已发: 0, 阶段申诉: 1, 窗口应发: 0, 窗口已发: 0 },
+  ], dualMetrics);
+  const total = table.rows.find((row) => row.__rowType === "grandTotal");
+  assert.equal(total.阶段发送率, 1);
+  assert.equal(total.窗口发送率, 1);
 });

@@ -18,6 +18,7 @@ import {
 } from "./reminderTouchSummary";
 import { ensureSheetJs } from "./sheetJsLoader";
 import { buildStageReportDingTalkOutput } from "./stageReportDingTalkWriter";
+import { buildStageReportBeautifyOutput } from "./stageReportBeautifyWriter";
 import { buildStageReportTargets } from "./stageReportListParser";
 import { matchStageReportData } from "./stageReportMatching";
 import type { ChatInfo, WorkerRequest } from "./types";
@@ -207,6 +208,32 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
           unsent: matchInfo.counts.未发送数 + matchInfo.counts.字段缺失数,
           cleanChats: chatInfo.chats.length,
           chatFiles: data.chatFiles.length,
+        },
+      }, [buffer]);
+      return;
+    }
+
+    if (data.mode === "stageReportBeautify") {
+      const sourceWorkbook = await readWorkbook(data.sourceFile, 3, 70, "阶段性报告原始表单");
+      progress("原始表单读取完成", "已识别明细、管理汇总与申诉工作表，开始整理公示版。", 74);
+      const output = buildStageReportBeautifyOutput(sourceWorkbook);
+      progress("正在生成公示版 Excel", "统一标题、列宽、冻结表头、发送率数据条及完成状态颜色。", 90);
+      const buffer = output.buffer.slice().buffer as ArrayBuffer;
+      workerScope.postMessage({
+        type: "complete",
+        buffer,
+        filename: `阶段性报告公示版（${localMonthDay()}）.xlsx`,
+        summary: {
+          mode: "stageReportBeautify",
+          targets: output.counts.stageRows,
+          sent: 0,
+          unsent: 0,
+          cleanChats: 0,
+          stageRows: output.counts.stageRows,
+          windowRows: output.counts.windowRows,
+          teacherRows: output.counts.teacherRows,
+          appealRows: output.counts.appealRows,
+          sheets: output.counts.sheets,
         },
       }, [buffer]);
       return;

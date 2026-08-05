@@ -11,7 +11,7 @@ export interface ProcessingStatus {
 }
 
 export interface ResultSummary {
-  mode?: "checkin" | "reminder" | "stageReport";
+  mode?: "checkin" | "reminder" | "stageReport" | "stageReportBeautify";
   targets: number;
   sent: number;
   unsent: number;
@@ -20,6 +20,11 @@ export interface ResultSummary {
   exceptions?: number;
   chatFiles?: number;
   summaryFiles?: number;
+  stageRows?: number;
+  windowRows?: number;
+  teacherRows?: number;
+  appealRows?: number;
+  sheets?: number;
 }
 
 export type WorkerResponse =
