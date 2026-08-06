@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.5.32",
+    date: "2026-08-06",
+    items: [
+      "更新内置学员白名单，补充申诉类免检记录并补齐已有记录的学员号。",
+    ],
+  },
+  {
     version: "v2.5.31",
     date: "2026-08-05",
     items: [
