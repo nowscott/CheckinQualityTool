@@ -14,7 +14,14 @@ import { useTheme } from "./hooks/useTheme";
 import type { ProcessingStatus, WeekLabel, WorkerResponse } from "./types/worker";
 
 type ActiveModal = "guide" | "changelog" | null;
-type ToolMode = "checkin" | "reminder" | "stageReport" | "stageReportBeautify";
+type ToolMode = "checkin" | "reminder" | "stageReport";
+type StageReportTab = "check" | "publish";
+type StatusKey = ToolMode | "stageReportPublish";
+
+interface RouteState {
+  mode: ToolMode;
+  stageReportTab: StageReportTab;
+}
 
 const INITIAL_STATUS: ProcessingStatus = {
   visible: false,
@@ -38,12 +45,37 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-function modeFromPath(): ToolMode {
-  const path = window.location.pathname.replace(/\/+$/, "");
-  if (path === "/remind") return "reminder";
-  if (path === "/stage-report") return "stageReport";
-  if (path === "/stage-report/beautify") return "stageReportBeautify";
-  return "checkin";
+function routeFromLocation(): RouteState {
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  if (path === "/remind") return { mode: "reminder", stageReportTab: "check" };
+  if (path === "/report") {
+    return {
+      mode: "stageReport",
+      stageReportTab: window.location.hash === "#publish" ? "publish" : "check",
+    };
+  }
+  if (path === "/stage-report/beautify") {
+    return { mode: "stageReport", stageReportTab: "publish" };
+  }
+  if (path === "/stage-report") return { mode: "stageReport", stageReportTab: "check" };
+  return { mode: "checkin", stageReportTab: "check" };
+}
+
+function routeUrl(route: RouteState) {
+  if (route.mode === "reminder") return "/remind";
+  if (route.mode === "stageReport") {
+    return route.stageReportTab === "publish" ? "/report#publish" : "/report";
+  }
+  return "/";
+}
+
+function initialRoute() {
+  const route = routeFromLocation();
+  const canonicalUrl = routeUrl(route);
+  if (`${window.location.pathname}${window.location.hash}` !== canonicalUrl) {
+    window.history.replaceState(null, "", canonicalUrl);
+  }
+  return route;
 }
 
 function createProcessingWorker() {
@@ -51,7 +83,7 @@ function createProcessingWorker() {
 }
 
 export default function App() {
-  const [activeMode, setActiveMode] = useState<ToolMode>(modeFromPath);
+  const [route, setRoute] = useState<RouteState>(initialRoute);
   const [listFile, setListFile] = useState<File | null>(null);
   const [chatFile, setChatFile] = useState<File | null>(null);
   const [reminderListFile, setReminderListFile] = useState<File | null>(null);
@@ -68,7 +100,12 @@ export default function App() {
   const [weekLabel, setWeekLabel] = useState<WeekLabel>("auto");
   const [useSingle, setUseSingle] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [status, setStatus] = useState(INITIAL_STATUS);
+  const [statuses, setStatuses] = useState<Record<StatusKey, ProcessingStatus>>({
+    checkin: INITIAL_STATUS,
+    reminder: INITIAL_STATUS,
+    stageReport: INITIAL_STATUS,
+    stageReportPublish: INITIAL_STATUS,
+  });
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const workerRef = useRef<Worker | null>(null);
   const { theme, usesSystemTheme, toggleTheme } = useTheme();
@@ -76,10 +113,28 @@ export default function App() {
   useEffect(() => () => workerRef.current?.terminate(), []);
 
   useEffect(() => {
-    const syncMode = () => setActiveMode(modeFromPath());
-    window.addEventListener("popstate", syncMode);
-    return () => window.removeEventListener("popstate", syncMode);
+    const syncRoute = () => setRoute(routeFromLocation());
+    window.addEventListener("popstate", syncRoute);
+    window.addEventListener("hashchange", syncRoute);
+    return () => {
+      window.removeEventListener("popstate", syncRoute);
+      window.removeEventListener("hashchange", syncRoute);
+    };
   }, []);
+
+  const activeMode = route.mode;
+  const stageReportTab = route.stageReportTab;
+  const activeStatusKey: StatusKey = activeMode === "stageReport" && stageReportTab === "publish"
+    ? "stageReportPublish"
+    : activeMode;
+
+  useEffect(() => {
+    document.title = activeMode === "reminder"
+      ? "开课提醒触达完成率公示"
+      : activeMode === "stageReport"
+        ? "阶段性报告"
+        : "打卡质检数据生成";
+  }, [activeMode]);
 
   const weekHint = useMemo(() => {
     if (weekLabel !== "auto") return `已手动指定为${weekLabel}`;
@@ -90,12 +145,16 @@ export default function App() {
   }, [listFile, weekLabel]);
 
   function updateStatus(
+    key: StatusKey,
     title: string,
     message: string,
     progress = 0,
     mode: ProcessingStatus["mode"] = "working",
   ) {
-    setStatus({ visible: true, title, message, progress, mode });
+    setStatuses((current) => ({
+      ...current,
+      [key]: { visible: true, title, message, progress, mode },
+    }));
   }
 
   function finishWorker() {
@@ -104,29 +163,24 @@ export default function App() {
     workerRef.current = null;
   }
 
-  function changeMode(mode: ToolMode) {
-    setActiveMode(mode);
-    setStatus(INITIAL_STATUS);
-    const path = mode === "reminder"
-      ? "/remind"
-      : mode === "stageReport"
-        ? "/stage-report"
-        : mode === "stageReportBeautify"
-          ? "/stage-report/beautify"
-          : "/";
-    if (window.location.pathname !== path) window.history.pushState(null, "", path);
-  }
-
-  function handleSecondaryLinkClick(event: MouseEvent<HTMLAnchorElement>) {
+  function handleNavigationClick(event: MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
-    changeMode(modeFromHref(event.currentTarget.getAttribute("href")));
-  }
-
-  function modeFromHref(href: string | null): ToolMode {
-    if (href === "/remind") return "reminder";
-    if (href === "/stage-report") return "stageReport";
-    if (href === "/stage-report/beautify") return "stageReportBeautify";
-    return "checkin";
+    const href = event.currentTarget.getAttribute("href");
+    if (!href) return;
+    const target = new URL(href, window.location.origin);
+    const nextRoute: RouteState = target.pathname === "/remind"
+      ? { mode: "reminder", stageReportTab: "check" }
+      : target.pathname === "/report"
+        ? {
+            mode: "stageReport",
+            stageReportTab: target.hash === "#publish" ? "publish" : "check",
+          }
+        : { mode: "checkin", stageReportTab: "check" };
+    const nextUrl = routeUrl(nextRoute);
+    setRoute(nextRoute);
+    if (`${window.location.pathname}${window.location.hash}` !== nextUrl) {
+      window.history.pushState(null, "", nextUrl);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -137,25 +191,26 @@ export default function App() {
     const worker = createProcessingWorker();
     workerRef.current = worker;
     setProcessing(true);
-    updateStatus("正在启动本地处理引擎", "所有文件只在当前浏览器中处理，不会上传。", 2);
+    updateStatus("checkin", "正在启动本地处理引擎", "所有文件只在当前浏览器中处理，不会上传。", 2);
 
     let whitelistCsv: string;
     try {
       whitelistCsv = await loadWhitelistCsv();
     } catch (error) {
-      updateStatus("处理失败", errorMessage(error), 100, "error");
+      updateStatus("checkin", "处理失败", errorMessage(error), 100, "error");
       finishWorker();
       return;
     }
 
     worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
       if (data.type === "progress") {
-        updateStatus(data.title, data.message, data.progress);
+        updateStatus("checkin", data.title, data.message, data.progress);
         return;
       }
       if (data.type === "complete") {
         downloadResult(data.buffer, data.filename);
         updateStatus(
+          "checkin",
           "处理完成，结果已下载",
           `质检 ${data.summary.targets.toLocaleString()} 人：已发送 ${data.summary.sent.toLocaleString()}，未发送 ${data.summary.unsent.toLocaleString()}，免检 ${Number(data.summary.exempt || 0).toLocaleString()}；清洗后聊天 ${data.summary.cleanChats.toLocaleString()} 条。`,
           100,
@@ -164,12 +219,12 @@ export default function App() {
         finishWorker();
         return;
       }
-      updateStatus("处理失败", data.message, 100, "error");
+      updateStatus("checkin", "处理失败", data.message, 100, "error");
       finishWorker();
     };
 
     worker.onerror = (event) => {
-      updateStatus("处理失败", event.message || "浏览器工作线程发生错误。", 100, "error");
+      updateStatus("checkin", "处理失败", event.message || "浏览器工作线程发生错误。", 100, "error");
       finishWorker();
     };
 
@@ -192,16 +247,17 @@ export default function App() {
     const worker = createProcessingWorker();
     workerRef.current = worker;
     setProcessing(true);
-    updateStatus("正在启动本地处理引擎", "所有文件只在当前浏览器中处理，不会上传。", 2);
+    updateStatus("reminder", "正在启动本地处理引擎", "所有文件只在当前浏览器中处理，不会上传。", 2);
 
     worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
       if (data.type === "progress") {
-        updateStatus(data.title, data.message, data.progress);
+        updateStatus("reminder", data.title, data.message, data.progress);
         return;
       }
       if (data.type === "complete") {
         downloadResult(data.buffer, data.filename);
         updateStatus(
+          "reminder",
           "处理完成，结果已下载",
           `开课提醒 ${data.summary.targets.toLocaleString()} 条：有效触达 ${data.summary.sent.toLocaleString()}，未触达 ${data.summary.unsent.toLocaleString()}，异常核对 ${Number(data.summary.exceptions || 0).toLocaleString()}；汇总文件 ${Number(data.summary.summaryFiles || 0).toLocaleString()} 个，聊天参考文件 ${Number(data.summary.chatFiles || 0).toLocaleString()} 个。`,
           100,
@@ -210,12 +266,12 @@ export default function App() {
         finishWorker();
         return;
       }
-      updateStatus("处理失败", data.message, 100, "error");
+      updateStatus("reminder", "处理失败", data.message, 100, "error");
       finishWorker();
     };
 
     worker.onerror = (event) => {
-      updateStatus("处理失败", event.message || "浏览器工作线程发生错误。", 100, "error");
+      updateStatus("reminder", "处理失败", event.message || "浏览器工作线程发生错误。", 100, "error");
       finishWorker();
     };
 
@@ -223,7 +279,7 @@ export default function App() {
     try {
       whitelistCsv = await loadWhitelistCsv();
     } catch (error) {
-      updateStatus("处理失败", errorMessage(error), 100, "error");
+      updateStatus("reminder", "处理失败", errorMessage(error), 100, "error");
       finishWorker();
       return;
     }
@@ -250,15 +306,16 @@ export default function App() {
     const worker = createProcessingWorker();
     workerRef.current = worker;
     setProcessing(true);
-    updateStatus("正在启动本地处理引擎", "所有文件只在当前浏览器中处理，不会上传。", 2);
+    updateStatus("stageReport", "正在启动本地处理引擎", "所有文件只在当前浏览器中处理，不会上传。", 2);
     worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
       if (data.type === "progress") {
-        updateStatus(data.title, data.message, data.progress);
+        updateStatus("stageReport", data.title, data.message, data.progress);
         return;
       }
       if (data.type === "complete") {
         downloadResult(data.buffer, data.filename);
         updateStatus(
+          "stageReport",
           "处理完成，结果已下载",
           `阶段性报告 ${data.summary.targets.toLocaleString()} 条：已发送 ${data.summary.sent.toLocaleString()}，未发送 ${data.summary.unsent.toLocaleString()}；清洗后聊天 ${data.summary.cleanChats.toLocaleString()} 条。`,
           100,
@@ -267,11 +324,11 @@ export default function App() {
         finishWorker();
         return;
       }
-      updateStatus("处理失败", data.message, 100, "error");
+      updateStatus("stageReport", "处理失败", data.message, 100, "error");
       finishWorker();
     };
     worker.onerror = (event) => {
-      updateStatus("处理失败", event.message || "浏览器工作线程发生错误。", 100, "error");
+      updateStatus("stageReport", "处理失败", event.message || "浏览器工作线程发生错误。", 100, "error");
       finishWorker();
     };
     worker.postMessage({
@@ -289,15 +346,16 @@ export default function App() {
     const worker = createProcessingWorker();
     workerRef.current = worker;
     setProcessing(true);
-    updateStatus("正在启动本地处理引擎", "所有文件只在当前浏览器中处理，不会上传。", 2);
+    updateStatus("stageReportPublish", "正在启动本地处理引擎", "所有文件只在当前浏览器中处理，不会上传。", 2);
     worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
       if (data.type === "progress") {
-        updateStatus(data.title, data.message, data.progress);
+        updateStatus("stageReportPublish", data.title, data.message, data.progress);
         return;
       }
       if (data.type === "complete") {
         downloadResult(data.buffer, data.filename);
         updateStatus(
+          "stageReportPublish",
           "处理完成，结果已下载",
           `已整理 ${Number(data.summary.stageRows || 0).toLocaleString()} 条阶段性报告明细、${Number(data.summary.windowRows || 0).toLocaleString()} 条窗口期明细，${Number(data.summary.teacherRows || 0).toLocaleString()} 条教师汇总；输出 ${Number(data.summary.sheets || 0).toLocaleString()} 个 Sheet。`,
           100,
@@ -306,11 +364,11 @@ export default function App() {
         finishWorker();
         return;
       }
-      updateStatus("处理失败", data.message, 100, "error");
+      updateStatus("stageReportPublish", "处理失败", data.message, 100, "error");
       finishWorker();
     };
     worker.onerror = (event) => {
-      updateStatus("处理失败", event.message || "浏览器工作线程发生错误。", 100, "error");
+      updateStatus("stageReportPublish", "处理失败", event.message || "浏览器工作线程发生错误。", 100, "error");
       finishWorker();
     };
     worker.postMessage({
@@ -320,13 +378,11 @@ export default function App() {
     });
   }
 
-  const secondaryLinks = activeMode === "checkin"
-    ? [{ href: "/remind", label: "开课提醒" }, { href: "/stage-report", label: "阶段性报告" }]
-    : activeMode === "reminder"
-      ? [{ href: "/", label: "打卡质检" }, { href: "/stage-report", label: "阶段性报告" }]
-      : activeMode === "stageReport"
-        ? [{ href: "/", label: "打卡质检" }, { href: "/remind", label: "开课提醒" }, { href: "/stage-report/beautify", label: "阶段性报告美化" }]
-        : [{ href: "/stage-report", label: "阶段性报告发送检查" }];
+  const navigationLinks = [
+    { href: "/", label: "打卡质检", active: activeMode === "checkin" },
+    { href: "/remind", label: "开课提醒", active: activeMode === "reminder" },
+    { href: "/report", label: "阶段性报告", active: activeMode === "stageReport" },
+  ];
 
   return (
     <>
@@ -334,23 +390,43 @@ export default function App() {
         <Header
           theme={theme}
           usesSystemTheme={usesSystemTheme}
-          title={activeMode === "reminder" ? "开课提醒触达完成率公示" : activeMode === "stageReport" ? "阶段性报告发送检查" : activeMode === "stageReportBeautify" ? "阶段性报告公示版美化" : "打卡质检数据生成"}
+          title={activeMode === "reminder" ? "开课提醒触达完成率公示" : activeMode === "stageReport" ? "阶段性报告" : "打卡质检数据生成"}
           subtitle={
             activeMode === "reminder"
               ? "上传开课提醒学员明细名单与聊天质检汇总文件，在浏览器本地计算教师及以上维度触达完成率。文件不会上传服务器。"
               : activeMode === "stageReport"
-                ? "上传阶段性报告分母与企微聊天质检结果，在浏览器本地核验每位学员的发送证据。文件不会上传服务器。"
-                : activeMode === "stageReportBeautify"
-                  ? "上传窗口期与非窗口期阶段性报告原始表单，在浏览器本地整理为统一的公示风格报告。文件不会上传服务器。"
+                ? "核验阶段性报告发送情况，或将窗口期与非窗口期原始表单整理为统一公示版。文件不会上传服务器。"
                 : undefined
           }
           showGuide={activeMode === "checkin"}
-          secondaryLinks={secondaryLinks}
+          navigationLinks={navigationLinks}
           onToggleTheme={toggleTheme}
           onOpenGuide={() => setActiveModal("guide")}
           onOpenChangelog={() => setActiveModal("changelog")}
-          onSecondaryLinkClick={handleSecondaryLinkClick}
+          onNavigationClick={handleNavigationClick}
         />
+        {activeMode === "stageReport" ? (
+          <nav className="stage-report-tabs" aria-label="阶段性报告功能">
+            <a
+              className={stageReportTab === "check" ? "active" : undefined}
+              href="/report"
+              aria-current={stageReportTab === "check" ? "page" : undefined}
+              onClick={handleNavigationClick}
+            >
+              <strong>发送检查</strong>
+              <small>分母＋聊天记录</small>
+            </a>
+            <a
+              className={stageReportTab === "publish" ? "active" : undefined}
+              href="/report#publish"
+              aria-current={stageReportTab === "publish" ? "page" : undefined}
+              onClick={handleNavigationClick}
+            >
+              <strong>公示版整理</strong>
+              <small>窗口期＋非窗口期原始表单</small>
+            </a>
+          </nav>
+        ) : null}
         {activeMode === "reminder" ? (
           <ReminderForm
             denominatorFile={reminderListFile}
@@ -372,7 +448,7 @@ export default function App() {
             onIncludeExplanationSheetChange={setIncludeReminderExplanationSheet}
             onSubmit={handleReminderSubmit}
           />
-        ) : activeMode === "stageReport" ? (
+        ) : activeMode === "stageReport" && stageReportTab === "check" ? (
           <StageReportForm
             denominatorFile={stageReportDenominatorFile}
             chatFiles={stageReportChatFiles}
@@ -381,7 +457,7 @@ export default function App() {
             onChatFilesChange={setStageReportChatFiles}
             onSubmit={handleStageReportSubmit}
           />
-        ) : activeMode === "stageReportBeautify" ? (
+        ) : activeMode === "stageReport" ? (
           <StageReportBeautifyForm
             sourceFile={stageReportBeautifyFile}
             processing={processing}
@@ -403,8 +479,8 @@ export default function App() {
             onSubmit={handleSubmit}
           />
         )}
-        <StatusCard status={status} />
-        <OutputGrid mode={activeMode} />
+        <StatusCard status={statuses[activeStatusKey]} />
+        <OutputGrid mode={activeMode === "stageReport" && stageReportTab === "publish" ? "stageReportBeautify" : activeMode} />
       </main>
 
       <ChangelogDialog
