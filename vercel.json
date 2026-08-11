@@ -15,6 +15,10 @@
       "destination": "/"
     },
     {
+      "source": "/report",
+      "destination": "/"
+    },
+    {
       "source": "/stage-report",
       "destination": "/"
     },

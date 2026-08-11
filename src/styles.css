@@ -161,22 +161,68 @@ h1 { margin: 0; font-family: var(--serif); font-size: clamp(42px, 5vw, 62px); li
   white-space: nowrap;
 }
 .logic-button:hover { color: white; border-color: var(--green); background: var(--green); }
-.secondary-tool-link {
-  margin-left: 8px;
-  display: inline-flex;
+.tool-nav {
+  width: min(540px, 100%);
+  margin-top: 16px;
+  padding: 3px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  background: var(--field);
+}
+.tool-nav a {
+  min-height: 44px;
+  padding: 8px 12px;
+  display: flex;
   align-items: center;
-  min-height: 28px;
+  justify-content: center;
   color: var(--green);
-  border-bottom: 1px solid var(--green-line);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
 }
-.secondary-tool-link:hover {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
+.tool-nav a:hover,
+.tool-nav a.active {
+  color: white;
+  background: var(--green);
 }
+.tool-nav a:focus-visible,
+.stage-report-tabs a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.stage-report-tabs {
+  margin: -8px 0 14px;
+  padding: 3px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  background: var(--field);
+}
+.stage-report-tabs a {
+  min-width: 0;
+  min-height: 58px;
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  text-align: center;
+  text-decoration: none;
+}
+.stage-report-tabs a:hover {
+  color: var(--green);
+  background: var(--green-soft);
+}
+.stage-report-tabs a.active {
+  color: white;
+  background: var(--green);
+}
+.stage-report-tabs strong { font-size: 15px; }
+.stage-report-tabs small { margin-top: 4px; opacity: .76; font-size: 11px; }
+.stage-report-tabs a.active small { opacity: .86; }
 .card, .status-card, .output-grid article {
   border: 1px solid var(--line);
   background: var(--card-translucent);
@@ -538,6 +584,10 @@ button small { opacity: .78; }
   header { margin-bottom: 34px; }
   h1 { font-size: clamp(42px, 12vw, 58px); line-height: 1.08; }
   .subtitle { margin-top: 20px; font-size: 17px; line-height: 1.8; }
+  .tool-nav { width: 100%; margin-top: 18px; }
+  .tool-nav a { padding-inline: 6px; font-size: 13px; }
+  .stage-report-tabs { margin-top: -18px; }
+  .stage-report-tabs a { min-height: 68px; padding-inline: 8px; }
   .header-controls {
     position: static;
     display: flex;

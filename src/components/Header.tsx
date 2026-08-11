@@ -4,6 +4,7 @@ import type { Theme } from "../hooks/useTheme";
 interface HeaderLink {
   href: string;
   label: string;
+  active: boolean;
 }
 
 interface HeaderProps {
@@ -12,11 +13,11 @@ interface HeaderProps {
   title?: string;
   subtitle?: string;
   showGuide?: boolean;
-  secondaryLinks?: HeaderLink[];
+  navigationLinks: HeaderLink[];
   onToggleTheme: () => void;
   onOpenGuide: () => void;
   onOpenChangelog: () => void;
-  onSecondaryLinkClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
+  onNavigationClick: (event: MouseEvent<HTMLAnchorElement>) => void;
 }
 
 export function Header({
@@ -25,11 +26,11 @@ export function Header({
   title = "打卡质检数据生成",
   subtitle = "上传课堂反馈名单与聊天导出数据，在浏览器本地完成清洗、匹配并生成可追溯的多 Sheet Excel。文件不会上传服务器。",
   showGuide = true,
-  secondaryLinks,
+  navigationLinks,
   onToggleTheme,
   onOpenGuide,
   onOpenChangelog,
-  onSecondaryLinkClick,
+  onNavigationClick,
 }: HeaderProps) {
   const nextThemeLabel = theme === "dark" ? "浅色" : "深色";
   const currentThemeLabel = theme === "dark" ? "深色" : "浅色";
@@ -54,12 +55,20 @@ export function Header({
             查看匹配规则
           </button>
         ) : null}
-        {secondaryLinks?.map((link) => (
-          <a className="secondary-tool-link" href={link.href} onClick={onSecondaryLinkClick} key={link.href}>
+      </p>
+      <nav className="tool-nav" aria-label="数据工具">
+        {navigationLinks.map((link) => (
+          <a
+            className={link.active ? "active" : undefined}
+            href={link.href}
+            aria-current={link.active ? "page" : undefined}
+            onClick={onNavigationClick}
+            key={link.href}
+          >
             {link.label}
           </a>
         ))}
-      </p>
+      </nav>
       <div className="header-controls">
         <button
           className="theme-button"
