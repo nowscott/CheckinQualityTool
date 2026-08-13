@@ -308,7 +308,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       },
     }, [buffer]);
   } catch (error) {
-    const message = error instanceof Error ? error.stack || error.message : String(error);
+    const message = error instanceof Error ? error.message : String(error);
     workerScope.postMessage({ type: "error", message });
   }
 };

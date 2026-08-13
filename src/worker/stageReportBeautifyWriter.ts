@@ -27,7 +27,13 @@ const STYLE = {
   unsent: 29,
 } as const;
 
-const STAGE_SENT_ALIASES = ["是否发送阶段性报告", "阶段性报告是否发送"];
+const STAGE_SENT_ALIASES = [
+  "是否发送阶段性报告",
+  "是否发送阶段性报告（系统数据）",
+  "阶段性报告是否发送",
+  "是否已发送（申诉+系统）",
+  "是否已发送(申诉+系统)",
+];
 const WINDOW_SENT_ALIASES = ["是否发送窗口期报告", "窗口期报告是否发送"];
 const STAGE_RATE_ALIASES = ["阶段性报告发送率", "非窗口期暑期在读阶段性报告发送率"];
 const WINDOW_RATE_ALIASES = ["窗口期报告发送率"];
@@ -164,6 +170,8 @@ function findSheet(
   workbook: SheetJsWorkbook,
   required: (headers: string[]) => boolean,
   namePattern?: RegExp,
+  description = "目标",
+  expected = "所需业务表头",
 ): FoundSheet {
   const candidates: FoundSheet[] = [];
   workbook.SheetNames.forEach((name) => {
@@ -172,7 +180,12 @@ function findSheet(
     const headers = rows[0].map(text);
     if (required(headers)) candidates.push({ name, rows });
   });
-  if (!candidates.length) throw new Error("找不到符合阶段性报告表单结构的工作表。");
+  if (!candidates.length) {
+    const sheetNames = workbook.SheetNames.length ? workbook.SheetNames.join("、") : "无";
+    throw new Error(
+      `公示版整理失败：找不到${description}。${expected}。当前工作表：${sheetNames}。请上传窗口期与非窗口期原始表单，不要上传已生成的公示版。`,
+    );
+  }
   return candidates.find((sheet) => namePattern?.test(sheet.name)) || candidates[0];
 }
 
@@ -185,6 +198,8 @@ function findDetailSheet(workbook: SheetJsWorkbook, sentAliases: readonly string
     workbook,
     (headers) => ["教师姓名", "学生姓名", "学号"].every((header) => headers.includes(header)) && hasAny(headers, sentAliases),
     namePattern,
+    namePattern.test("窗口期报告发送明细") ? "窗口期报告明细" : "阶段性报告明细",
+    `需要“教师姓名、学生姓名、学号”以及发送结果列（支持：${sentAliases.join("、")}）`,
   );
 }
 
@@ -195,6 +210,8 @@ function findSummarySheet(workbook: SheetJsWorkbook, key: "teacher" | "training"
     (headers) => headers.includes(key === "teacher" ? "教师姓名" : "师训组长") &&
       hasAny(headers, STAGE_TOTAL_ALIASES) && hasAny(headers, WINDOW_TOTAL_ALIASES),
     pattern,
+    key === "teacher" ? "教师维度汇总" : "师训组长维度汇总",
+    `需要身份列以及阶段性、窗口期报告的需发送数和已发送数列`,
   );
 }
 
@@ -204,6 +221,8 @@ function findAppealSheet(workbook: SheetJsWorkbook) {
     (headers) => ["教师姓名", "学生姓名"].every((header) => headers.includes(header)) &&
       (headers.includes("申诉情况说明") || headers.includes("申诉情况详情")),
     /申诉/u,
+    "申诉情况",
+    "需要“教师姓名、学生姓名”以及“申诉情况说明”或“申诉情况详情”",
   );
 }
 
