@@ -77,6 +77,8 @@ function assistantTeachingGroupCompare(a: string, b: string) {
 }
 
 export function isStageReportAppealed(row: DataRow) {
+  const effective = text(row.申诉是否生效).toLocaleLowerCase("zh-CN");
+  if (effective) return ["申诉生效", "有效", "是", "通过"].includes(effective);
   const status = text(row.是否申诉).toLocaleLowerCase("zh-CN");
   if (status && !["否", "no", "n", "未申诉"].includes(status)) return true;
   return Boolean(text(row.申诉情况详情 || row.申诉说明));
