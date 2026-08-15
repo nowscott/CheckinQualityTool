@@ -115,7 +115,6 @@ const PERIOD_ASSISTANT_COLUMNS = [
     metric.totalColumn,
     metric.sentColumn,
     metric.rateColumn,
-    metric.unsentColumn,
     ...(metric.appealColumn ? [metric.appealColumn] : []),
   ]),
 ] as const;
