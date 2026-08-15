@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.6.8",
+    date: "2026-08-15",
+    items: [
+      "申诉数仅统计“申诉生效”记录；已发送申诉和无需申诉记录不再计入。",
+    ],
+  },
+  {
     version: "v2.6.7",
     date: "2026-08-15",
     items: [

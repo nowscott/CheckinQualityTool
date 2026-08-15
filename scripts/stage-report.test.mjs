@@ -258,6 +258,9 @@ test("申诉判定与零应发发送率口径保持一致", () => {
   assert.equal(isStageReportAppealed({ 是否申诉: "否", 申诉情况详情: "" }), false);
   assert.equal(isStageReportAppealed({ 是否申诉: "短期冲刺课/三次课内学员" }), true);
   assert.equal(isStageReportAppealed({ 是否申诉: "", 申诉情况详情: "已提交说明" }), true);
+  assert.equal(isStageReportAppealed({ 是否申诉: "其他特殊情况", 申诉是否生效: "申诉生效" }), true);
+  assert.equal(isStageReportAppealed({ 是否申诉: "已发送", 申诉是否生效: "申诉为已发送" }), false);
+  assert.equal(isStageReportAppealed({ 是否申诉: "其他特殊情况", 申诉是否生效: "已发送无需申诉" }), false);
   const table = buildResearchGroupHierarchy([
     { 教师姓名: "甲", 助理主管: "主管1", 教研组: "高中双语", 阶段应发: 0, 阶段已发: 0, 阶段申诉: 1, 窗口应发: 0, 窗口已发: 0 },
   ], dualMetrics);
