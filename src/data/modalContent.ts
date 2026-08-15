@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.6.3",
+    date: "2026-08-15",
+    items: [
+      "阶段性报告公示版兼容两批结课数据及带 0805、0819 后缀的汇总指标，分别保留两份阶段明细和申诉数据，不再遗漏第二批。",
+    ],
+  },
+  {
     version: "v2.6.2",
     date: "2026-08-15",
     items: [

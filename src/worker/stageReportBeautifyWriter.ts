@@ -208,10 +208,32 @@ function findSummarySheet(workbook: SheetJsWorkbook, key: "teacher" | "training"
   return findSheet(
     workbook,
     (headers) => headers.includes(key === "teacher" ? "教师姓名" : "师训组长") &&
-      hasAny(headers, STAGE_TOTAL_ALIASES) && hasAny(headers, WINDOW_TOTAL_ALIASES),
+      hasStageTotal(headers) && hasWindowTotal(headers),
     pattern,
     key === "teacher" ? "教师维度汇总" : "师训组长维度汇总",
     `需要身份列以及阶段性、窗口期报告的需发送数和已发送数列`,
+  );
+}
+
+function hasStageTotal(headers: string[]) {
+  return hasAny(headers, STAGE_TOTAL_ALIASES) || headers.some((header) => /^阶段性报告需发送(?:数)?\d{4}$/u.test(header));
+}
+
+function hasWindowTotal(headers: string[]) {
+  return hasAny(headers, WINDOW_TOTAL_ALIASES) || headers.some((header) => /^窗口期报告需发送(?:数)?\d{4}$/u.test(header));
+}
+
+function hasPeriodStageMetrics(headers: string[]) {
+  return headers.some((header) => /^阶段性报告(?:需发送|已发送|发送率)(?:数)?\d{4}$/u.test(header));
+}
+
+function findNamedSummarySheet(workbook: SheetJsWorkbook, identity: string, pattern: RegExp, description: string) {
+  return findSheet(
+    workbook,
+    (headers) => headers.includes(identity) && hasStageTotal(headers) && hasWindowTotal(headers),
+    pattern,
+    description,
+    `需要“${identity}”以及阶段性、窗口期报告的需发送数和已发送数列`,
   );
 }
 
@@ -260,11 +282,11 @@ function numericCount(value: unknown) {
 }
 
 function isRateColumn(column: string) {
-  return /发送率$/u.test(column);
+  return /发送率\d{0,4}$/u.test(column);
 }
 
 function isCountColumn(column: string) {
-  return /(?:需发送|应发送|已发送|未发送)(?:数)?$|申诉数$/u.test(column);
+  return /(?:需发送|应发送|已发送|未发送)(?:数)?\d{0,4}$|申诉数$/u.test(column);
 }
 
 function isStatusColumn(column: string) {
@@ -272,8 +294,10 @@ function isStatusColumn(column: string) {
 }
 
 function metricColumn(columns: string[], rateColumn: string, kind: "需发送" | "已发送") {
-  const prefix = rateColumn.replace(/发送率$/u, "");
-  return columns.find((column) => column.includes(prefix) && column.includes(kind));
+  const match = rateColumn.match(/^(.*)发送率(\d{4})?$/u);
+  if (!match) return undefined;
+  const [, prefix, period = ""] = match;
+  return columns.find((column) => new RegExp(`^${prefix}${kind}(?:数)?${period}$`, "u").test(column));
 }
 
 function requiredColumn(columns: string[], aliases: readonly string[], label: string) {
@@ -506,8 +530,79 @@ function makeDetailSheet(name: string, found: FoundSheet): SheetDefinition {
   };
 }
 
+function detailName(found: FoundSheet, index: number) {
+  const match = found.name.match(/（([^）]+)）/u);
+  return `阶段性报告明细${match ? `（${match[1]}）` : index > 1 ? `（第${index}批）` : ""}`;
+}
+
+function appealName(found: FoundSheet, index: number) {
+  const match = found.name.match(/（([^）]+)）/u);
+  return `阶段性报告申诉情况${match ? `（${match[1]}）` : index > 1 ? `（第${index}批）` : ""}`;
+}
+
+function findAllSheets(workbook: SheetJsWorkbook, required: (headers: string[]) => boolean, pattern: RegExp) {
+  return workbook.SheetNames.flatMap((name) => {
+    const rows = rowsForSheet(workbook, name);
+    return rows.length && pattern.test(name) && required(rows[0].map(text)) ? [{ name, rows }] : [];
+  });
+}
+
+function buildPeriodReportOutput(workbook: SheetJsWorkbook, dataTime: string) {
+  const stageDetails = findAllSheets(
+    workbook,
+    (headers) => ["教师姓名", "学生姓名", "学号"].every((header) => headers.includes(header)) && hasAny(headers, STAGE_SENT_ALIASES),
+    /非窗口期|暑期在读|阶段性报告发送明细/u,
+  );
+  const appeals = findAllSheets(
+    workbook,
+    (headers) => ["教师姓名", "学生姓名"].every((header) => headers.includes(header)) &&
+      (headers.includes("申诉情况说明") || headers.includes("申诉情况详情")),
+    /申诉/u,
+  );
+  const group = transformSummary(findNamedSummarySheet(workbook, "教研组", /教研组维度/u, "教研组维度汇总"), "教研组维度", dataTime);
+  const assistant = transformSummary(findNamedSummarySheet(workbook, "助理主管", /助理主管维度/u, "助理主管维度汇总"), "助理主管维度", dataTime);
+  const training = transformSummary(findSummarySheet(workbook, "training"), "师训组长维度", dataTime);
+  const teacher = transformSummary(findSummarySheet(workbook, "teacher"), "教师维度", dataTime);
+  const windowDetail = findDetailSheet(workbook, WINDOW_SENT_ALIASES, /窗口期报告发送明细/u);
+  const sheets: SheetDefinition[] = [
+    ...stageDetails.map((detail, index) => makeDetailSheet(detailName(detail, index + 1), detail)),
+    makeDetailSheet("窗口期报告明细", windowDetail),
+    ...appeals.map((appeal, index) => ({
+      name: appealName(appeal, index + 1),
+      title: `${appealName(appeal, index + 1)}（数据时间 ${dataTime}）`,
+      rows: rowObjects(appeal).rows,
+      columns: rowObjects(appeal).columns,
+      widths: detailWidths(rowObjects(appeal).columns),
+      titleStyle: STYLE.title,
+      headerStyle: STYLE.header,
+      titleHeight: 42,
+      headerHeight: 38,
+      dataRowHeight: 24,
+      rowStyle: () => STYLE.detail,
+    })),
+    makeSummarySheet(group),
+    makeSummarySheet(assistant),
+    makeSummarySheet(training),
+    makeSummarySheet(teacher),
+  ];
+  return {
+    buffer: buildWorkbook(sheets),
+    dataTime,
+    counts: {
+      stageRows: stageDetails.reduce((total, detail) => total + rowObjects(detail).rows.length, 0),
+      windowRows: rowObjects(windowDetail).rows.length,
+      teacherRows: teacher.rows.length,
+      appealRows: appeals.reduce((total, appeal) => total + rowObjects(appeal).rows.length, 0),
+      sheets: sheets.length,
+    },
+  };
+}
+
 export function buildStageReportBeautifyOutput(workbook: SheetJsWorkbook) {
   const dataTime = latestUpdateTime(workbook);
+  if (workbook.SheetNames.some((name) => hasPeriodStageMetrics(rowsForSheet(workbook, name)[0]?.map(text) || []))) {
+    return buildPeriodReportOutput(workbook, dataTime);
+  }
   const stageDetail = findDetailSheet(workbook, STAGE_SENT_ALIASES, /非窗口期|暑期在读|阶段性报告发送明细/u);
   const windowDetail = findDetailSheet(workbook, WINDOW_SENT_ALIASES, /窗口期报告发送明细/u);
   const teacherFound = findSummarySheet(workbook, "teacher");
