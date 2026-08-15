@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.6.7",
+    date: "2026-08-15",
+    items: [
+      "教研组、助理主管汇总页移除窗口期及各批次“未发送数”列，保留应发送、已发送、发送率和申诉数。",
+    ],
+  },
+  {
     version: "v2.6.6",
     date: "2026-08-15",
     items: [
