@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.6.5",
+    date: "2026-08-15",
+    items: [
+      "阶段性报告公示版兼容“应发送”表头；0819、0805 批次号前置于明细和申诉 Sheet 名，方便识别。",
+    ],
+  },
+  {
     version: "v2.6.4",
     date: "2026-08-15",
     items: [
