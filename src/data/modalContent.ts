@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.6.2",
+    date: "2026-08-15",
+    items: [
+      "公式版公示整理输出移除阶段性报告和窗口期报告明细中的数据变动时间列。",
+    ],
+  },
+  {
     version: "v2.6.1",
     date: "2026-08-13",
     items: [
