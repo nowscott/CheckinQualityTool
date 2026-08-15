@@ -13,6 +13,7 @@ import { text } from "./utils";
 const STYLE = {
   title: 16,
   header: 17,
+  singleLineHeader: 30,
   body: 18,
   rate: 19,
   detail: 20,
@@ -99,11 +100,11 @@ const PERIOD_HIERARCHY_METRICS: readonly HierarchyMetricSpec[] = [
     unsentColumn: "窗口期报告未发送数",
   },
   ...["0819", "0805"].map((period) => ({
-    totalColumn: `阶段性报告${period}应发送数`,
-    sentColumn: `阶段性报告${period}已发送数`,
-    rateColumn: `阶段性报告${period}发送率`,
-    unsentColumn: `阶段性报告${period}未发送数`,
-    appealColumn: `阶段性报告${period}申诉数`,
+    totalColumn: `阶段性报告应发送数${period}`,
+    sentColumn: `阶段性报告已发送数${period}`,
+    rateColumn: `阶段性报告发送率${period}`,
+    unsentColumn: `阶段性报告未发送数${period}`,
+    appealColumn: `阶段性报告申诉数${period}`,
   })),
 ];
 
@@ -310,7 +311,7 @@ function isRateColumn(column: string) {
 }
 
 function isCountColumn(column: string) {
-  return /(?:需发送|应发送|已发送|未发送)(?:数)?\d{0,4}$|申诉数$/u.test(column);
+  return /(?:需发送|应发送|已发送|未发送)(?:数)?\d{0,4}$|申诉数\d{0,4}$/u.test(column);
 }
 
 function isStatusColumn(column: string) {
@@ -480,9 +481,9 @@ function buildPeriodHierarchyTeacherRows(teacherFound: FoundSheet, stageDetails:
       窗口期报告应发送数: numericCount(row[windowTotalColumn]),
       窗口期报告已发送数: numericCount(row[windowSentColumn]),
       ...Object.fromEntries([...stageColumns].flatMap(([period, columns]) => [
-        [`阶段性报告${period}应发送数`, numericCount(row[columns.total])],
-        [`阶段性报告${period}已发送数`, numericCount(row[columns.sent])],
-        [`阶段性报告${period}申诉数`, 0],
+        [`阶段性报告应发送数${period}`, numericCount(row[columns.total])],
+        [`阶段性报告已发送数${period}`, numericCount(row[columns.sent])],
+        [`阶段性报告申诉数${period}`, 0],
       ])),
     }));
   const exactIndex = new Map<string, number[]>();
@@ -493,7 +494,7 @@ function buildPeriodHierarchyTeacherRows(teacherFound: FoundSheet, stageDetails:
   });
   stageDetails.forEach((detail) => {
     const period = periodCode(detail);
-    const appealColumn = `阶段性报告${period}申诉数`;
+    const appealColumn = `阶段性报告申诉数${period}`;
     if (!period || !PERIOD_HIERARCHY_METRICS.some((metric) => metric.appealColumn === appealColumn)) return;
     rowObjects(detail).rows.filter(isStageReportAppealed).forEach((appealRow) => {
       const exactCandidates = exactIndex.get(hierarchyIdentity(appealRow)) || [];
@@ -552,6 +553,7 @@ function summaryWidths(columns: readonly string[]) {
     else if (/负责人/u.test(column)) result[column] = 44;
     else if (/教研组/u.test(column)) result[column] = 24;
     else if (/姓名|组长|主管/u.test(column)) result[column] = 20;
+    else if (/^(?:窗口期报告|阶段性报告).*(?:应发送|已发送|发送率|未发送|申诉).*$/u.test(column)) result[column] = 24;
     else if (isRateColumn(column) || isStatusColumn(column)) result[column] = 20;
     else if (isCountColumn(column)) result[column] = 18;
     else if (/更新时间/u.test(column)) result[column] = 24;
@@ -568,7 +570,7 @@ function makeSummarySheet(summary: ReturnType<typeof transformSummary>): SheetDe
     columns: summary.columns,
     widths: summaryWidths(summary.columns),
     titleStyle: STYLE.title,
-    headerStyle: STYLE.header,
+    headerStyle: STYLE.singleLineHeader,
     titleHeight: 42,
     headerHeight: 42,
     dataRowHeight: 24,
@@ -593,9 +595,9 @@ function makeHierarchySheet(
     columns,
     widths: summaryWidths(columns),
     titleStyle: STYLE.title,
-    headerStyle: STYLE.header,
+    headerStyle: STYLE.singleLineHeader,
     titleHeight: 42,
-    headerHeight: 48,
+    headerHeight: 26,
     dataRowHeight: 24,
     mergeCells: table.mergeCells,
     rowStyle: hierarchyStyle,

@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.6.6",
+    date: "2026-08-15",
+    items: [
+      "汇总列名统一将批次数字置后；教研组、助理主管汇总列不换行并加宽。",
+    ],
+  },
+  {
     version: "v2.6.5",
     date: "2026-08-15",
     items: [
