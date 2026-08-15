@@ -308,7 +308,7 @@ function requiredColumn(columns: string[], aliases: readonly string[], label: st
 
 function transformSummary(found: FoundSheet, titleLabel: string, dataTime: string) {
   const { columns: sourceColumns, rows: sourceRows } = rowObjects(found);
-  const columns = sourceColumns.filter((column) => !/是否达标/u.test(column));
+  const columns = orderedSummaryColumns(sourceColumns.filter((column) => !/是否达标/u.test(column)));
 
   const rows = sourceRows.map((source) => {
     const row: DataRow = { ...source };
@@ -332,6 +332,20 @@ function transformSummary(found: FoundSheet, titleLabel: string, dataTime: strin
     rows,
     columns,
   };
+}
+
+function periodRank(column: string) {
+  if (/窗口期报告/u.test(column)) return 0;
+  if (/阶段性报告.*0819/u.test(column)) return 1;
+  if (/阶段性报告.*0805/u.test(column)) return 2;
+  return -1;
+}
+
+function orderedSummaryColumns(columns: string[]) {
+  return [
+    ...columns.filter((column) => periodRank(column) < 0),
+    ...[0, 1, 2].flatMap((rank) => columns.filter((column) => periodRank(column) === rank)),
+  ];
 }
 
 function compact(value: unknown) {
@@ -530,14 +544,19 @@ function makeDetailSheet(name: string, found: FoundSheet): SheetDefinition {
   };
 }
 
+function periodCode(found: FoundSheet) {
+  const match = found.name.match(/8[_月-]?(\d{1,2})/u);
+  return match ? `08${match[1].padStart(2, "0")}` : "";
+}
+
 function detailName(found: FoundSheet, index: number) {
-  const match = found.name.match(/（([^）]+)）/u);
-  return `阶段性报告明细${match ? `（${match[1]}）` : index > 1 ? `（第${index}批）` : ""}`;
+  const code = periodCode(found);
+  return `阶段性报告明细${code ? `（${code}）` : index > 1 ? `（第${index}批）` : ""}`;
 }
 
 function appealName(found: FoundSheet, index: number) {
-  const match = found.name.match(/（([^）]+)）/u);
-  return `阶段性报告申诉情况${match ? `（${match[1]}）` : index > 1 ? `（第${index}批）` : ""}`;
+  const code = periodCode(found);
+  return `阶段性报告申诉情况${code ? `（${code}）` : index > 1 ? `（第${index}批）` : ""}`;
 }
 
 function findAllSheets(workbook: SheetJsWorkbook, required: (headers: string[]) => boolean, pattern: RegExp) {
@@ -552,21 +571,21 @@ function buildPeriodReportOutput(workbook: SheetJsWorkbook, dataTime: string) {
     workbook,
     (headers) => ["教师姓名", "学生姓名", "学号"].every((header) => headers.includes(header)) && hasAny(headers, STAGE_SENT_ALIASES),
     /非窗口期|暑期在读|阶段性报告发送明细/u,
-  );
+  ).sort((left, right) => periodCode(right).localeCompare(periodCode(left)));
   const appeals = findAllSheets(
     workbook,
     (headers) => ["教师姓名", "学生姓名"].every((header) => headers.includes(header)) &&
       (headers.includes("申诉情况说明") || headers.includes("申诉情况详情")),
     /申诉/u,
-  );
+  ).sort((left, right) => periodCode(right).localeCompare(periodCode(left)));
   const group = transformSummary(findNamedSummarySheet(workbook, "教研组", /教研组维度/u, "教研组维度汇总"), "教研组维度", dataTime);
   const assistant = transformSummary(findNamedSummarySheet(workbook, "助理主管", /助理主管维度/u, "助理主管维度汇总"), "助理主管维度", dataTime);
   const training = transformSummary(findSummarySheet(workbook, "training"), "师训组长维度", dataTime);
   const teacher = transformSummary(findSummarySheet(workbook, "teacher"), "教师维度", dataTime);
   const windowDetail = findDetailSheet(workbook, WINDOW_SENT_ALIASES, /窗口期报告发送明细/u);
   const sheets: SheetDefinition[] = [
-    ...stageDetails.map((detail, index) => makeDetailSheet(detailName(detail, index + 1), detail)),
     makeDetailSheet("窗口期报告明细", windowDetail),
+    ...stageDetails.map((detail, index) => makeDetailSheet(detailName(detail, index + 1), detail)),
     ...appeals.map((appeal, index) => ({
       name: appealName(appeal, index + 1),
       title: `${appealName(appeal, index + 1)}（数据时间 ${dataTime}）`,

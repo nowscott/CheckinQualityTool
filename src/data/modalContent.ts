@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.6.4",
+    date: "2026-08-15",
+    items: [
+      "两批阶段性报告公示版统一使用窗口期、0819、0805 顺序，明细、申诉和汇总字段更易查找。",
+    ],
+  },
+  {
     version: "v2.6.3",
     date: "2026-08-15",
     items: [
