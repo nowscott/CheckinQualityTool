@@ -488,11 +488,16 @@ function makeHierarchySheet(
 
 function makeDetailSheet(name: string, found: FoundSheet): SheetDefinition {
   const detail = rowObjects(found);
+  const columns = detail.columns.filter((column) => !/数据变动时间/u.test(column));
+  const rows = detail.rows.map((source) => columns.reduce<DataRow>((result, column) => {
+    result[column] = source[column] ?? "";
+    return result;
+  }, {}));
   return {
     name,
-    rows: detail.rows,
-    columns: detail.columns,
-    widths: detailWidths(detail.columns),
+    rows,
+    columns,
+    widths: detailWidths(columns),
     headerStyle: STYLE.header,
     headerHeight: 38,
     dataRowHeight: 22,
