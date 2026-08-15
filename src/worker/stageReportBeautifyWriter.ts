@@ -40,8 +40,12 @@ const WINDOW_RATE_ALIASES = ["窗口期报告发送率"];
 const STAGE_TOTAL_ALIASES = [
   "阶段性报告需发送",
   "阶段性报告需发送数",
+  "阶段性报告应发送",
+  "阶段性报告应发送数",
   "非窗口期暑期在读阶段性报告需发送",
   "非窗口期暑期在读阶段性报告需发送数",
+  "非窗口期暑期在读阶段性报告应发送",
+  "非窗口期暑期在读阶段性报告应发送数",
 ];
 const STAGE_SENT_COUNT_ALIASES = [
   "阶段性报告已发送",
@@ -49,7 +53,7 @@ const STAGE_SENT_COUNT_ALIASES = [
   "非窗口期暑期在读阶段性报告已发送",
   "非窗口期暑期在读阶段性报告已发送数",
 ];
-const WINDOW_TOTAL_ALIASES = ["窗口期报告需发送", "窗口期报告需发送数"];
+const WINDOW_TOTAL_ALIASES = ["窗口期报告需发送", "窗口期报告需发送数", "窗口期报告应发送", "窗口期报告应发送数"];
 const WINDOW_SENT_COUNT_ALIASES = ["窗口期报告已发送", "窗口期报告已发送数"];
 
 const ASSISTANT_COLUMNS = [
@@ -86,6 +90,36 @@ const HIERARCHY_METRICS: readonly HierarchyMetricSpec[] = [
     unsentColumn: "窗口期报告未发送数",
   },
 ];
+
+const PERIOD_HIERARCHY_METRICS: readonly HierarchyMetricSpec[] = [
+  {
+    totalColumn: "窗口期报告应发送数",
+    sentColumn: "窗口期报告已发送数",
+    rateColumn: "窗口期报告发送率",
+    unsentColumn: "窗口期报告未发送数",
+  },
+  ...["0819", "0805"].map((period) => ({
+    totalColumn: `阶段性报告${period}应发送数`,
+    sentColumn: `阶段性报告${period}已发送数`,
+    rateColumn: `阶段性报告${period}发送率`,
+    unsentColumn: `阶段性报告${period}未发送数`,
+    appealColumn: `阶段性报告${period}申诉数`,
+  })),
+];
+
+const PERIOD_ASSISTANT_COLUMNS = [
+  "教研组",
+  "师训主管/助理主管",
+  ...PERIOD_HIERARCHY_METRICS.flatMap((metric) => [
+    metric.totalColumn,
+    metric.sentColumn,
+    metric.rateColumn,
+    metric.unsentColumn,
+    ...(metric.appealColumn ? [metric.appealColumn] : []),
+  ]),
+] as const;
+
+const PERIOD_RESEARCH_GROUP_COLUMNS = ["教研组", ...PERIOD_ASSISTANT_COLUMNS.slice(2)] as const;
 
 function generatedDate() {
   const now = new Date();
@@ -216,25 +250,15 @@ function findSummarySheet(workbook: SheetJsWorkbook, key: "teacher" | "training"
 }
 
 function hasStageTotal(headers: string[]) {
-  return hasAny(headers, STAGE_TOTAL_ALIASES) || headers.some((header) => /^阶段性报告需发送(?:数)?\d{4}$/u.test(header));
+  return hasAny(headers, STAGE_TOTAL_ALIASES) || headers.some((header) => /^阶段性报告[需应]发送(?:数)?\d{4}$/u.test(header));
 }
 
 function hasWindowTotal(headers: string[]) {
-  return hasAny(headers, WINDOW_TOTAL_ALIASES) || headers.some((header) => /^窗口期报告需发送(?:数)?\d{4}$/u.test(header));
+  return hasAny(headers, WINDOW_TOTAL_ALIASES) || headers.some((header) => /^窗口期报告[需应]发送(?:数)?\d{4}$/u.test(header));
 }
 
 function hasPeriodStageMetrics(headers: string[]) {
-  return headers.some((header) => /^阶段性报告(?:需发送|已发送|发送率)(?:数)?\d{4}$/u.test(header));
-}
-
-function findNamedSummarySheet(workbook: SheetJsWorkbook, identity: string, pattern: RegExp, description: string) {
-  return findSheet(
-    workbook,
-    (headers) => headers.includes(identity) && hasStageTotal(headers) && hasWindowTotal(headers),
-    pattern,
-    description,
-    `需要“${identity}”以及阶段性、窗口期报告的需发送数和已发送数列`,
-  );
+  return headers.some((header) => /^阶段性报告(?:[需应]发送|已发送|发送率)(?:数)?\d{4}$/u.test(header));
 }
 
 function findAppealSheet(workbook: SheetJsWorkbook) {
@@ -293,11 +317,12 @@ function isStatusColumn(column: string) {
   return /是否完成|是否已通知/u.test(column);
 }
 
-function metricColumn(columns: string[], rateColumn: string, kind: "需发送" | "已发送") {
+function metricColumn(columns: string[], rateColumn: string, kind: "总发送" | "已发送") {
   const match = rateColumn.match(/^(.*)发送率(\d{4})?$/u);
   if (!match) return undefined;
   const [, prefix, period = ""] = match;
-  return columns.find((column) => new RegExp(`^${prefix}${kind}(?:数)?${period}$`, "u").test(column));
+  const label = kind === "总发送" ? "[需应]发送" : kind;
+  return columns.find((column) => new RegExp(`^${prefix}${label}(?:数)?${period}$`, "u").test(column));
 }
 
 function requiredColumn(columns: string[], aliases: readonly string[], label: string) {
@@ -314,7 +339,7 @@ function transformSummary(found: FoundSheet, titleLabel: string, dataTime: strin
     const row: DataRow = { ...source };
     sourceColumns.forEach((column) => {
       if (isRateColumn(column)) {
-        const totalColumn = metricColumn(sourceColumns, column, "需发送");
+        const totalColumn = metricColumn(sourceColumns, column, "总发送");
         const sentColumn = metricColumn(sourceColumns, column, "已发送");
         const total = totalColumn ? Number(countValue(row[totalColumn])) : Number.NaN;
         const sent = sentColumn ? Number(countValue(row[sentColumn])) : Number.NaN;
@@ -427,6 +452,61 @@ function buildHierarchyTeacherRows(teacherFound: FoundSheet, stageDetailRows: Da
   return rows;
 }
 
+function requiredPeriodColumn(columns: string[], kind: "总发送" | "已发送", period: string) {
+  const label = kind === "总发送" ? "[需应]发送" : kind;
+  const column = columns.find((value) => new RegExp(`^阶段性报告${label}(?:数)?${period}$`, "u").test(value));
+  if (!column) throw new Error(`教师维度缺少“阶段性报告应发送${period}”列。`);
+  return column;
+}
+
+function buildPeriodHierarchyTeacherRows(teacherFound: FoundSheet, stageDetails: FoundSheet[]) {
+  const source = rowObjects(teacherFound);
+  const windowTotalColumn = requiredColumn(source.columns, WINDOW_TOTAL_ALIASES, "窗口期报告需发送");
+  const windowSentColumn = requiredColumn(source.columns, WINDOW_SENT_COUNT_ALIASES, "窗口期报告已发送");
+  ["教师姓名", "教研组", "师训组长", "助理主管"].forEach((column) => {
+    if (!source.columns.includes(column)) throw new Error(`教师维度缺少“${column}”列。`);
+  });
+  const stageColumns = new Map(["0819", "0805"].map((period) => [period, {
+    total: requiredPeriodColumn(source.columns, "总发送", period),
+    sent: requiredPeriodColumn(source.columns, "已发送", period),
+  }]));
+  const rows = source.rows
+    .filter((row) => !/^(?:总计|合计)$/u.test(text(row.教师姓名)))
+    .map((row): DataRow => ({
+      教师姓名: row.教师姓名,
+      教研组: row.教研组,
+      师训组长: row.师训组长,
+      助理主管: row.助理主管,
+      窗口期报告应发送数: numericCount(row[windowTotalColumn]),
+      窗口期报告已发送数: numericCount(row[windowSentColumn]),
+      ...Object.fromEntries([...stageColumns].flatMap(([period, columns]) => [
+        [`阶段性报告${period}应发送数`, numericCount(row[columns.total])],
+        [`阶段性报告${period}已发送数`, numericCount(row[columns.sent])],
+        [`阶段性报告${period}申诉数`, 0],
+      ])),
+    }));
+  const exactIndex = new Map<string, number[]>();
+  const teacherIndex = new Map<string, number[]>();
+  rows.forEach((row, index) => {
+    addIndex(exactIndex, hierarchyIdentity(row), index);
+    addIndex(teacherIndex, teacherIdentity(row), index);
+  });
+  stageDetails.forEach((detail) => {
+    const period = periodCode(detail);
+    const appealColumn = `阶段性报告${period}申诉数`;
+    if (!period || !PERIOD_HIERARCHY_METRICS.some((metric) => metric.appealColumn === appealColumn)) return;
+    rowObjects(detail).rows.filter(isStageReportAppealed).forEach((appealRow) => {
+      const exactCandidates = exactIndex.get(hierarchyIdentity(appealRow)) || [];
+      const teacherCandidates = teacherIndex.get(teacherIdentity(appealRow)) || [];
+      const targetIndex = exactCandidates.length === 1 ? exactCandidates[0] : teacherCandidates.length === 1 ? teacherCandidates[0] : -1;
+      if (targetIndex >= 0) {
+        rows[targetIndex][appealColumn] = Number(rows[targetIndex][appealColumn]) + 1;
+      }
+    });
+  });
+  return rows;
+}
+
 function summaryCellStyle(row: DataRow, column: string, baseStyle: number) {
   if (isRateColumn(column)) return STYLE.rate;
   if (isStatusColumn(column)) return row[column] === "是" ? STYLE.sent : STYLE.unsent;
@@ -504,6 +584,7 @@ function makeHierarchySheet(
   table: HierarchyTable,
   columns: readonly string[],
   dataTime: string,
+  metrics = HIERARCHY_METRICS,
 ): SheetDefinition {
   return {
     name,
@@ -519,7 +600,7 @@ function makeHierarchySheet(
     mergeCells: table.mergeCells,
     rowStyle: hierarchyStyle,
     cellStyle: hierarchyCellStyle,
-    dataBarColumns: HIERARCHY_METRICS.map((metric) => metric.rateColumn),
+    dataBarColumns: metrics.map((metric) => metric.rateColumn),
     dataBarColor: "C68A26",
   };
 }
@@ -551,12 +632,12 @@ function periodCode(found: FoundSheet) {
 
 function detailName(found: FoundSheet, index: number) {
   const code = periodCode(found);
-  return `阶段性报告明细${code ? `（${code}）` : index > 1 ? `（第${index}批）` : ""}`;
+  return code ? `${code}阶段性报告明细` : `阶段性报告明细${index > 1 ? `第${index}批` : ""}`;
 }
 
 function appealName(found: FoundSheet, index: number) {
   const code = periodCode(found);
-  return `阶段性报告申诉情况${code ? `（${code}）` : index > 1 ? `（第${index}批）` : ""}`;
+  return code ? `${code}阶段性报告申诉情况` : `阶段性报告申诉情况${index > 1 ? `第${index}批` : ""}`;
 }
 
 function findAllSheets(workbook: SheetJsWorkbook, required: (headers: string[]) => boolean, pattern: RegExp) {
@@ -578,10 +659,12 @@ function buildPeriodReportOutput(workbook: SheetJsWorkbook, dataTime: string) {
       (headers.includes("申诉情况说明") || headers.includes("申诉情况详情")),
     /申诉/u,
   ).sort((left, right) => periodCode(right).localeCompare(periodCode(left)));
-  const group = transformSummary(findNamedSummarySheet(workbook, "教研组", /教研组维度/u, "教研组维度汇总"), "教研组维度", dataTime);
-  const assistant = transformSummary(findNamedSummarySheet(workbook, "助理主管", /助理主管维度/u, "助理主管维度汇总"), "助理主管维度", dataTime);
+  const teacherFound = findSummarySheet(workbook, "teacher");
+  const hierarchyTeacherRows = buildPeriodHierarchyTeacherRows(teacherFound, stageDetails);
+  const group = buildResearchGroupHierarchy(hierarchyTeacherRows, PERIOD_HIERARCHY_METRICS, false);
+  const assistant = buildAssistantHierarchy(hierarchyTeacherRows, PERIOD_HIERARCHY_METRICS);
   const training = transformSummary(findSummarySheet(workbook, "training"), "师训组长维度", dataTime);
-  const teacher = transformSummary(findSummarySheet(workbook, "teacher"), "教师维度", dataTime);
+  const teacher = transformSummary(teacherFound, "教师维度", dataTime);
   const windowDetail = findDetailSheet(workbook, WINDOW_SENT_ALIASES, /窗口期报告发送明细/u);
   const sheets: SheetDefinition[] = [
     makeDetailSheet("窗口期报告明细", windowDetail),
@@ -599,8 +682,8 @@ function buildPeriodReportOutput(workbook: SheetJsWorkbook, dataTime: string) {
       dataRowHeight: 24,
       rowStyle: () => STYLE.detail,
     })),
-    makeSummarySheet(group),
-    makeSummarySheet(assistant),
+    makeHierarchySheet("教研组维度", group, PERIOD_RESEARCH_GROUP_COLUMNS, dataTime, PERIOD_HIERARCHY_METRICS),
+    makeHierarchySheet("助理主管维度", assistant, PERIOD_ASSISTANT_COLUMNS, dataTime, PERIOD_HIERARCHY_METRICS),
     makeSummarySheet(training),
     makeSummarySheet(teacher),
   ];
