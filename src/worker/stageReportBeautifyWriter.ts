@@ -120,6 +120,26 @@ const PERIOD_ASSISTANT_COLUMNS = [
 ] as const;
 
 const PERIOD_RESEARCH_GROUP_COLUMNS = ["教研组", ...PERIOD_ASSISTANT_COLUMNS.slice(2)] as const;
+const PERIOD_GROUP_WIDTHS = [16, 18, 18, 16, 17, 20, 19, 18, 17, 17, 16, 13];
+const GROUP_HEADER_LABELS = [
+  { label: "窗口期报告", startColumn: 0, endColumn: 3 },
+  { label: "阶段性报告应发送情况（0806～0819结课）", startColumn: 4, endColumn: 7 },
+  { label: "阶段性报告应发送情况（0805前结课）", startColumn: 8, endColumn: 11 },
+] as const;
+const PERIOD_GROUP_COLUMN_LABELS = [
+  "教研组",
+  "窗口期报告应发送数",
+  "窗口期报告已发送数",
+  "窗口期报告发送率",
+  "阶段性报告应发送数",
+  "阶段性报告已发送数",
+  "阶段性报告发送率",
+  "阶段性报告申诉数",
+  "阶段性报告应发送数",
+  "阶段性报告已发送数",
+  "阶段性报告发送率",
+  "阶段性报告申诉数",
+] as const;
 
 function generatedDate() {
   const now = new Date();
@@ -586,17 +606,24 @@ function makeHierarchySheet(
   columns: readonly string[],
   dataTime: string,
   metrics = HIERARCHY_METRICS,
+  groupedHeaders = false,
 ): SheetDefinition {
+  const widths = summaryWidths(columns);
+  if (name === "助理主管维度") {
+    columns.slice(2).forEach((column) => { widths[column] = 20; });
+  }
+  if (groupedHeaders) columns.forEach((column, index) => { widths[column] = PERIOD_GROUP_WIDTHS[index] || widths[column]; });
   return {
     name,
     title: `阶段性报告与窗口期报告发送率【${name}】（数据时间 ${dataTime}）`,
     rows: table.rows,
     columns,
-    widths: summaryWidths(columns),
+    widths,
     titleStyle: STYLE.title,
     headerStyle: STYLE.singleLineHeader,
     titleHeight: 42,
-    headerHeight: 26,
+    headerHeight: groupedHeaders ? 44 : 26,
+    ...(groupedHeaders ? { headerLabels: PERIOD_GROUP_COLUMN_LABELS, headerGroups: GROUP_HEADER_LABELS, headerGroupStyle: STYLE.singleLineHeader, headerGroupHeight: 27, freezeRows: 2 } : {}),
     dataRowHeight: 24,
     mergeCells: table.mergeCells,
     rowStyle: hierarchyStyle,
@@ -633,12 +660,16 @@ function periodCode(found: FoundSheet) {
 
 function detailName(found: FoundSheet, index: number) {
   const code = periodCode(found);
-  return code ? `${code}阶段性报告明细` : `阶段性报告明细${index > 1 ? `第${index}批` : ""}`;
+  if (code === "0819") return "0805～0819结课阶段性报告明细";
+  if (code === "0805") return "0805前结课阶段性报告明细";
+  return `阶段性报告明细${index > 1 ? `第${index}批` : ""}`;
 }
 
 function appealName(found: FoundSheet, index: number) {
   const code = periodCode(found);
-  return code ? `${code}阶段性报告申诉情况` : `阶段性报告申诉情况${index > 1 ? `第${index}批` : ""}`;
+  if (code === "0819") return "0805～0819结课阶段性报告分母申诉情况";
+  if (code === "0805") return "0805前结课阶段性报告分母申诉情况";
+  return `阶段性报告申诉情况${index > 1 ? `第${index}批` : ""}`;
 }
 
 function findAllSheets(workbook: SheetJsWorkbook, required: (headers: string[]) => boolean, pattern: RegExp) {
@@ -683,7 +714,7 @@ function buildPeriodReportOutput(workbook: SheetJsWorkbook, dataTime: string) {
       dataRowHeight: 24,
       rowStyle: () => STYLE.detail,
     })),
-    makeHierarchySheet("教研组维度", group, PERIOD_RESEARCH_GROUP_COLUMNS, dataTime, PERIOD_HIERARCHY_METRICS),
+    makeHierarchySheet("教研组维度", group, PERIOD_RESEARCH_GROUP_COLUMNS, dataTime, PERIOD_HIERARCHY_METRICS, true),
     makeHierarchySheet("助理主管维度", assistant, PERIOD_ASSISTANT_COLUMNS, dataTime, PERIOD_HIERARCHY_METRICS),
     makeSummarySheet(training),
     makeSummarySheet(teacher),
