@@ -133,6 +133,11 @@ export interface SheetDefinition {
   headerStyle?: number;
   titleHeight?: number;
   headerHeight?: number;
+  headerLabels?: readonly string[];
+  headerGroups?: readonly { label: string; startColumn: number; endColumn: number }[];
+  headerGroupStyle?: number;
+  headerGroupHeight?: number;
+  freezeRows?: number;
   dataRowHeight?: number;
   mergeCells?: string[];
   dataBarColumns?: readonly string[];

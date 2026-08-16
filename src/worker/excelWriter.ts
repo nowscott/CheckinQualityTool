@@ -78,20 +78,28 @@ function* worksheetChunks(
   headerStyle = 1,
   titleHeight = 38,
   headerHeight = 24,
+  headerLabels = columns,
+  headerGroups: readonly { label: string; startColumn: number; endColumn: number }[] = [],
+  headerGroupStyle = headerStyle,
+  headerGroupHeight = 24,
+  freezeRows: number | undefined = undefined,
   dataRowHeight = 0,
   mergeCells: string[] = [],
   dataBarColumns: readonly string[] = [],
   dataBarColor = "00B050",
 ) {
-  const headerRowIndex = title ? 2 : 1;
+  const groupHeaderRowIndex = title ? 2 : 1;
+  const headerRowIndex = groupHeaderRowIndex + (headerGroups.length ? 1 : 0);
   const dataStartRow = headerRowIndex + 1;
+  const frozenRows = freezeRows ?? headerRowIndex;
   const lastCell = `${excelColumn(columns.length - 1)}${rows.length + headerRowIndex}`;
   const colsXml = columns.map((column, index) => {
     const width = widths[column] || Math.min(Math.max(column.length * 2 + 2, 12), 24);
     return `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`;
   }).join("");
   const titleMerge = title ? [`A1:${excelColumn(columns.length - 1)}1`] : [];
-  const allMerges = [...titleMerge, ...mergeCells];
+  const headerGroupMerges = headerGroups.map((group) => `${excelColumn(group.startColumn)}${groupHeaderRowIndex}:${excelColumn(group.endColumn)}${groupHeaderRowIndex}`);
+  const allMerges = [...titleMerge, ...headerGroupMerges, ...mergeCells];
   const mergeXml = allMerges.length
     ? `<mergeCells count="${allMerges.length}">${allMerges.map((ref) => `<mergeCell ref="${ref}"/>`).join("")}</mergeCells>`
     : "";
@@ -108,12 +116,15 @@ function* worksheetChunks(
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
     `<dimension ref="A1:${lastCell}"/><sheetViews><sheetView workbookViewId="0"${title ? ` showGridLines="0"` : ""}>` +
-    `<pane ySplit="${headerRowIndex}" topLeftCell="A${dataStartRow}" activePane="bottomLeft" state="frozen"/>` +
+    `<pane ySplit="${frozenRows}" topLeftCell="A${frozenRows + 1}" activePane="bottomLeft" state="frozen"/>` +
     `</sheetView></sheetViews><cols>${colsXml}</cols><sheetData>` +
     (title
       ? `<row r="1" ht="${titleHeight}" customHeight="1">${cellXml(title, 0, 1, titleStyle)}</row>`
       : "") +
-    `<row r="${headerRowIndex}" ht="${headerHeight}" customHeight="1">${columns.map((column, index) => cellXml(column, index, headerRowIndex, headerStyle)).join("")}</row>`
+    (headerGroups.length
+      ? `<row r="${groupHeaderRowIndex}" ht="${headerGroupHeight}" customHeight="1">${headerGroups.map((group) => cellXml(group.label, group.startColumn, groupHeaderRowIndex, headerGroupStyle)).join("")}</row>`
+      : "") +
+    `<row r="${headerRowIndex}" ht="${headerHeight}" customHeight="1">${columns.map((column, index) => cellXml(headerLabels[index] || column, index, headerRowIndex, headerStyle)).join("")}</row>`
   );
   let buffer = "";
   for (let rowOffset = 0; rowOffset < rows.length; rowOffset += 1) {
@@ -351,6 +362,11 @@ export function buildWorkbook(sheets: SheetDefinition[]) {
         sheet.headerStyle,
         sheet.titleHeight,
         sheet.headerHeight,
+        sheet.headerLabels,
+        sheet.headerGroups,
+        sheet.headerGroupStyle,
+        sheet.headerGroupHeight,
+        sheet.freezeRows,
         sheet.dataRowHeight,
         sheet.mergeCells,
         sheet.dataBarColumns,

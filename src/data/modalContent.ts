@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.6.9",
+    date: "2026-08-16",
+    items: [
+      "公示版采用结课阶段 Sheet 命名；教研组维度使用分段双层表头，助理主管维度 C-M 指标列宽统一为 20。",
+    ],
+  },
+  {
     version: "v2.6.8",
     date: "2026-08-15",
     items: [
