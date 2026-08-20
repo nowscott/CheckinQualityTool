@@ -4,6 +4,9 @@ import vm from "node:vm";
 
 const root = resolve(import.meta.dirname, "..");
 const args = process.argv.slice(2);
+const useSingleIndex = args.indexOf("--use-single");
+const useSingle = useSingleIndex >= 0;
+if (useSingle) args.splice(useSingleIndex, 1);
 const includeCleanChatsIndex = args.indexOf("--include-clean-chats");
 const includeCleanChats = includeCleanChatsIndex >= 0;
 if (includeCleanChats) args.splice(includeCleanChatsIndex, 1);
@@ -147,7 +150,7 @@ await context.self.onmessage({
         listFile: file(listPath, listBuffer),
         chatFile: file(chatPaths[0], chatBuffers[0]),
         weekLabel: "auto",
-        useSingle: false,
+        useSingle,
         whitelistCsv,
       },
 });

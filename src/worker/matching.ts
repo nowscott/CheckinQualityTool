@@ -25,6 +25,7 @@ interface TargetPlan {
   target: TargetRow;
   strong: string;
   normalizedStrong: string;
+  whitelistNameKeyword: string;
   weak: string;
   normalizedWeak: string;
   aliasKeywords: string[];
@@ -54,6 +55,10 @@ function addKeyword(keywordsByEmail: Map<string, Set<string>>, email: string, ke
   keywordsByEmail.get(email)!.add(keyword);
 }
 
+function trailingNameKeyword(value: string) {
+  return normalizeMatchText([...String(value || "").replace(/\s+/g, "")].slice(-2).join(""));
+}
+
 function collectShortKeywordHits(textValue: string, keywords: Set<string>, output: Set<string>) {
   for (let index = 0; index < textValue.length; index += 1) {
     const one = textValue[index];
@@ -70,6 +75,7 @@ function buildHitIndex(targetPlans: TargetPlan[], chats: ChatRow[]) {
   targetPlans.forEach((plan) => {
     if (plan.whitelistExempt || plan.teacherExempt) return;
     plan.aliasKeywords.forEach((keyword) => addKeyword(keywordsByEmail, plan.target.教师邮箱, keyword));
+    addKeyword(keywordsByEmail, plan.target.教师邮箱, plan.whitelistNameKeyword);
     addKeyword(keywordsByEmail, plan.target.教师邮箱, plan.normalizedStrong);
     addKeyword(keywordsByEmail, plan.target.教师邮箱, plan.normalizedWeak);
   });
@@ -151,6 +157,7 @@ export function matchData(
       target,
       strong,
       normalizedStrong: normalizeMatchText(strong),
+      whitelistNameKeyword: trailingNameKeyword(whitelistEntry?.匹配学员姓名 || ""),
       weak,
       normalizedWeak: normalizeMatchText(weak),
       aliasKeywords: whitelistEntry?.处理方式 === "别名" ? whitelistEntry.匹配别名关键词.filter(Boolean) : [],
@@ -182,6 +189,7 @@ export function matchData(
     plan.aliasKeywords.forEach((keyword) =>
       addMatchesFromHits(matchesByChat, hitsByKeyword, keyword, keyword, "别名匹配"),
     );
+    addMatchesFromHits(matchesByChat, hitsByKeyword, plan.whitelistNameKeyword, plan.whitelistNameKeyword, "强匹配");
     addMatchesFromHits(matchesByChat, hitsByKeyword, plan.normalizedStrong, strong, "强匹配");
     addMatchesFromHits(matchesByChat, hitsByKeyword, plan.normalizedWeak, weak, "弱匹配");
     const matches = [...matchesByChat.values()];
