@@ -1,12 +1,18 @@
 import type { ChatRow, CountMap, DataRow } from "./types";
-import { normalizeTeacherName } from "./teacherExemptions";
-import { normalizeMatchText } from "./utils";
+import { normalizeMatchText, normalizeTeacherName } from "./utils";
 import type { StageReportListInfo, StageReportTarget } from "./stageReportListParser";
 
 export interface StageReportMatchInfo {
   detailRows: DataRow[];
   teacherRows: DataRow[];
   counts: CountMap;
+  unresolvedRows: Array<{ sourceRowNumber: number; reason: string }>;
+}
+
+interface NormalizedStageChat {
+  chat: ChatRow;
+  group: string;
+  content: string;
 }
 
 interface StageReportMatchedChat {
@@ -27,34 +33,37 @@ function studentKeywords(student: string) {
   return { strong: normalizeMatchText(strong), weak: normalizeMatchText(weak), displayStrong: strong, displayWeak: weak };
 }
 
-function matchLocations(chat: ChatRow, keyword: string) {
-  const group = normalizeMatchText(chat["群名/好友昵称"]);
-  const content = normalizeMatchText(chat.聊天内容);
-  return [group.includes(keyword) ? "群名" : "", content.includes(keyword) ? "聊天内容" : ""].filter(Boolean);
+function matchLocations(chat: NormalizedStageChat, keyword: string) {
+  return [chat.group.includes(keyword) ? "群名" : "", chat.content.includes(keyword) ? "聊天内容" : ""].filter(Boolean);
 }
 
-function findStudentMatch(chats: ChatRow[], student: string): StageReportMatchedChat | undefined {
+function findStudentMatch(chats: NormalizedStageChat[], student: string): StageReportMatchedChat | undefined {
   const { strong, weak, displayStrong, displayWeak } = studentKeywords(student);
   for (const [keyword, display, strength] of [[strong, displayStrong, "强匹配"], [weak, displayWeak, "弱匹配"]] as const) {
     if (!keyword) continue;
     const chat = chats.find((item) => matchLocations(item, keyword).length > 0);
-    if (chat) return { chat, studentKeyword: display, strength, locations: matchLocations(chat, keyword) };
+    if (chat) return { chat: chat.chat, studentKeyword: display, strength, locations: matchLocations(chat, keyword) };
   }
   return undefined;
 }
 
 export function matchStageReportData(listInfo: StageReportListInfo, chats: ChatRow[]): StageReportMatchInfo {
-  const chatsByEmail = new Map<string, ChatRow[]>();
-  const chatsByTeacher = new Map<string, ChatRow[]>();
+  const chatsByEmail = new Map<string, NormalizedStageChat[]>();
+  const chatsByTeacher = new Map<string, NormalizedStageChat[]>();
   const emailsByTeacher = new Map<string, Set<string>>();
   chats.forEach((chat) => {
     const email = normalizeMatchText(chat.有效教师邮箱);
+    const normalized: NormalizedStageChat = {
+      chat,
+      group: normalizeMatchText(chat["群名/好友昵称"]),
+      content: normalizeMatchText(chat.聊天内容),
+    };
     if (!chatsByEmail.has(email)) chatsByEmail.set(email, []);
-    chatsByEmail.get(email)!.push(chat);
+    chatsByEmail.get(email)!.push(normalized);
     const teacher = normalizeTeacherName(chat.发送人名称);
     if (!teacher) return;
     if (!chatsByTeacher.has(teacher)) chatsByTeacher.set(teacher, []);
-    chatsByTeacher.get(teacher)!.push(chat);
+    chatsByTeacher.get(teacher)!.push(normalized);
     if (!emailsByTeacher.has(teacher)) emailsByTeacher.set(teacher, new Set<string>());
     emailsByTeacher.get(teacher)!.add(email);
   });
@@ -70,6 +79,7 @@ export function matchStageReportData(listInfo: StageReportListInfo, chats: ChatR
   };
   const detailRows: DataRow[] = [];
   const summary = new Map<string, DataRow>();
+  const unresolvedRows: Array<{ sourceRowNumber: number; reason: string }> = [];
 
   listInfo.targets.forEach((target) => {
     const email = normalizeMatchText(target.email);
@@ -80,6 +90,12 @@ export function matchStageReportData(listInfo: StageReportListInfo, chats: ChatR
     const candidates = email ? chatsByEmail.get(email) || [] : chatsByTeacher.get(teacher) || [];
     const matched = student ? findStudentMatch(candidates, student) : undefined;
     const missing = !target.teacher || !student || nameAmbiguous;
+    const missingReasons = [
+      !target.teacher ? "教师姓名为空" : "",
+      !student ? "学员姓名为空" : "",
+      nameAmbiguous ? "教师姓名对应多个聊天邮箱" : "",
+    ].filter(Boolean);
+    if (missing) unresolvedRows.push({ sourceRowNumber: target.sourceRowNumber, reason: missingReasons.join("、") });
     const conclusion = missing ? "字段缺失" : matched ? "已发送" : "未发送";
     if (conclusion === "已发送") counts.已发送数 += 1;
     else if (conclusion === "字段缺失") counts.字段缺失数 += 1;
@@ -117,5 +133,5 @@ export function matchStageReportData(listInfo: StageReportListInfo, chats: ChatR
   const teacherRows: DataRow[] = [...summary.values()]
     .map((row): DataRow => ({ ...row, 发送率: Number(row.应发送数) ? Number(row.已发送数) / Number(row.应发送数) : 1 }))
     .sort((a, b) => String(a.教师姓名).localeCompare(String(b.教师姓名), "zh-CN") || String(a.教师邮箱).localeCompare(String(b.教师邮箱), "zh-CN"));
-  return { detailRows, teacherRows, counts };
+  return { detailRows, teacherRows, counts, unresolvedRows };
 }

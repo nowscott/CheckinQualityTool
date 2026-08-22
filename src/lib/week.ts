@@ -1,6 +1,6 @@
 import type { WeekLabel } from "../types/worker";
 
-function weekOfMonthFromDate(date: Date) {
+export function weekOfMonthFromDate(date: Date) {
   const year = date.getFullYear();
   const month = date.getMonth();
   const firstDay = new Date(year, month, 1);

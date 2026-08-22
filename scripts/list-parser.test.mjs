@@ -10,6 +10,7 @@ globalThis.XLSX = {
 };
 
 const { buildTargets } = await import("../worker/listParser.js");
+const workbookWithSheets = (value) => value;
 
 test("完整课次时间表头优先选择含真实老师邮箱的课堂反馈 Sheet", () => {
   const workbook = {
@@ -37,4 +38,51 @@ test("完整课次时间表头优先选择含真实老师邮箱的课堂反馈 S
   assert.equal(result.targets[0].教师邮箱, "teacher@xdf.cn");
   assert.equal(result.targets[0].上课开始, "10:20");
   assert.equal(result.targets[0].上课结束, "12:20");
+});
+
+test("拆分时间表头按开始日期列后的两个时间值读取", () => {
+  const result = buildTargets(workbookWithSheets({
+    SheetNames: ["拆分"],
+    Sheets: {
+      拆分: {
+        rows: [
+          ["老师姓名", "学员姓名", "学员号", "课次开始时", "间", "间", "老师邮箱"],
+          ["张老师", "陈一", "GZ1", "2026-07-20", "10:20", "12:20", "teacher@xdf.cn"],
+        ],
+      },
+    },
+  }));
+  assert.equal(result.targets[0].上课开始, "10:20");
+  assert.equal(result.targets[0].上课结束, "12:20");
+});
+
+test("缺少可识别结束时间时明确报错，不回退日期列", () => {
+  assert.throws(() => buildTargets(workbookWithSheets({
+    SheetNames: ["错误"],
+    Sheets: {
+      错误: {
+        rows: [
+          ["老师姓名", "学员姓名", "学员号", "课次开始时", "老师邮箱"],
+          ["张老师", "陈一", "GZ1", "2026-07-20", "teacher@xdf.cn"],
+        ],
+      },
+    },
+  })), /有效开始\/结束时间列/);
+});
+
+test("教师邮箱为空时不按同名教师和学员自动合并", () => {
+  const result = buildTargets(workbookWithSheets({
+    SheetNames: ["名单"],
+    Sheets: {
+      名单: {
+        rows: [
+          ["老师姓名", "学员姓名", "学员号", "课次开始时间", "课次结束时间", "老师邮箱"],
+          ["张老师", "陈一", "GZ1", "2026-07-20 10:20", "2026-07-20 12:20", ""],
+          ["张老师", "陈一", "GZ1", "2026-07-21 10:20", "2026-07-21 12:20", ""],
+        ],
+      },
+    },
+  }));
+  assert.equal(result.targets.length, 2);
+  assert.equal(result.counts.未自动合并教师邮箱为空, 2);
 });

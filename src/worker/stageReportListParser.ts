@@ -1,4 +1,4 @@
-import { headerMap, type FoundSheet } from "./excelReader";
+import { headerMap, sheetCandidates, type FoundSheet } from "./excelReader";
 import { trainingPersonKey } from "./stageReportGroups";
 import type { CellValue, CountMap, DataRow } from "./types";
 import { cleanStudentName, emailValue, text } from "./utils";
@@ -68,15 +68,8 @@ function scoreStageReportSheet(name: string, headers: string[], map: Map<string,
 
 function findStageReportSheet(workbook: SheetJsWorkbook): FoundSheet {
   const candidates: Array<{ found: FoundSheet; score: number; hasGroup: boolean; order: number }> = [];
-  for (const name of workbook.SheetNames) {
-    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[name], {
-      header: 1,
-      range: 0,
-      blankrows: false,
-      defval: "",
-    });
-    if (!rows.length) continue;
-    const map = headerMap(rows[0]);
+  for (const candidate of sheetCandidates(workbook)) {
+    const { name, rows, map } = candidate;
     if ([HEADERS.teacher, HEADERS.studentId, HEADERS.student].every((aliases) => hasHeader(map, aliases))) {
       const headers = rows[0].map(text);
       candidates.push({
@@ -108,16 +101,8 @@ function addLeadGroup(groups: Map<string, Set<string>>, lead: CellValue, group: 
 function findFallbackTrainingLeadGroups(workbook: SheetJsWorkbook): Map<string, string[]> {
   const ownGroups = new Map<string, Set<string>>();
   const summaryGroups = new Map<string, Set<string>>();
-  for (const name of workbook.SheetNames) {
-    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[name], {
-      header: 1,
-      range: 0,
-      blankrows: false,
-      defval: "",
-    });
-    if (!rows.length) continue;
-    const headers = rows[0].map(text);
-    const map = headerMap(rows[0]);
+  for (const candidate of sheetCandidates(workbook)) {
+    const { rows, map, headers } = candidate;
     const leadIndex = firstIndex(map, ["师训组长"]);
     const groupIndex = firstIndex(map, HEADERS.teachingGroup);
     if (leadIndex < 0 || groupIndex < 0) continue;

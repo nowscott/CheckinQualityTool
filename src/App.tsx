@@ -208,7 +208,7 @@ export default function App() {
         return;
       }
       if (data.type === "complete") {
-        downloadResult(data.buffer, data.filename);
+        downloadResult(data.chunks, data.filename);
         updateStatus(
           "checkin",
           "处理完成，结果已下载",
@@ -255,7 +255,7 @@ export default function App() {
         return;
       }
       if (data.type === "complete") {
-        downloadResult(data.buffer, data.filename);
+        downloadResult(data.chunks, data.filename);
         updateStatus(
           "reminder",
           "处理完成，结果已下载",
@@ -313,7 +313,7 @@ export default function App() {
         return;
       }
       if (data.type === "complete") {
-        downloadResult(data.buffer, data.filename);
+        downloadResult(data.chunks, data.filename);
         updateStatus(
           "stageReport",
           "处理完成，结果已下载",
@@ -353,7 +353,7 @@ export default function App() {
         return;
       }
       if (data.type === "complete") {
-        downloadResult(data.buffer, data.filename);
+        downloadResult(data.chunks, data.filename);
         updateStatus(
           "stageReportPublish",
           "处理完成，结果已下载",

@@ -1,4 +1,4 @@
-import { headerMap, type FoundSheet } from "./excelReader";
+import { headerMap, sheetCandidates, type FoundSheet } from "./excelReader";
 import type { ChatInfo, ChatRow } from "./types";
 import { emailValue, text } from "./utils";
 
@@ -31,19 +31,29 @@ function hasAnyHeader(map: Map<string, number[]>, aliases: readonly string[]) {
 
 function findChatSheet(workbook: SheetJsWorkbook): FoundSheet {
   const required = [CHAT_HEADERS.type, CHAT_HEADERS.sender, CHAT_HEADERS.content];
-  const seenSheets: string[] = [];
-  for (const name of workbook.SheetNames) {
-    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[name], {
-      header: 1,
-      range: 0,
-      blankrows: false,
-      defval: "",
-    });
-    if (!rows.length) continue;
-    seenSheets.push(name);
-    const map = headerMap(rows[0]);
-    if (required.every((aliases) => hasAnyHeader(map, aliases))) return { name, rows };
+  const candidates = sheetCandidates(workbook);
+  const ranked = candidates
+    .filter((candidate) => required.every((aliases) => hasAnyHeader(candidate.map, aliases)))
+    .map((candidate) => {
+      const email = firstIndex(candidate.map, CHAT_HEADERS.groupEmail) >= 0
+        ? firstIndex(candidate.map, CHAT_HEADERS.groupEmail)
+        : firstIndex(candidate.map, CHAT_HEADERS.email);
+      const content = firstIndex(candidate.map, CHAT_HEADERS.content);
+      const usableRows = candidate.rows.slice(1).filter((row) => email >= 0 && content >= 0 && emailValue(row[email]) && text(row[content])).length;
+      return {
+        candidate,
+        score: Number(hasAnyHeader(candidate.map, CHAT_HEADERS.email)) +
+          Number(hasAnyHeader(candidate.map, CHAT_HEADERS.groupEmail)) +
+          Number(hasAnyHeader(candidate.map, CHAT_HEADERS.group)) +
+          Number(hasAnyHeader(candidate.map, CHAT_HEADERS.time)),
+        usableRows,
+      };
+    })
+    .sort((a, b) => b.score - a.score || b.usableRows - a.usableRows || b.candidate.rows.length - a.candidate.rows.length || a.candidate.order - b.candidate.order);
+  if (ranked.length && (ranked.length === 1 || ranked[0].score > ranked[1].score || ranked[0].usableRows > ranked[1].usableRows || ranked[0].candidate.rows.length > ranked[1].candidate.rows.length)) {
+    return ranked[0].candidate;
   }
+  const seenSheets = candidates.map((candidate) => candidate.name);
   throw new Error(
     "找不到聊天记录工作表：需要第一行包含“聊天类型/类型”、“发送方/消息发送方”和“聊天内容/消息内容/内容”。" +
       `已检查 Sheet：${seenSheets.join("、") || "无"}`,

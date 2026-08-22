@@ -1,4 +1,5 @@
 import type { CellValue, CleanStudentName } from "./types";
+import { weekOfMonthFromDate } from "../lib/week.js";
 
 export function text(value: unknown) {
   return value == null ? "" : String(value).trim();
@@ -45,6 +46,13 @@ export function normalizeMatchText(value: unknown) {
   return text(value).toLocaleLowerCase("zh-CN");
 }
 
+export function normalizeTeacherName(value: unknown) {
+  return normalizeMatchText(value)
+    .replace(/\s+/g, "")
+    .replace(/[0-9０-９]+$/u, "")
+    .replace(/老师$/u, "");
+}
+
 export function excelDate(value: CellValue) {
   if (value instanceof Date && !Number.isNaN(value.valueOf())) {
     const pad = (number: number) => String(number).padStart(2, "0");
@@ -87,12 +95,7 @@ export function sortDate(value: CellValue) {
 export function weekOfMonth(value: CellValue) {
   const match = excelDate(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return 0;
-  const year = Number(match[1]);
-  const month = Number(match[2]) - 1;
-  const day = Number(match[3]);
-  const firstDay = new Date(year, month, 1);
-  const mondayOffset = (firstDay.getDay() + 6) % 7;
-  return Math.min(5, Math.floor((day + mondayOffset - 1) / 7) + 1);
+  return weekOfMonthFromDate(new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
 }
 
 export function chineseWeek(number: number) {

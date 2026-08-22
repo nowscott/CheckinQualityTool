@@ -1,6 +1,6 @@
 import { findSheet, headerMap } from "./excelReader";
 import { REMINDER_PASS_RATE } from "./reminderConfig";
-import { normalizeTeacherName } from "./teacherExemptions";
+import { normalizeTeacherName } from "./utils";
 import type { CellValue, CountMap, DataRow } from "./types";
 import { emailValue, text } from "./utils";
 import type { ReminderMatchInfo } from "./reminderMatching";

@@ -1,5 +1,5 @@
-export function downloadResult(buffer: ArrayBuffer, filename: string) {
-  const blob = new Blob([buffer], {
+export function downloadResult(chunks: Uint8Array[], filename: string) {
+  const blob = new Blob(chunks as BlobPart[], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
   const url = URL.createObjectURL(blob);

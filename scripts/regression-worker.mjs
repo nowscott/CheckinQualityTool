@@ -4,6 +4,9 @@ import vm from "node:vm";
 
 const root = resolve(import.meta.dirname, "..");
 const args = process.argv.slice(2);
+const profileIndex = args.indexOf("--profile");
+const profile = profileIndex >= 0;
+if (profile) args.splice(profileIndex, 1);
 const useSingleIndex = args.indexOf("--use-single");
 const useSingle = useSingleIndex >= 0;
 if (useSingle) args.splice(useSingleIndex, 1);
@@ -76,8 +79,14 @@ const workerSources = new Map([
 
 let context;
 let complete;
+const progressEvents = [];
+const startedAt = performance.now();
 const result = new Promise((resolveResult, rejectResult) => {
   complete = (message) => {
+    if (message.type === "progress") {
+      progressEvents.push({ elapsedMs: Number((performance.now() - startedAt).toFixed(1)), title: message.title, progress: message.progress });
+      return;
+    }
     if (message.type === "complete") resolveResult(message);
     if (message.type === "error") rejectResult(new Error(message.message));
   };
@@ -156,11 +165,14 @@ await context.self.onmessage({
 });
 
 const message = await result;
-await writeFile(resolve(outputPath), new Uint8Array(message.buffer));
+const chunks = message.chunks || [new Uint8Array(message.buffer)];
+const outputBytes = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+await writeFile(resolve(outputPath), outputBytes);
 console.log(JSON.stringify({
   worker: basename(workerFile),
   mode,
   output: resolve(outputPath),
-  bytes: message.buffer.byteLength,
+  bytes: message.byteLength || outputBytes.byteLength,
   summary: message.summary,
+  ...(profile ? { progress: progressEvents } : {}),
 }, null, 2));

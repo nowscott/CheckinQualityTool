@@ -720,7 +720,7 @@ function buildPeriodReportOutput(workbook: SheetJsWorkbook, dataTime: string) {
     makeSummarySheet(teacher),
   ];
   return {
-    buffer: buildWorkbook(sheets),
+    chunks: buildWorkbook(sheets),
     dataTime,
     counts: {
       stageRows: stageDetails.reduce((total, detail) => total + rowObjects(detail).rows.length, 0),
@@ -768,9 +768,9 @@ export function buildStageReportBeautifyOutput(workbook: SheetJsWorkbook) {
     makeSummarySheet(training),
     makeSummarySheet(teacher),
   ];
-  const buffer = buildWorkbook(sheets);
+  const chunks = buildWorkbook(sheets);
   return {
-    buffer,
+    chunks,
     dataTime,
     counts: {
       stageRows: stageDetailRows.length,

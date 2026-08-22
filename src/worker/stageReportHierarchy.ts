@@ -1,5 +1,6 @@
 import type { DataRow } from "./types";
 import { normalizeMatchText, text } from "./utils";
+import { reminderProjectGroup } from "./reminderProjectGroup";
 
 export interface HierarchyMetricSpec {
   totalColumn: string;
@@ -31,7 +32,7 @@ function compareText(a: unknown, b: unknown) {
   return text(a).localeCompare(text(b), "zh-CN");
 }
 
-function normalizePersonName(value: unknown) {
+export function normalizePersonName(value: unknown) {
   return normalizeMatchText(value).replace(/\s+/g, "").replace(/[0-9０-９]+$/u, "");
 }
 
@@ -44,13 +45,7 @@ export function displayPersonNames(values: Iterable<string>) {
 }
 
 export function projectForResearchGroup(value: unknown) {
-  const group = text(value).replace(/\s+/g, "");
-  if (!group || group === "跨教研组" || group === "未分组") return "其他项目";
-  if (/(博文|实验)[A-Za-zＡ-Ｚａ-ｚ]/u.test(group) || /文综|理综|文理综|政史地生|政史地|史地生/u.test(group)) return "文理综项目";
-  if (group.includes("博文")) return "博文项目";
-  if (group.includes("双语")) return "双语项目";
-  if (group.includes("益智")) return "益智项目";
-  return "其他项目";
+  return reminderProjectGroup(value);
 }
 
 function projectCompare(a: string, b: string) {
@@ -68,7 +63,7 @@ export function assistantTeachingGroup(value: unknown) {
   return "政史地生";
 }
 
-function assistantTeachingGroupCompare(a: string, b: string) {
+export function assistantTeachingGroupCompare(a: string, b: string) {
   const order = ["实验P", "实验C", "政史地生"];
   const ai = order.indexOf(a);
   const bi = order.indexOf(b);
@@ -127,7 +122,7 @@ function metricValues(bucket: HierarchyBucket, metricSpecs: readonly HierarchyMe
   }, {});
 }
 
-function assistantOwnTeachingGroups(teacherRows: DataRow[]) {
+export function assistantOwnTeachingGroups(teacherRows: DataRow[]) {
   const groups = new Map<string, string>();
   teacherRows.forEach((row) => {
     const teacher = normalizePersonName(row.教师姓名);

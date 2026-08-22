@@ -5,6 +5,7 @@ dist/
 部署包/
 .vercel/
 .DS_Store
+outputs/
 .vercel
 .env*
 .local-tests/

@@ -1,5 +1,4 @@
 import type { ChatRow, DataRow, MatchInfo, TargetRow, Whitelist } from "./types";
-import { isTeacherExempt } from "./teacherExemptions";
 import { excelDate, normalizeMatchText, sortDate } from "./utils";
 import { findWhitelistEntry } from "./whitelist";
 
@@ -7,6 +6,7 @@ interface MatchedChat extends ChatRow {
   匹配强度: string;
   命中位置: string;
   命中关键词: string;
+  命中关键词来源: string;
 }
 
 interface NormalizedChat {
@@ -30,7 +30,6 @@ interface TargetPlan {
   normalizedWeak: string;
   aliasKeywords: string[];
   whitelistEntry: ReturnType<typeof findWhitelistEntry>;
-  teacherExempt: boolean;
   whitelistExempt: boolean;
 }
 
@@ -73,7 +72,7 @@ function collectShortKeywordHits(textValue: string, keywords: Set<string>, outpu
 function buildHitIndex(targetPlans: TargetPlan[], chats: ChatRow[]) {
   const keywordsByEmail = new Map<string, Set<string>>();
   targetPlans.forEach((plan) => {
-    if (plan.whitelistExempt || plan.teacherExempt) return;
+    if (plan.whitelistExempt) return;
     plan.aliasKeywords.forEach((keyword) => addKeyword(keywordsByEmail, plan.target.教师邮箱, keyword));
     addKeyword(keywordsByEmail, plan.target.教师邮箱, plan.whitelistNameKeyword);
     addKeyword(keywordsByEmail, plan.target.教师邮箱, plan.normalizedStrong);
@@ -124,6 +123,7 @@ function addMatchesFromHits(
   keyword: string,
   displayKeyword: string,
   strength: string,
+  source: string,
 ) {
   const hits = hitsByKeyword?.get(keyword);
   if (!hits?.length) return;
@@ -134,6 +134,7 @@ function addMatchesFromHits(
       匹配强度: strength,
       命中位置: hit.locations.join("+"),
       命中关键词: displayKeyword,
+      命中关键词来源: source,
     });
   });
 }
@@ -152,7 +153,6 @@ export function matchData(
     const automaticWeak = nameLength < 2;
     const weak = automaticWeak || useSingle ? weakSource.slice(-1) : "";
     const whitelistEntry = findWhitelistEntry(target, whitelist);
-    const teacherExempt = isTeacherExempt(target.教师姓名);
     return {
       target,
       strong,
@@ -162,7 +162,6 @@ export function matchData(
       normalizedWeak: normalizeMatchText(weak),
       aliasKeywords: whitelistEntry?.处理方式 === "别名" ? whitelistEntry.匹配别名关键词.filter(Boolean) : [],
       whitelistEntry,
-      teacherExempt,
       whitelistExempt: whitelistEntry?.处理方式 === "免检",
     };
   });
@@ -183,15 +182,15 @@ export function matchData(
   };
 
   targetPlans.forEach((plan, targetIndex) => {
-    const { target, strong, weak, whitelistEntry, teacherExempt, whitelistExempt } = plan;
-    const hitsByKeyword = whitelistExempt || teacherExempt ? undefined : hitsByEmail.get(target.教师邮箱);
+    const { target, strong, weak, whitelistEntry, whitelistExempt } = plan;
+    const hitsByKeyword = whitelistExempt ? undefined : hitsByEmail.get(target.教师邮箱);
     const matchesByChat = new Map<number, MatchedChat>();
     plan.aliasKeywords.forEach((keyword) =>
-      addMatchesFromHits(matchesByChat, hitsByKeyword, keyword, keyword, "别名匹配"),
+      addMatchesFromHits(matchesByChat, hitsByKeyword, keyword, keyword, "别名匹配", "白名单别名"),
     );
-    addMatchesFromHits(matchesByChat, hitsByKeyword, plan.whitelistNameKeyword, plan.whitelistNameKeyword, "强匹配");
-    addMatchesFromHits(matchesByChat, hitsByKeyword, plan.normalizedStrong, strong, "强匹配");
-    addMatchesFromHits(matchesByChat, hitsByKeyword, plan.normalizedWeak, weak, "弱匹配");
+    addMatchesFromHits(matchesByChat, hitsByKeyword, plan.whitelistNameKeyword, plan.whitelistNameKeyword, "强匹配", "白名单登记名");
+    addMatchesFromHits(matchesByChat, hitsByKeyword, plan.normalizedStrong, strong, "强匹配", "名单姓名后两字");
+    addMatchesFromHits(matchesByChat, hitsByKeyword, plan.normalizedWeak, weak, "弱匹配", "名单姓名末字");
     const matches = [...matchesByChat.values()];
     const matchPriority: Record<string, number> = {
       别名匹配: 0,
@@ -204,8 +203,8 @@ export function matchData(
         sortDate(a.聊天时间) - sortDate(b.聊天时间),
     );
     const best = matches[0];
-    const status = whitelistExempt || teacherExempt || Boolean(best) ? "已发送" : "未发送";
-    const conclusion = whitelistExempt ? "白名单免检" : best?.匹配强度 || (teacherExempt ? "强匹配" : "无匹配");
+    const status = whitelistExempt || Boolean(best) ? "已发送" : "未发送";
+    const conclusion = whitelistExempt ? "白名单免检" : best?.匹配强度 || "无匹配";
     counts[status as "已发送" | "未发送"] += 1;
     if (whitelistExempt) counts.免检 += 1;
     if (conclusion in counts) {
@@ -226,6 +225,7 @@ export function matchData(
       发送情况: status,
       匹配结论: conclusion,
       命中关键词: best?.命中关键词 || "",
+      命中关键词来源: best?.命中关键词来源 || "",
       命中位置: best?.命中位置 || "",
       命中群名: best?.["群名/好友昵称"] || "",
       白名单命中: whitelistEntry ? "是" : "否",
@@ -237,7 +237,7 @@ export function matchData(
       科目: target.科目,
       源名单行号: target.源名单行号,
     });
-    matches.forEach((match, matchIndex) =>
+    if (best) {
       detailRows.push({
         质检序号: id,
         教师姓名: target.教师姓名,
@@ -247,19 +247,20 @@ export function matchData(
         姓名清洗说明: target.姓名清洗说明,
         学员关键词_后两字: strong,
         学员关键词_末字: weak,
-        匹配序号: matchIndex + 1,
-        匹配强度: match.匹配强度,
-        命中位置: match.命中位置,
-        命中关键词: match.命中关键词,
-        发送人名称: match.发送人名称,
-        有效教师邮箱: match.有效教师邮箱,
-        邮箱来源: match.邮箱来源,
-        "群名/好友昵称": match["群名/好友昵称"],
-        聊天时间: match.聊天时间,
-        聊天内容: match.聊天内容,
-        源聊天行号: match.源聊天行号,
-      }),
-    );
+        匹配序号: 1,
+        匹配强度: best.匹配强度,
+        命中位置: best.命中位置,
+        命中关键词: best.命中关键词,
+        命中关键词来源: best.命中关键词来源,
+        发送人名称: best.发送人名称,
+        有效教师邮箱: best.有效教师邮箱,
+        邮箱来源: best.邮箱来源,
+        "群名/好友昵称": best["群名/好友昵称"],
+        聊天时间: best.聊天时间,
+        聊天内容: best.聊天内容,
+        源聊天行号: best.源聊天行号,
+      });
+    }
   });
   counts.匹配明细行数 = detailRows.length;
   return { finalRows, detailRows, counts };

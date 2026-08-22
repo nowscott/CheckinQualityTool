@@ -88,7 +88,7 @@ function metrics(bucket: SummaryBucket) {
 }
 
 function findSentColumn(columns: string[]) {
-  const aliases = ["是否发送阶段性报告", "阶段性报告是否发送"];
+  const aliases = ["是否发送阶段性报告", "是否发送阶段性报告（系统数据）", "阶段性报告是否发送"];
   const column = columns.find((name) => aliases.includes(text(name)));
   if (!column) throw new Error("钉钉表单分母缺少“是否发送阶段性报告”列。");
   return column;
@@ -193,6 +193,13 @@ export function buildStageReportDingTalkOutput(
   listInfo: StageReportListInfo,
   matchInfo: StageReportMatchInfo,
 ) {
+  if (matchInfo.unresolvedRows.length) {
+    const sample = matchInfo.unresolvedRows
+      .slice(0, 10)
+      .map((row) => `第${row.sourceRowNumber}行：${row.reason}`)
+      .join("；");
+    throw new Error(`阶段性报告存在${matchInfo.unresolvedRows.length}条未决数据，已阻止导出。${sample}`);
+  }
   const sentColumn = findSentColumn(listInfo.columns);
   const detailRows = buildDetailRows(listInfo, matchInfo, sentColumn);
   const teacherRows = buildTeacherRows(detailRows, sentColumn);

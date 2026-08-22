@@ -63,3 +63,25 @@ test("打卡白名单学员姓名也按后两字作为候选", () => {
   assert.equal(result.finalRows[0].匹配结论, "强匹配");
   assert.equal(result.finalRows[0].命中关键词, "思妍");
 });
+
+test("白名单命中来源可核对且每个目标只保留最佳明细", () => {
+  const whitelist = buildWhitelist([
+    "学员号,学员姓名,处理方式,匹配别名,说明",
+    "GZ2401573428,卢思妍,别名,周炳燊,系统登记名与实际学员名不一致",
+  ].join("\n"));
+  const result = matchData(
+    [target()],
+    [
+      chat("卢思妍家长您好。"),
+      chat("周炳燊家长您好。"),
+      chat("周炳燊本周课程反馈。"),
+    ],
+    false,
+    "第三周",
+    whitelist,
+  );
+  assert.equal(result.finalRows[0].命中关键词来源, "白名单别名");
+  assert.equal(result.finalRows[0].匹配消息数, 3);
+  assert.equal(result.detailRows.length, 1);
+  assert.equal(result.detailRows[0].命中关键词来源, "白名单别名");
+});
