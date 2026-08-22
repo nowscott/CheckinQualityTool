@@ -16,5 +16,5 @@ export function reminderProjectGroup(teachingGroup: unknown) {
   if (value.includes("博文")) return "博文项目";
   if (value.includes("双语")) return "双语项目";
   if (value.includes("益智")) return "益智项目";
-  return value || "其他项目";
+  return "其他项目";
 }

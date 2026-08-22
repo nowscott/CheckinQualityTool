@@ -173,6 +173,20 @@ test("钉钉表单无邮箱时，教师姓名去尾号后可兜底匹配聊天�
   assert.equal(result.detailRows[0].教师匹配方式, "姓名兜底匹配");
 });
 
+test("无邮箱教师姓名对应多个聊天邮箱时记录未决行，不回填未发送", () => {
+  const list = buildStageReportTargets(workbook([
+    ["教师姓名", "学号", "学生姓名", "是否发送阶段性报告"],
+    ["张凝72", "GZ1", "张昊", ""],
+  ]));
+  const result = matchStageReportData(list, [
+    chat({ email: "one@xdf.cn", sender: "张凝", content: "张昊家长您好" }),
+    chat({ email: "two@xdf.cn", sender: "张凝", content: "张昊家长您好" }),
+  ]);
+  assert.equal(result.counts.字段缺失数, 1);
+  assert.equal(result.detailRows[0].本次检查结论, "字段缺失");
+  assert.deepEqual(result.unresolvedRows, [{ sourceRowNumber: 2, reason: "教师姓名对应多个聊天邮箱" }]);
+});
+
 test("没有学员命中或邮箱不一致均不能判已发送", () => {
   const list = buildStageReportTargets(workbook([
     ["教师姓名", "邮箱", "学号", "学员姓名"],

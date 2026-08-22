@@ -15,14 +15,14 @@ import { WHITELIST_COLUMNS } from "./whitelist";
 const FINAL_COLUMNS = [
   "教师姓名", "上课日期", "上课时间", "学生姓名", "服务周", "发送情况",
   "序号", "教师邮箱", "匹配学员姓名", "姓名清洗说明", "该周课次数",
-  "匹配结论", "命中关键词", "命中位置", "命中群名", "白名单命中", "白名单说明",
+  "匹配结论", "命中关键词", "命中关键词来源", "命中位置", "命中群名", "白名单命中", "白名单说明",
   "命中聊天时间", "匹配消息数", "校区", "项目组", "科目", "源名单行号",
 ] as const;
 
 const DETAIL_COLUMNS = [
   "质检序号", "教师姓名", "教师邮箱", "原始学员姓名", "匹配学员姓名", "姓名清洗说明",
   "学员关键词_后两字", "学员关键词_末字",
-  "匹配序号", "匹配强度", "命中位置", "命中关键词", "发送人名称", "有效教师邮箱",
+  "匹配序号", "匹配强度", "命中位置", "命中关键词", "命中关键词来源", "发送人名称", "有效教师邮箱",
   "邮箱来源", "群名/好友昵称", "聊天时间", "聊天内容", "源聊天行号",
 ] as const;
 
@@ -30,6 +30,8 @@ const CHAT_COLUMNS = [
   "有效教师邮箱", "邮箱来源", "发送人名称", "群名/好友昵称",
   "聊天时间", "聊天内容", "源聊天行号",
 ] as const;
+
+type CompressionLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 function xmlEscape(value: unknown) {
   return displayValue(value)
@@ -56,8 +58,8 @@ function cellXml(value: unknown, columnIndex: number, rowIndex: number, style = 
   return `<c r="${reference}" t="inlineStr"${style ? ` s="${style}"` : ""}><is><t xml:space="preserve">${xmlEscape(value)}</t></is></c>`;
 }
 
-function addZipTextFile(zip: Zip, filename: string, chunks: string | Iterable<string>) {
-  const entry = new ZipDeflate(filename, { level: 6 });
+function addZipTextFile(zip: Zip, filename: string, chunks: string | Iterable<string>, compressionLevel: CompressionLevel = 6) {
+  const entry = new ZipDeflate(filename, { level: compressionLevel });
   zip.add(entry);
   if (typeof chunks === "string") {
     entry.push(strToU8(chunks), true);
@@ -143,17 +145,6 @@ function* worksheetChunks(
   yield `</sheetData>${mergeXml}${dataBarXml}<autoFilter ref="A${headerRowIndex}:${lastCell}"/></worksheet>`;
 }
 
-function concatenate(chunks: Uint8Array[]) {
-  const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-  const output = new Uint8Array(total);
-  let offset = 0;
-  chunks.forEach((chunk) => {
-    output.set(chunk, offset);
-    offset += chunk.length;
-  });
-  return output;
-}
-
 export function buildOutput(
   listInfo: ListInfo,
   chatInfo: ChatInfo,
@@ -181,7 +172,7 @@ export function buildOutput(
     { 项目: "文本匹配规则", 值: "英文忽略大小写；中文按原字符匹配" },
     { 项目: "强匹配规则", 值: "教师邮箱一致，且群名或聊天内容包含学员名后两字" },
     { 项目: "弱匹配规则", 值: `清洗后不足两字自动使用末字；正常姓名末字弱匹配${useSingle ? "已启用" : "未启用"}` },
-    { 项目: "白名单规则", 值: "优先按学员号关联；保留原名项在名单清洗前跳过姓名后缀清洗。免检项不检查聊天，发送情况直接记为已发送，匹配结论保留“白名单免检”；别名项增加实际姓名后两字，聊天真实命中后才判已发送" },
+    { 项目: "白名单规则", 值: "优先按学员号关联；保留原名项在名单清洗前跳过姓名后缀清洗。免检项不检查聊天，发送情况直接记为已发送，匹配结论保留“白名单免检”；白名单学员姓名和匹配别名均取后两字作为候选，任一候选真实命中且教师邮箱一致后才判已发送" },
     { 项目: "内置白名单数量", 值: whitelist.entries.length },
   ];
   Object.entries(listInfo.counts).forEach(([key, value]) => explanation.push({ 项目: `名单_${key}`, 值: value }));
@@ -227,19 +218,20 @@ export function buildOutput(
     },
   ];
 
-  return buildWorkbook(sheets);
+  return buildWorkbook(sheets, 3);
 }
 
-export function buildWorkbook(sheets: SheetDefinition[]) {
+export function buildWorkbook(sheets: SheetDefinition[], compressionLevel: CompressionLevel = 6) {
   const outputChunks: Uint8Array[] = [];
   const zip = new Zip((error, chunk) => {
     if (error) throw error;
     outputChunks.push(chunk);
   });
+  const addFile = (filename: string, chunks: string | Iterable<string>) => addZipTextFile(zip, filename, chunks, compressionLevel);
   const sheetOverrides = sheets.map((_, index) =>
     `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`
   ).join("");
-  addZipTextFile(zip, "[Content_Types].xml",
+  addFile("[Content_Types].xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
     `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
@@ -248,20 +240,20 @@ export function buildWorkbook(sheets: SheetDefinition[]) {
     `<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>` +
     sheetOverrides + `</Types>`,
   );
-  addZipTextFile(zip, "_rels/.rels",
+  addFile("_rels/.rels",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
     `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>` +
     `</Relationships>`,
   );
-  addZipTextFile(zip, "xl/workbook.xml",
+  addFile("xl/workbook.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ` +
     `xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>` +
     sheets.map((sheet, index) => `<sheet name="${xmlEscape(sheet.name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`).join("") +
     `</sheets></workbook>`,
   );
-  addZipTextFile(zip, "xl/_rels/workbook.xml.rels",
+  addFile("xl/_rels/workbook.xml.rels",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
     sheets.map((_, index) =>
@@ -270,7 +262,7 @@ export function buildWorkbook(sheets: SheetDefinition[]) {
     `<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
     `</Relationships>`,
   );
-  addZipTextFile(zip, "xl/styles.xml",
+  addFile("xl/styles.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
     `<numFmts count="1"><numFmt numFmtId="164" formatCode="0.0%"/></numFmts>` +
@@ -348,8 +340,7 @@ export function buildWorkbook(sheets: SheetDefinition[]) {
       `${sheet.name}：${sheet.rows.length.toLocaleString()} 行`,
       Math.min(98, 85 + index * 3),
     );
-    addZipTextFile(
-      zip,
+    addFile(
       `xl/worksheets/sheet${index + 1}.xml`,
       worksheetChunks(
         sheet.rows,
@@ -375,5 +366,5 @@ export function buildWorkbook(sheets: SheetDefinition[]) {
     );
   });
   zip.end();
-  return concatenate(outputChunks);
+  return outputChunks;
 }

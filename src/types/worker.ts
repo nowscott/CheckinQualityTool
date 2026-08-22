@@ -36,7 +36,8 @@ export type WorkerResponse =
     }
   | {
       type: "complete";
-      buffer: ArrayBuffer;
+      chunks: Uint8Array[];
+      byteLength: number;
       filename: string;
       summary: ResultSummary;
     }

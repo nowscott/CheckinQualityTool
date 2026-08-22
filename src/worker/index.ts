@@ -22,6 +22,7 @@ import { buildStageReportBeautifyOutput } from "./stageReportBeautifyWriter";
 import { buildStageReportTargets } from "./stageReportListParser";
 import { matchStageReportData } from "./stageReportMatching";
 import type { ChatInfo, WorkerRequest } from "./types";
+import type { ResultSummary } from "../types/worker";
 import { inferServiceWeek } from "./utils";
 import { buildWhitelist } from "./whitelist";
 
@@ -97,6 +98,12 @@ function localMonthDay(date = new Date()) {
   return `${date.getMonth() + 1}.${date.getDate()}`;
 }
 
+function postComplete(chunks: Uint8Array[], filename: string, summary: ResultSummary) {
+  const byteLength = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+  const transfer = [...new Set(chunks.map((chunk) => chunk.buffer))] as ArrayBuffer[];
+  workerScope.postMessage({ type: "complete", chunks, byteLength, filename, summary }, transfer);
+}
+
 workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
   if (data.type !== "process") return;
   try {
@@ -153,22 +160,16 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
         chat: data.chatFiles.map((file) => file.name).join("；"),
         summary: data.summaryFiles.map((file) => file.name).join("；"),
       }, data.includeCleanChats, data.includeResultColors, data.includeExceptionSheet, data.includeExplanationSheet);
-      const buffer = output.buffer as ArrayBuffer;
-      workerScope.postMessage({
-        type: "complete",
-        buffer,
-        filename: `暑期开课提醒话术发送进度（${localMonthDay()}）.xlsx`,
-        summary: {
-          mode: "reminder",
-          targets: listInfo.targets.length,
-          sent: matchInfo.counts.有效触达数 || 0,
-          unsent: Math.max(0, (matchInfo.counts.应发送数 || 0) - (matchInfo.counts.有效触达数 || 0)),
-          exceptions: matchInfo.counts.异常明细行数,
-          summaryFiles: data.summaryFiles.length,
-          chatFiles: data.chatFiles.length,
-          cleanChats: chatInfo.chats.length,
-        },
-      }, [buffer]);
+      postComplete(output, `暑期开课提醒话术发送进度（${localMonthDay()}）.xlsx`, {
+        mode: "reminder",
+        targets: listInfo.targets.length,
+        sent: matchInfo.counts.有效触达数 || 0,
+        unsent: Math.max(0, (matchInfo.counts.应发送数 || 0) - (matchInfo.counts.有效触达数 || 0)),
+        exceptions: matchInfo.counts.异常明细行数,
+        summaryFiles: data.summaryFiles.length,
+        chatFiles: data.chatFiles.length,
+        cleanChats: chatInfo.chats.length,
+      });
       return;
     }
 
@@ -195,21 +196,14 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       );
       progress("正在生成公示表", "复刻暑假督课层级和样式，写入管理维度、教师维度及钉钉明细。", 90);
       const dingTalk = buildStageReportDingTalkOutput(listInfo, matchInfo);
-      const output = dingTalk.output;
-      const buffer = output.buffer as ArrayBuffer;
-      workerScope.postMessage({
-        type: "complete",
-        buffer,
-        filename: `阶段性报告发送进度（${localMonthDay()}）.xlsx`,
-        summary: {
-          mode: "stageReport",
-          targets: listInfo.targets.length,
-          sent: matchInfo.counts.已发送数,
-          unsent: matchInfo.counts.未发送数 + matchInfo.counts.字段缺失数,
-          cleanChats: chatInfo.chats.length,
-          chatFiles: data.chatFiles.length,
-        },
-      }, [buffer]);
+      postComplete(dingTalk.output, `阶段性报告发送进度（${localMonthDay()}）.xlsx`, {
+        mode: "stageReport",
+        targets: listInfo.targets.length,
+        sent: matchInfo.counts.已发送数,
+        unsent: matchInfo.counts.未发送数 + matchInfo.counts.字段缺失数,
+        cleanChats: chatInfo.chats.length,
+        chatFiles: data.chatFiles.length,
+      });
       return;
     }
 
@@ -218,24 +212,18 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       progress("原始表单读取完成", "已识别明细、管理汇总与申诉工作表，开始整理公示版。", 74);
       const output = buildStageReportBeautifyOutput(sourceWorkbook);
       progress("正在生成公示版 Excel", "统一标题、列宽、冻结表头、发送率数据条及完成状态颜色。", 90);
-      const buffer = output.buffer.slice().buffer as ArrayBuffer;
-      workerScope.postMessage({
-        type: "complete",
-        buffer,
-        filename: `窗口期报告+非窗口期暑期在读阶段性报告明细（${output.dataTime}）.xlsx`,
-        summary: {
-          mode: "stageReportBeautify",
-          targets: output.counts.stageRows,
-          sent: 0,
-          unsent: 0,
-          cleanChats: 0,
-          stageRows: output.counts.stageRows,
-          windowRows: output.counts.windowRows,
-          teacherRows: output.counts.teacherRows,
-          appealRows: output.counts.appealRows,
-          sheets: output.counts.sheets,
-        },
-      }, [buffer]);
+      postComplete(output.chunks, `窗口期报告+非窗口期暑期在读阶段性报告明细（${output.dataTime}）.xlsx`, {
+        mode: "stageReportBeautify",
+        targets: output.counts.stageRows,
+        sent: 0,
+        unsent: 0,
+        cleanChats: 0,
+        stageRows: output.counts.stageRows,
+        windowRows: output.counts.windowRows,
+        teacherRows: output.counts.teacherRows,
+        appealRows: output.counts.appealRows,
+        sheets: output.counts.sheets,
+      });
       return;
     }
 
@@ -294,19 +282,13 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       { list: data.listFile.name, chat: data.chatFile.name },
     );
     const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
-    const buffer = output.buffer as ArrayBuffer;
-    workerScope.postMessage({
-      type: "complete",
-      buffer,
-      filename: `打卡质检结果_${stamp}.xlsx`,
-      summary: {
-        targets: listInfo.targets.length,
-        sent: matchInfo.counts.已发送,
-        unsent: matchInfo.counts.未发送,
-        exempt: matchInfo.counts.免检,
-        cleanChats: chatInfo.chats.length,
-      },
-    }, [buffer]);
+    postComplete(output, `打卡质检结果_${stamp}.xlsx`, {
+      targets: listInfo.targets.length,
+      sent: matchInfo.counts.已发送,
+      unsent: matchInfo.counts.未发送,
+      exempt: matchInfo.counts.免检,
+      cleanChats: chatInfo.chats.length,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     workerScope.postMessage({ type: "error", message });

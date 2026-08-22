@@ -7,6 +7,12 @@ export interface FoundSheet {
   rows: CellValue[][];
 }
 
+export interface SheetCandidate extends FoundSheet {
+  headers: string[];
+  map: Map<string, number[]>;
+  order: number;
+}
+
 export function headerMap(headerRow: CellValue[]) {
   const map = new Map<string, number[]>();
   headerRow.forEach((value, index) => {
@@ -17,23 +23,30 @@ export function headerMap(headerRow: CellValue[]) {
   return map;
 }
 
-export function findSheet(workbook: SheetJsWorkbook, requiredHeaders: string[]): FoundSheet {
-  for (const name of workbook.SheetNames) {
+export function sheetCandidates(workbook: SheetJsWorkbook): SheetCandidate[] {
+  const candidates: SheetCandidate[] = [];
+  workbook.SheetNames.forEach((name, order) => {
     const rows = XLSX.utils.sheet_to_json(workbook.Sheets[name], {
       header: 1,
       range: 0,
       blankrows: false,
       defval: "",
     });
-    if (!rows.length) continue;
-    const headers = new Set(rows[0].map(text));
-    if (requiredHeaders.every((header) => headers.has(header))) return { name, rows };
+    if (!rows.length) return;
+    candidates.push({ name, rows, headers: rows[0].map(text), map: headerMap(rows[0]), order });
+  });
+  return candidates;
+}
+
+export function findSheet(workbook: SheetJsWorkbook, requiredHeaders: string[]): FoundSheet {
+  for (const candidate of sheetCandidates(workbook)) {
+    if (requiredHeaders.every((header) => candidate.map.has(header))) return candidate;
   }
   throw new Error(`找不到包含字段“${requiredHeaders.join("、")}”的工作表。`);
 }
 
 function isRecoverableZipSizeWarning(args: unknown[]) {
-  return args.some((arg) => /^Bad uncompressed size: \d+ != 0$/u.test(text(arg)));
+  return args.length === 1 && /^Bad uncompressed size: \d+ != 0$/u.test(text(args[0]));
 }
 
 function readXlsx(data: ArrayBuffer) {
@@ -46,7 +59,7 @@ function readXlsx(data: ArrayBuffer) {
     if (!isRecoverableZipSizeWarning(args)) originalError(...args);
   };
   try {
-    return XLSX.read(data, { type: "array", dense: true, cellDates: true });
+    return XLSX.read(data, { type: "array", dense: true, cellDates: true, cellText: false });
   } finally {
     console.warn = originalWarn;
     console.error = originalError;

@@ -9,8 +9,8 @@ globalThis.XLSX = {
   },
 };
 
-const exemptTeacher = decodeURIComponent("%E7%89%9B%E6%96%BD%E6%A1%A5");
-const teacherSuffix = decodeURIComponent("%E8%80%81%E5%B8%88");
+const exemptTeacher = "牛施桥";
+const teacherSuffix = "老师";
 
 const { buildReminderTargets } = await import("../worker/reminderListParser.js");
 const { buildReminderAppeals } = await import("../worker/reminderAppealParser.js");
@@ -23,6 +23,7 @@ const {
 const { reminderProjectGroup } = await import("../worker/reminderProjectGroup.js");
 const { buildWhitelist } = await import("../worker/whitelist.js");
 const { REMINDER_MATCH_RULES } = await import("../worker/reminderConfig.js");
+const { preprocessChats } = await import("../worker/chatCleaner.js");
 
 function workbook(rows) {
   return {
@@ -409,6 +410,18 @@ test("开课提醒项目组归类将博文和实验字母组归入文理综", ()
   assert.equal(reminderProjectGroup("初中博文"), "博文项目");
   assert.equal(reminderProjectGroup("高中博文"), "博文项目");
   assert.equal(reminderProjectGroup("初中益智"), "益智项目");
+});
+
+test("聊天 Sheet 按字段质量选择，不取首个弱候选", () => {
+  const info = preprocessChats({
+    SheetNames: ["弱候选", "主聊天"],
+    Sheets: {
+      弱候选: { __rows: [["聊天类型", "发送方", "聊天内容"], ["群聊", "员工", "阶段性报告"]] },
+      主聊天: { __rows: [["聊天类型", "发送方", "聊天内容", "群名/好友昵称", "群聊发送人邮箱", "聊天时间"], ["群聊", "员工", "陈一反馈", "陈一群", "teacher@xdf.cn", "2026-08-01 10:00"]] },
+    },
+  });
+  assert.equal(info.sheetName, "主聊天");
+  assert.equal(info.chats.length, 1);
 });
 
 test("汇总文件同一老师跨文件按邮箱取最大触达数，避免多关键词重复计数", () => {

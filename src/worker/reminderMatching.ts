@@ -1,8 +1,8 @@
 import { REMINDER_MATCH_RULES, REMINDER_PASS_RATE } from "./reminderConfig";
-import { isTeacherExempt, normalizeTeacherName } from "./teacherExemptions";
 import type { ChatRow, CountMap, DataRow } from "./types";
-import { displayValue, emailValue, normalizeMatchText, sortDate } from "./utils";
+import { displayValue, emailValue, normalizeMatchText, normalizeTeacherName, sortDate } from "./utils";
 import { appealKey, isSentAppeal, type ReminderAppealInfo, type ReminderAppealRecord } from "./reminderAppealParser";
+import { assistantOwnTeachingGroups } from "./stageReportHierarchy";
 import type { ReminderListInfo, ReminderTarget } from "./reminderListParser";
 
 export interface ReminderMatchedChat extends ChatRow {
@@ -71,16 +71,40 @@ function senderMatchesTarget(chat: ChatRow, target: ReminderTarget) {
   return Boolean(teacher && senderTeacher && senderTeacher === teacher);
 }
 
-function buildStudentHitIndex(chats: NormalizedReminderChat[], keywords: Iterable<string>) {
+export function buildStudentHitIndex(chats: NormalizedReminderChat[], keywords: Iterable<string>) {
   const index = new Map<string, StudentHit[]>();
-  for (const keyword of keywords) {
-    const hits: StudentHit[] = [];
-    for (const item of chats) {
-      const group = item.group.includes(keyword);
-      const content = item.content.includes(keyword);
-      if (group || content) hits.push({ item, keyword, group, content });
+  const keywordsByLength = new Map<number, Map<string, string>>();
+  for (const keyword of new Set(keywords)) {
+    if (!keyword) continue;
+    if (!keywordsByLength.has(keyword.length)) keywordsByLength.set(keyword.length, new Map());
+    keywordsByLength.get(keyword.length)!.set(keyword, keyword);
+    index.set(keyword, []);
+  }
+  // ponytail: scans once per distinct keyword length; use Aho-Corasick if many lengths appear.
+  const lengths = [...keywordsByLength.keys()];
+  const collect = (value: string, matched: Set<string>) => {
+    for (const length of lengths) {
+      const byKeyword = keywordsByLength.get(length)!;
+      for (let offset = 0; offset + length <= value.length; offset += 1) {
+        const keyword = byKeyword.get(value.slice(offset, offset + length));
+        if (keyword) matched.add(keyword);
+      }
     }
-    index.set(keyword, hits);
+  };
+  for (const item of chats) {
+    const groupMatches = new Set<string>();
+    const contentMatches = new Set<string>();
+    collect(item.group, groupMatches);
+    collect(item.content, contentMatches);
+    const matched = new Set([...groupMatches, ...contentMatches]);
+    for (const keyword of matched) {
+      index.get(keyword)!.push({
+        item,
+        keyword,
+        group: groupMatches.has(keyword),
+        content: contentMatches.has(keyword),
+      });
+    }
   }
   return index;
 }
@@ -95,18 +119,6 @@ function candidateStudentHits(keywords: string[], hitIndex: Map<string, StudentH
     }
   }
   return [...byChat.values()];
-}
-
-function assistantOwnTeachingGroups(rows: DataRow[]) {
-  const groups = new Map<string, unknown>();
-  rows.forEach((row) => {
-    const teacher = normalizeTeacherName(row.教师姓名);
-    const assistant = normalizeTeacherName(row.助理主管);
-    if (teacher && assistant && teacher === assistant && row.教研组) {
-      groups.set(assistant, row.教研组);
-    }
-  });
-  return groups;
 }
 
 function addException(rows: DataRow[], target: ReminderTarget, type: string, reason: string, chat?: ChatRow) {
@@ -214,45 +226,6 @@ export function matchReminderData(
   };
 
   for (const target of listInfo.targets) {
-    if (isTeacherExempt(target.授课教师)) {
-      counts.应发送数 += 1;
-      counts.已发送数 += 1;
-      studentRows.push({
-        质检序号: target.id,
-        教师姓名: target.授课教师,
-        教师邮箱: target.教师邮箱,
-        学员号: target.学员号,
-        教研组: target.教研组,
-        师训组长: target.师训组长,
-        助理主管: target.助理主管,
-        学员姓名: target.学员姓名,
-        匹配学员姓名: target.匹配学员姓名,
-        白名单命中: target.白名单命中,
-        白名单说明: target.白名单说明,
-        姓名清洗说明: target.姓名清洗说明,
-        校区: target.校区,
-        年级: target.年级,
-        学管姓名: target.学管,
-        新老生季度: target.新老生季度,
-        课时: target.课时,
-        是否发送: "是",
-        匹配状态: "已发送",
-        匹配方式: "",
-        异常原因: "",
-        命中位置: "",
-        命中关键词: "",
-        命中群名: "",
-        命中聊天时间: "",
-        命中质检文件: "",
-        发送人名称: "",
-        发送人邮箱: "",
-        源名单行号: target.源名单行号,
-        去重合并行号: target.去重合并行号,
-        源聊天行号: "",
-        匹配消息数: 0,
-      });
-      continue;
-    }
     const appeal = appealInfo?.byKey.get(appealKey(target.授课教师, target.学员姓名)) ||
       appealInfo?.byKey.get(appealKey(target.授课教师, target.匹配学员姓名));
     const keywords = studentKeywords(target);

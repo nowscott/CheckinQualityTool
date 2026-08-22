@@ -1,6 +1,12 @@
 import { buildWorkbook } from "./excelWriter";
 import { REMINDER_PASS_RATE } from "./reminderConfig";
 import { reminderProjectGroup } from "./reminderProjectGroup";
+import {
+  assistantOwnTeachingGroups,
+  assistantTeachingGroup,
+  assistantTeachingGroupCompare,
+  normalizePersonName,
+} from "./stageReportHierarchy";
 import type { ChatInfo, DataRow, SheetDefinition, SourceNames } from "./types";
 import type { ReminderListInfo } from "./reminderListParser";
 import type { ReminderMatchInfo } from "./reminderMatching";
@@ -93,10 +99,6 @@ function compareText(a: unknown, b: unknown) {
   return text(a).localeCompare(text(b), "zh-CN");
 }
 
-function normalizePersonName(value: unknown) {
-  return normalizeMatchText(value).replace(/\s+/g, "").replace(/[0-9０-９]+$/u, "");
-}
-
 function displayTeachingGroup(value: unknown) {
   const group = text(value);
   if (!group) return "未分组";
@@ -174,36 +176,6 @@ function assistantCellStyle(row: DataRow, column: string, baseStyle: number) {
   if (row.__rowType === "projectTotal" || row.__rowType === "grandTotal") return 13;
   if (row.__rowType === "groupTotal") return 15;
   return 12;
-}
-
-function assistantTeachingGroup(value: unknown) {
-  const group = text(value) || "未分组";
-  const project = reminderProjectGroup(group);
-  const compactGroup = group.replace(/\s+/g, "");
-  if (project !== "文理综项目") return group;
-  if (compactGroup.includes("实验P")) return "实验P";
-  if (compactGroup.includes("实验C")) return "实验C";
-  return "政史地生";
-}
-
-function assistantTeachingGroupCompare(a: string, b: string) {
-  const order = ["实验P", "实验C", "政史地生"];
-  const ai = order.indexOf(a);
-  const bi = order.indexOf(b);
-  if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || compareText(a, b);
-  return compareText(a, b);
-}
-
-function assistantOwnTeachingGroups(rows: DataRow[]) {
-  const groups = new Map<string, string>();
-  rows.forEach((row) => {
-    const teacher = normalizePersonName(row.教师姓名);
-    const assistant = normalizePersonName(row.助理主管);
-    if (teacher && assistant && teacher === assistant && row.教研组) {
-      groups.set(assistant, assistantTeachingGroup(row.教研组));
-    }
-  });
-  return groups;
 }
 
 function buildPublicTable(matchInfo: ReminderMatchInfo): PublicTable {
