@@ -99,7 +99,7 @@ const PERIOD_HIERARCHY_METRICS: readonly HierarchyMetricSpec[] = [
     rateColumn: "窗口期报告发送率",
     unsentColumn: "窗口期报告未发送数",
   },
-  ...["0819", "0805"].map((period) => ({
+  ...["0824", "0819", "0805"].map((period) => ({
     totalColumn: `阶段性报告应发送数${period}`,
     sentColumn: `阶段性报告已发送数${period}`,
     rateColumn: `阶段性报告发送率${period}`,
@@ -120,17 +120,22 @@ const PERIOD_ASSISTANT_COLUMNS = [
 ] as const;
 
 const PERIOD_RESEARCH_GROUP_COLUMNS = ["教研组", ...PERIOD_ASSISTANT_COLUMNS.slice(2)] as const;
-const PERIOD_GROUP_WIDTHS = [16, 18, 18, 16, 17, 20, 19, 18, 17, 17, 16, 13];
+const PERIOD_GROUP_WIDTHS = [16, 18, 18, 16, 17, 20, 19, 18, 17, 20, 19, 18, 17, 17, 16, 13];
 const GROUP_HEADER_LABELS = [
   { label: "窗口期报告", startColumn: 0, endColumn: 3 },
-  { label: "阶段性报告应发送情况（0806～0819结课）", startColumn: 4, endColumn: 7 },
-  { label: "阶段性报告应发送情况（0805前结课）", startColumn: 8, endColumn: 11 },
+  { label: "阶段性报告应发送情况（0824，0819之后结课）", startColumn: 4, endColumn: 7 },
+  { label: "阶段性报告应发送情况（0806～0819结课）", startColumn: 8, endColumn: 11 },
+  { label: "阶段性报告应发送情况（0805前结课）", startColumn: 12, endColumn: 15 },
 ] as const;
 const PERIOD_GROUP_COLUMN_LABELS = [
   "教研组",
   "窗口期报告应发送数",
   "窗口期报告已发送数",
   "窗口期报告发送率",
+  "阶段性报告应发送数",
+  "阶段性报告已发送数",
+  "阶段性报告发送率",
+  "阶段性报告申诉数",
   "阶段性报告应发送数",
   "阶段性报告已发送数",
   "阶段性报告发送率",
@@ -380,16 +385,16 @@ function transformSummary(found: FoundSheet, titleLabel: string, dataTime: strin
 }
 
 function periodRank(column: string) {
-  if (/窗口期报告/u.test(column)) return 0;
-  if (/阶段性报告.*0819/u.test(column)) return 1;
-  if (/阶段性报告.*0805/u.test(column)) return 2;
+  if (/^窗口期报告(?:应发送|已发送|发送率|未发送学生姓名)/u.test(column)) return 0;
+  const match = column.match(/^阶段性报告(?:应发送|已发送|发送率|未发送学生姓名)(?:数)?(0824|0819|0805)$/u);
+  if (match) return ["0824", "0819", "0805"].indexOf(match[1]) + 1;
   return -1;
 }
 
 function orderedSummaryColumns(columns: string[]) {
   return [
     ...columns.filter((column) => periodRank(column) < 0),
-    ...[0, 1, 2].flatMap((rank) => columns.filter((column) => periodRank(column) === rank)),
+    ...[0, 1, 2, 3].flatMap((rank) => columns.filter((column) => periodRank(column) === rank)),
   ];
 }
 
@@ -486,7 +491,7 @@ function buildPeriodHierarchyTeacherRows(teacherFound: FoundSheet, stageDetails:
   ["教师姓名", "教研组", "师训组长", "助理主管"].forEach((column) => {
     if (!source.columns.includes(column)) throw new Error(`教师维度缺少“${column}”列。`);
   });
-  const stageColumns = new Map(["0819", "0805"].map((period) => [period, {
+  const stageColumns = new Map(["0824", "0819", "0805"].map((period) => [period, {
     total: requiredPeriodColumn(source.columns, "总发送", period),
     sent: requiredPeriodColumn(source.columns, "已发送", period),
   }]));
@@ -660,6 +665,7 @@ function periodCode(found: FoundSheet) {
 
 function detailName(found: FoundSheet, index: number) {
   const code = periodCode(found);
+  if (code === "0824") return "0819之后结课阶段性报告明细";
   if (code === "0819") return "0805～0819结课阶段性报告明细";
   if (code === "0805") return "0805前结课阶段性报告明细";
   return `阶段性报告明细${index > 1 ? `第${index}批` : ""}`;
@@ -667,6 +673,7 @@ function detailName(found: FoundSheet, index: number) {
 
 function appealName(found: FoundSheet, index: number) {
   const code = periodCode(found);
+  if (code === "0824") return "0819之后结课阶段性报告分母申诉情况";
   if (code === "0819") return "0805～0819结课阶段性报告分母申诉情况";
   if (code === "0805") return "0805前结课阶段性报告分母申诉情况";
   return `阶段性报告申诉情况${index > 1 ? `第${index}批` : ""}`;
