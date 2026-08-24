@@ -1,11 +1,12 @@
 {
   "name": "checkin-quality-tool",
   "private": true,
-  "version": "2.7.0",
+  "version": "2.8.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test:stage-report-beautify": "rm -rf /tmp/checkin-stage-report-beautify-tests && npx tsc --ignoreConfig --target ES2022 --module ESNext --moduleResolution Bundler --outDir /tmp/checkin-stage-report-beautify-tests --skipLibCheck src/worker/stageReportBeautifyWriter.ts src/worker/stageReportHierarchy.ts src/worker/excelWriter.ts src/worker/progress.ts src/worker/whitelist.ts src/worker/utils.ts src/worker/types.ts src/lib/week.ts src/types/worker.ts src/worker/sheetjs.d.ts && perl -0pi -e 's/from \"(\\.\\/[^\".]+)\"/from \"$1.js\"/g' /tmp/checkin-stage-report-beautify-tests/worker/*.js && mkdir -p /tmp/checkin-stage-report-beautify-tests/scripts /tmp/checkin-stage-report-beautify-tests/node_modules && ln -s \"$PWD/node_modules/fflate\" /tmp/checkin-stage-report-beautify-tests/node_modules/fflate && cp scripts/stage-report-beautify.test.mjs /tmp/checkin-stage-report-beautify-tests/scripts/stage-report-beautify.test.mjs && node --test /tmp/checkin-stage-report-beautify-tests/scripts/stage-report-beautify.test.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test:checkin": "rm -rf /tmp/checkin-date-tests && npx tsc --ignoreConfig --target ES2022 --module ESNext --moduleResolution Bundler --outDir /tmp/checkin-date-tests --skipLibCheck src/worker/utils.ts src/worker/types.ts src/lib/week.ts src/types/worker.ts src/worker/sheetjs.d.ts && mkdir -p /tmp/checkin-date-tests/scripts && cp scripts/checkin-date.test.mjs /tmp/checkin-date-tests/scripts/checkin-date.test.mjs && node --test /tmp/checkin-date-tests/scripts/checkin-date.test.mjs",
