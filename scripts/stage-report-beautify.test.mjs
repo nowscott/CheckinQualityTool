@@ -100,9 +100,9 @@ test("公示版兼容 0824、0819、0805 三批数据及新版更新时间字段
     try {
       const check = spawnSync("unzip", ["-t", written.file], { encoding: "utf8" });
       assert.equal(check.status, 0, check.stderr || check.stdout);
-      assert.match(unzipText(written.file, "xl/workbook.xml"), /0819之后结课阶段性报告明细/u);
+      assert.match(unzipText(written.file, "xl/workbook.xml"), /剩余全部结课阶段性报告明细/u);
       const groupXml = unzipText(written.file, "xl/worksheets/sheet8.xml");
-      assert.match(groupXml, /阶段性报告应发送情况（0824，0819之后结课）/u);
+      assert.match(groupXml, /阶段性报告应发送情况（剩余全部结课）/u);
       assert.equal((groupXml.match(/阶段性报告应发送数/g) || []).length, 3);
       assert.match(unzipText(written.file, "xl/worksheets/sheet9.xml"), /阶段性报告应发送数0824/u);
     } finally {

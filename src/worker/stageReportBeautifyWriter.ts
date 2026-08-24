@@ -123,7 +123,7 @@ const PERIOD_RESEARCH_GROUP_COLUMNS = ["教研组", ...PERIOD_ASSISTANT_COLUMNS.
 const PERIOD_GROUP_WIDTHS = [16, 18, 18, 16, 17, 20, 19, 18, 17, 20, 19, 18, 17, 17, 16, 13];
 const GROUP_HEADER_LABELS = [
   { label: "窗口期报告", startColumn: 0, endColumn: 3 },
-  { label: "阶段性报告应发送情况（0824，0819之后结课）", startColumn: 4, endColumn: 7 },
+  { label: "阶段性报告应发送情况（剩余全部结课）", startColumn: 4, endColumn: 7 },
   { label: "阶段性报告应发送情况（0806～0819结课）", startColumn: 8, endColumn: 11 },
   { label: "阶段性报告应发送情况（0805前结课）", startColumn: 12, endColumn: 15 },
 ] as const;
@@ -665,7 +665,7 @@ function periodCode(found: FoundSheet) {
 
 function detailName(found: FoundSheet, index: number) {
   const code = periodCode(found);
-  if (code === "0824") return "0819之后结课阶段性报告明细";
+  if (code === "0824") return "剩余全部结课阶段性报告明细";
   if (code === "0819") return "0805～0819结课阶段性报告明细";
   if (code === "0805") return "0805前结课阶段性报告明细";
   return `阶段性报告明细${index > 1 ? `第${index}批` : ""}`;
@@ -673,7 +673,7 @@ function detailName(found: FoundSheet, index: number) {
 
 function appealName(found: FoundSheet, index: number) {
   const code = periodCode(found);
-  if (code === "0824") return "0819之后结课阶段性报告分母申诉情况";
+  if (code === "0824") return "剩余全部结课阶段性报告分母申诉情况";
   if (code === "0819") return "0805～0819结课阶段性报告分母申诉情况";
   if (code === "0805") return "0805前结课阶段性报告分母申诉情况";
   return `阶段性报告申诉情况${index > 1 ? `第${index}批` : ""}`;
