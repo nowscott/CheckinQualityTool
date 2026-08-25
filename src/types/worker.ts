@@ -21,7 +21,6 @@ export interface ResultSummary {
   chatFiles?: number;
   summaryFiles?: number;
   stageRows?: number;
-  windowRows?: number;
   teacherRows?: number;
   appealRows?: number;
   sheets?: number;

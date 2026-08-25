@@ -35,9 +35,7 @@ const STAGE_SENT_ALIASES = [
   "是否已发送（申诉+系统）",
   "是否已发送(申诉+系统)",
 ];
-const WINDOW_SENT_ALIASES = ["是否发送窗口期报告", "窗口期报告是否发送"];
 const STAGE_RATE_ALIASES = ["阶段性报告发送率", "非窗口期暑期在读阶段性报告发送率"];
-const WINDOW_RATE_ALIASES = ["窗口期报告发送率"];
 const STAGE_TOTAL_ALIASES = [
   "阶段性报告需发送",
   "阶段性报告需发送数",
@@ -54,9 +52,6 @@ const STAGE_SENT_COUNT_ALIASES = [
   "非窗口期暑期在读阶段性报告已发送",
   "非窗口期暑期在读阶段性报告已发送数",
 ];
-const WINDOW_TOTAL_ALIASES = ["窗口期报告需发送", "窗口期报告需发送数", "窗口期报告应发送", "窗口期报告应发送数"];
-const WINDOW_SENT_COUNT_ALIASES = ["窗口期报告已发送", "窗口期报告已发送数"];
-
 const ASSISTANT_COLUMNS = [
   "教研组",
   "师训主管/助理主管",
@@ -65,10 +60,6 @@ const ASSISTANT_COLUMNS = [
   "阶段性报告发送率",
   "阶段性报告未发送数",
   "阶段性报告申诉数",
-  "窗口期报告应发送数",
-  "窗口期报告已发送数",
-  "窗口期报告发送率",
-  "窗口期报告未发送数",
 ] as const;
 
 const RESEARCH_GROUP_COLUMNS = [
@@ -84,21 +75,9 @@ const HIERARCHY_METRICS: readonly HierarchyMetricSpec[] = [
     unsentColumn: "阶段性报告未发送数",
     appealColumn: "阶段性报告申诉数",
   },
-  {
-    totalColumn: "窗口期报告应发送数",
-    sentColumn: "窗口期报告已发送数",
-    rateColumn: "窗口期报告发送率",
-    unsentColumn: "窗口期报告未发送数",
-  },
 ];
 
 const PERIOD_HIERARCHY_METRICS: readonly HierarchyMetricSpec[] = [
-  {
-    totalColumn: "窗口期报告应发送数",
-    sentColumn: "窗口期报告已发送数",
-    rateColumn: "窗口期报告发送率",
-    unsentColumn: "窗口期报告未发送数",
-  },
   ...["0824", "0819", "0805"].map((period) => ({
     totalColumn: `阶段性报告应发送数${period}`,
     sentColumn: `阶段性报告已发送数${period}`,
@@ -120,18 +99,14 @@ const PERIOD_ASSISTANT_COLUMNS = [
 ] as const;
 
 const PERIOD_RESEARCH_GROUP_COLUMNS = ["教研组", ...PERIOD_ASSISTANT_COLUMNS.slice(2)] as const;
-const PERIOD_GROUP_WIDTHS = [16, 18, 18, 16, 17, 20, 19, 18, 17, 20, 19, 18, 17, 17, 16, 13];
+const PERIOD_GROUP_WIDTHS = [16, 17, 20, 19, 18, 17, 20, 19, 18, 17, 17, 16, 13];
 const GROUP_HEADER_LABELS = [
-  { label: "窗口期报告", startColumn: 0, endColumn: 3 },
-  { label: "阶段性报告应发送情况（剩余全部结课）", startColumn: 4, endColumn: 7 },
-  { label: "阶段性报告应发送情况（0806～0819结课）", startColumn: 8, endColumn: 11 },
-  { label: "阶段性报告应发送情况（0805前结课）", startColumn: 12, endColumn: 15 },
+  { label: "阶段性报告应发送情况（剩余全部结课）", startColumn: 0, endColumn: 4 },
+  { label: "阶段性报告应发送情况（0806～0819结课）", startColumn: 5, endColumn: 8 },
+  { label: "阶段性报告应发送情况（0805前结课）", startColumn: 9, endColumn: 12 },
 ] as const;
 const PERIOD_GROUP_COLUMN_LABELS = [
   "教研组",
-  "窗口期报告应发送数",
-  "窗口期报告已发送数",
-  "窗口期报告发送率",
   "阶段性报告应发送数",
   "阶段性报告已发送数",
   "阶段性报告发送率",
@@ -210,7 +185,7 @@ function latestUpdateTime(workbook: SheetJsWorkbook) {
     const rows = rowsForSheet(workbook, name);
     if (!rows.length) return;
     const updateColumns = rows[0]
-      .map((value, index) => /更新时间/u.test(text(value)) ? index : -1)
+      .map((value, index) => /阶段性报告.*更新时间/u.test(text(value)) ? index : -1)
       .filter((index) => index >= 0);
     rows.slice(1).forEach((row) => {
       updateColumns.forEach((columnIndex) => {
@@ -242,7 +217,7 @@ function findSheet(
   if (!candidates.length) {
     const sheetNames = workbook.SheetNames.length ? workbook.SheetNames.join("、") : "无";
     throw new Error(
-      `公示版整理失败：找不到${description}。${expected}。当前工作表：${sheetNames}。请上传窗口期与非窗口期原始表单，不要上传已生成的公示版。`,
+      `公示版整理失败：找不到${description}。${expected}。当前工作表：${sheetNames}。请上传阶段性报告原始表单，不要上传已生成的公示版。`,
     );
   }
   return candidates.find((sheet) => namePattern?.test(sheet.name)) || candidates[0];
@@ -257,7 +232,7 @@ function findDetailSheet(workbook: SheetJsWorkbook, sentAliases: readonly string
     workbook,
     (headers) => ["教师姓名", "学生姓名", "学号"].every((header) => headers.includes(header)) && hasAny(headers, sentAliases),
     namePattern,
-    namePattern.test("窗口期报告发送明细") ? "窗口期报告明细" : "阶段性报告明细",
+    "阶段性报告明细",
     `需要“教师姓名、学生姓名、学号”以及发送结果列（支持：${sentAliases.join("、")}）`,
   );
 }
@@ -266,22 +241,16 @@ function findSummarySheet(workbook: SheetJsWorkbook, key: "teacher" | "training"
   const pattern = key === "teacher" ? /教师维度/u : /组长维度/u;
   return findSheet(
     workbook,
-    (headers) => headers.includes(key === "teacher" ? "教师姓名" : "师训组长") &&
-      hasStageTotal(headers) && hasWindowTotal(headers),
+    (headers) => headers.includes(key === "teacher" ? "教师姓名" : "师训组长") && hasStageTotal(headers),
     pattern,
     key === "teacher" ? "教师维度汇总" : "师训组长维度汇总",
-    `需要身份列以及阶段性、窗口期报告的需发送数和已发送数列`,
+    `需要身份列以及阶段性报告的需发送数和已发送数列`,
   );
 }
 
 function hasStageTotal(headers: string[]) {
   return hasAny(headers, STAGE_TOTAL_ALIASES) || headers.some((header) => /^阶段性报告[需应]发送(?:数)?\d{4}$/u.test(header));
 }
-
-function hasWindowTotal(headers: string[]) {
-  return hasAny(headers, WINDOW_TOTAL_ALIASES) || headers.some((header) => /^窗口期报告[需应]发送(?:数)?\d{4}$/u.test(header));
-}
-
 function hasPeriodStageMetrics(headers: string[]) {
   return headers.some((header) => /^阶段性报告(?:[需应]发送|已发送|发送率)(?:数)?\d{4}$/u.test(header));
 }
@@ -358,7 +327,7 @@ function requiredColumn(columns: string[], aliases: readonly string[], label: st
 
 function transformSummary(found: FoundSheet, titleLabel: string, dataTime: string) {
   const { columns: sourceColumns, rows: sourceRows } = rowObjects(found);
-  const columns = orderedSummaryColumns(sourceColumns.filter((column) => !/是否达标/u.test(column)));
+  const columns = orderedSummaryColumns(sourceColumns.filter((column) => !/是否达标|窗口期报告|窗口期数据/u.test(column)));
 
   const rows = sourceRows.map((source) => {
     const row: DataRow = { ...source };
@@ -378,23 +347,22 @@ function transformSummary(found: FoundSheet, titleLabel: string, dataTime: strin
   });
   return {
     name: titleLabel,
-    title: `阶段性报告与窗口期报告发送率【${titleLabel}】（数据时间 ${dataTime}）`,
+    title: `阶段性报告发送率【${titleLabel}】（数据时间 ${dataTime}）`,
     rows,
     columns,
   };
 }
 
 function periodRank(column: string) {
-  if (/^窗口期报告(?:应发送|已发送|发送率|未发送学生姓名)/u.test(column)) return 0;
   const match = column.match(/^阶段性报告(?:应发送|已发送|发送率|未发送学生姓名)(?:数)?(0824|0819|0805)$/u);
-  if (match) return ["0824", "0819", "0805"].indexOf(match[1]) + 1;
+  if (match) return ["0824", "0819", "0805"].indexOf(match[1]);
   return -1;
 }
 
 function orderedSummaryColumns(columns: string[]) {
   return [
     ...columns.filter((column) => periodRank(column) < 0),
-    ...[0, 1, 2, 3].flatMap((rank) => columns.filter((column) => periodRank(column) === rank)),
+    ...[0, 1, 2].flatMap((rank) => columns.filter((column) => periodRank(column) === rank)),
   ];
 }
 
@@ -420,8 +388,6 @@ function buildHierarchyTeacherRows(teacherFound: FoundSheet, stageDetailRows: Da
   const source = rowObjects(teacherFound);
   const stageTotalColumn = requiredColumn(source.columns, STAGE_TOTAL_ALIASES, "阶段性报告需发送");
   const stageSentColumn = requiredColumn(source.columns, STAGE_SENT_COUNT_ALIASES, "阶段性报告已发送");
-  const windowTotalColumn = requiredColumn(source.columns, WINDOW_TOTAL_ALIASES, "窗口期报告需发送");
-  const windowSentColumn = requiredColumn(source.columns, WINDOW_SENT_COUNT_ALIASES, "窗口期报告已发送");
   ["教师姓名", "教研组", "师训组长", "助理主管"].forEach((column) => {
     if (!source.columns.includes(column)) throw new Error(`教师维度缺少“${column}”列。`);
   });
@@ -436,8 +402,6 @@ function buildHierarchyTeacherRows(teacherFound: FoundSheet, stageDetailRows: Da
       阶段性报告应发送数: numericCount(row[stageTotalColumn]),
       阶段性报告已发送数: numericCount(row[stageSentColumn]),
       阶段性报告申诉数: 0,
-      窗口期报告应发送数: numericCount(row[windowTotalColumn]),
-      窗口期报告已发送数: numericCount(row[windowSentColumn]),
     }));
 
   const exactIndex = new Map<string, number[]>();
@@ -466,8 +430,6 @@ function buildHierarchyTeacherRows(teacherFound: FoundSheet, stageDetailRows: Da
       阶段性报告应发送数: 0,
       阶段性报告已发送数: 0,
       阶段性报告申诉数: 1,
-      窗口期报告应发送数: 0,
-      窗口期报告已发送数: 0,
     };
     const fallbackIndex = rows.length;
     rows.push(fallback);
@@ -486,8 +448,6 @@ function requiredPeriodColumn(columns: string[], kind: "总发送" | "已发送"
 
 function buildPeriodHierarchyTeacherRows(teacherFound: FoundSheet, stageDetails: FoundSheet[]) {
   const source = rowObjects(teacherFound);
-  const windowTotalColumn = requiredColumn(source.columns, WINDOW_TOTAL_ALIASES, "窗口期报告需发送");
-  const windowSentColumn = requiredColumn(source.columns, WINDOW_SENT_COUNT_ALIASES, "窗口期报告已发送");
   ["教师姓名", "教研组", "师训组长", "助理主管"].forEach((column) => {
     if (!source.columns.includes(column)) throw new Error(`教师维度缺少“${column}”列。`);
   });
@@ -502,8 +462,6 @@ function buildPeriodHierarchyTeacherRows(teacherFound: FoundSheet, stageDetails:
       教研组: row.教研组,
       师训组长: row.师训组长,
       助理主管: row.助理主管,
-      窗口期报告应发送数: numericCount(row[windowTotalColumn]),
-      窗口期报告已发送数: numericCount(row[windowSentColumn]),
       ...Object.fromEntries([...stageColumns].flatMap(([period, columns]) => [
         [`阶段性报告应发送数${period}`, numericCount(row[columns.total])],
         [`阶段性报告已发送数${period}`, numericCount(row[columns.sent])],
@@ -554,7 +512,7 @@ function hierarchyCellStyle(row: DataRow, column: string, baseStyle: number) {
 }
 
 function detailCellStyle(row: DataRow, column: string, baseStyle: number) {
-  if (hasAny([column], [...STAGE_SENT_ALIASES, ...WINDOW_SENT_ALIASES])) {
+  if (hasAny([column], STAGE_SENT_ALIASES)) {
     return text(row[column]) === "是" ? STYLE.sent : STYLE.unsent;
   }
   return baseStyle;
@@ -577,7 +535,7 @@ function summaryWidths(columns: readonly string[]) {
     else if (/负责人/u.test(column)) result[column] = 44;
     else if (/教研组/u.test(column)) result[column] = 24;
     else if (/姓名|组长|主管/u.test(column)) result[column] = 20;
-    else if (/^(?:窗口期报告|阶段性报告).*(?:应发送|已发送|发送率|未发送|申诉).*$/u.test(column)) result[column] = 24;
+    else if (/^阶段性报告.*(?:应发送|已发送|发送率|未发送|申诉).*$/u.test(column)) result[column] = 24;
     else if (isRateColumn(column) || isStatusColumn(column)) result[column] = 20;
     else if (isCountColumn(column)) result[column] = 18;
     else if (/更新时间/u.test(column)) result[column] = 24;
@@ -620,7 +578,7 @@ function makeHierarchySheet(
   if (groupedHeaders) columns.forEach((column, index) => { widths[column] = PERIOD_GROUP_WIDTHS[index] || widths[column]; });
   return {
     name,
-    title: `阶段性报告与窗口期报告发送率【${name}】（数据时间 ${dataTime}）`,
+    title: `阶段性报告发送率【${name}】（数据时间 ${dataTime}）`,
     rows: table.rows,
     columns,
     widths,
@@ -704,9 +662,7 @@ function buildPeriodReportOutput(workbook: SheetJsWorkbook, dataTime: string) {
   const assistant = buildAssistantHierarchy(hierarchyTeacherRows, PERIOD_HIERARCHY_METRICS);
   const training = transformSummary(findSummarySheet(workbook, "training"), "师训组长维度", dataTime);
   const teacher = transformSummary(teacherFound, "教师维度", dataTime);
-  const windowDetail = findDetailSheet(workbook, WINDOW_SENT_ALIASES, /窗口期报告发送明细/u);
   const sheets: SheetDefinition[] = [
-    makeDetailSheet("窗口期报告明细", windowDetail),
     ...stageDetails.map((detail, index) => makeDetailSheet(detailName(detail, index + 1), detail)),
     ...appeals.map((appeal, index) => ({
       name: appealName(appeal, index + 1),
@@ -731,7 +687,6 @@ function buildPeriodReportOutput(workbook: SheetJsWorkbook, dataTime: string) {
     dataTime,
     counts: {
       stageRows: stageDetails.reduce((total, detail) => total + rowObjects(detail).rows.length, 0),
-      windowRows: rowObjects(windowDetail).rows.length,
       teacherRows: teacher.rows.length,
       appealRows: appeals.reduce((total, appeal) => total + rowObjects(appeal).rows.length, 0),
       sheets: sheets.length,
@@ -745,7 +700,6 @@ export function buildStageReportBeautifyOutput(workbook: SheetJsWorkbook) {
     return buildPeriodReportOutput(workbook, dataTime);
   }
   const stageDetail = findDetailSheet(workbook, STAGE_SENT_ALIASES, /非窗口期|暑期在读|阶段性报告发送明细/u);
-  const windowDetail = findDetailSheet(workbook, WINDOW_SENT_ALIASES, /窗口期报告发送明细/u);
   const teacherFound = findSummarySheet(workbook, "teacher");
   const teacher = transformSummary(teacherFound, "教师维度", dataTime);
   const training = transformSummary(findSummarySheet(workbook, "training"), "师训组长维度", dataTime);
@@ -756,7 +710,6 @@ export function buildStageReportBeautifyOutput(workbook: SheetJsWorkbook) {
   const appeal = rowObjects(findAppealSheet(workbook));
   const sheets: SheetDefinition[] = [
     makeDetailSheet("阶段性报告明细", stageDetail),
-    makeDetailSheet("窗口期报告明细", windowDetail),
     {
       name: "阶段性报告申诉情况",
       title: `阶段性报告申诉情况（数据时间 ${dataTime}）`,
@@ -781,7 +734,6 @@ export function buildStageReportBeautifyOutput(workbook: SheetJsWorkbook) {
     dataTime,
     counts: {
       stageRows: stageDetailRows.length,
-      windowRows: rowObjects(windowDetail).rows.length,
       teacherRows: teacher.rows.length,
       appealRows: appeal.rows.length,
       sheets: sheets.length,
