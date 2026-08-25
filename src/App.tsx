@@ -357,7 +357,7 @@ export default function App() {
         updateStatus(
           "stageReportPublish",
           "处理完成，结果已下载",
-          `已整理 ${Number(data.summary.stageRows || 0).toLocaleString()} 条阶段性报告明细、${Number(data.summary.windowRows || 0).toLocaleString()} 条窗口期明细，${Number(data.summary.teacherRows || 0).toLocaleString()} 条教师汇总；输出 ${Number(data.summary.sheets || 0).toLocaleString()} 个 Sheet。`,
+          `已整理 ${Number(data.summary.stageRows || 0).toLocaleString()} 条阶段性报告明细、${Number(data.summary.teacherRows || 0).toLocaleString()} 条教师汇总；输出 ${Number(data.summary.sheets || 0).toLocaleString()} 个 Sheet。`,
           100,
           "done",
         );
@@ -395,7 +395,7 @@ export default function App() {
             activeMode === "reminder"
               ? "上传开课提醒学员明细名单与聊天质检汇总文件，在浏览器本地计算教师及以上维度触达完成率。文件不会上传服务器。"
               : activeMode === "stageReport"
-                ? "核验阶段性报告发送情况，或将窗口期与非窗口期原始表单整理为统一公示版。文件不会上传服务器。"
+                ? "核验阶段性报告发送情况，或将阶段性报告原始表单整理为统一公示版。文件不会上传服务器。"
                 : undefined
           }
           showGuide={activeMode === "checkin"}
@@ -423,7 +423,7 @@ export default function App() {
               onClick={handleNavigationClick}
             >
               <strong>公示版整理</strong>
-              <small>窗口期＋非窗口期原始表单</small>
+              <small>阶段性报告原始表单</small>
             </a>
           </nav>
         ) : null}

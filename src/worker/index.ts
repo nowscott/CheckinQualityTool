@@ -212,14 +212,13 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       progress("原始表单读取完成", "已识别明细、管理汇总与申诉工作表，开始整理公示版。", 74);
       const output = buildStageReportBeautifyOutput(sourceWorkbook);
       progress("正在生成公示版 Excel", "统一标题、列宽、冻结表头、发送率数据条及完成状态颜色。", 90);
-      postComplete(output.chunks, `窗口期报告+非窗口期暑期在读阶段性报告明细（${output.dataTime}）.xlsx`, {
+      postComplete(output.chunks, `非窗口期暑期在读阶段性报告明细（${output.dataTime}）.xlsx`, {
         mode: "stageReportBeautify",
         targets: output.counts.stageRows,
         sent: 0,
         unsent: 0,
         cleanChats: 0,
         stageRows: output.counts.stageRows,
-        windowRows: output.counts.windowRows,
         teacherRows: output.counts.teacherRows,
         appealRows: output.counts.appealRows,
         sheets: output.counts.sheets,
