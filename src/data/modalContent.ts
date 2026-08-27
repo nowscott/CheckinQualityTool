@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.8.3",
+    date: "2026-08-27",
+    items: [
+      "公示版第一批阶段性报告明细和申诉 Sheet 改名为“0820之后结课”，教研组汇总标题同步改为“0820后结课”。",
+    ],
+  },
+  {
     version: "v2.8.2",
     date: "2026-08-25",
     items: [
