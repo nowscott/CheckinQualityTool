@@ -101,10 +101,11 @@ test("公示版兼容 0824、0819、0805 三批数据及新版更新时间字段
       const check = spawnSync("unzip", ["-t", written.file], { encoding: "utf8" });
       assert.equal(check.status, 0, check.stderr || check.stdout);
       const workbookXml = unzipText(written.file, "xl/workbook.xml");
-      assert.match(workbookXml, /剩余全部结课阶段性报告明细/u);
+      assert.match(workbookXml, /0820之后结课阶段性报告明细/u);
+      assert.match(workbookXml, /0820之后结课阶段性报告分母申诉情况/u);
       assert.doesNotMatch(workbookXml, /窗口期报告/u);
       const groupXml = unzipText(written.file, "xl/worksheets/sheet7.xml");
-      assert.match(groupXml, /阶段性报告应发送情况（剩余全部结课）/u);
+      assert.match(groupXml, /阶段性报告应发送情况（0820后结课）/u);
       assert.equal((groupXml.match(/阶段性报告应发送数/g) || []).length, 3);
       assert.match(groupXml, /<mergeCell ref="A2:E2"\/>/u);
       assert.match(groupXml, /<mergeCell ref="F2:I2"\/>/u);
