@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.8.4",
+    date: "2026-08-30",
+    items: [
+      "新增肖恩课时包的“肖雅晴”别名规则，支持按实际群聊名称匹配。",
+    ],
+  },
+  {
     version: "v2.8.3",
     date: "2026-08-27",
     items: [
