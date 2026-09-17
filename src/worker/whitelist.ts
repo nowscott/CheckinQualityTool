@@ -97,11 +97,10 @@ export function findPreCleanWhitelistEntry(
   originalStudentName: string,
   whitelist: Whitelist,
 ) {
-  return (
-    (studentId && whitelist.byStudentId.get(normalizeMatchText(studentId))) ||
-    whitelist.byOriginalStudentName.get(normalizeMatchText(originalStudentName)) ||
-    null
-  );
+  const byStudentId = studentId && whitelist.byStudentId.get(normalizeMatchText(studentId));
+  if (byStudentId) return byStudentId;
+  const byName = whitelist.byOriginalStudentName.get(normalizeMatchText(originalStudentName));
+  return byName?.处理方式 === "剔除" ? null : byName || null;
 }
 
 export function findWhitelistEntry(target: TargetRow, whitelist: Whitelist) {
