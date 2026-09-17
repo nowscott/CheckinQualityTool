@@ -1,5 +1,13 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.8.5",
+    date: "2026-09-17",
+    items: [
+      "新增黄晓琳课时包的“袁梓宁”别名规则，并按学员号关联。",
+      "新增黄慧童学员号的打卡分母剔除规则。",
+    ],
+  },
+  {
     version: "v2.8.4",
     date: "2026-08-30",
     items: [

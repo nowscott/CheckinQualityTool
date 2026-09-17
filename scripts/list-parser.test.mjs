@@ -10,6 +10,7 @@ globalThis.XLSX = {
 };
 
 const { buildTargets } = await import("../worker/listParser.js");
+const { buildWhitelist } = await import("../worker/whitelist.js");
 const workbookWithSheets = (value) => value;
 
 test("完整课次时间表头优先选择含真实老师邮箱的课堂反馈 Sheet", () => {
@@ -85,4 +86,27 @@ test("教师邮箱为空时不按同名教师和学员自动合并", () => {
   }));
   assert.equal(result.targets.length, 2);
   assert.equal(result.counts.未自动合并教师邮箱为空, 2);
+});
+
+test("剔除白名单按学员号从打卡分母移除，不误伤同名学员", () => {
+  const whitelist = buildWhitelist([
+    "学员号,学员姓名,处理方式,匹配别名,说明",
+    "GZ2086833119,黄慧童,剔除,,按学员号从打卡质检分母中剔除",
+  ].join("\n"));
+  const result = buildTargets(workbookWithSheets({
+    SheetNames: ["名单"],
+    Sheets: {
+      名单: {
+        rows: [
+          ["老师姓名", "学员姓名", "学员号", "课次开始时间", "课次结束时间", "老师邮箱"],
+          ["张老师", "黄慧童", "GZ2086833119", "2026-07-20 10:20", "2026-07-20 12:20", "teacher@xdf.cn"],
+          ["张老师", "黄慧童", "GZ-other", "2026-07-21 10:20", "2026-07-21 12:20", "teacher@xdf.cn"],
+        ],
+      },
+    },
+  }), whitelist);
+  assert.equal(result.targets.length, 1);
+  assert.equal(result.targets[0].学员号, "GZ-other");
+  assert.equal(result.counts.剔除白名单课次, 1);
+  assert.equal(result.counts.合并的重复课次, 0);
 });

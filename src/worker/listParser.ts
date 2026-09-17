@@ -123,6 +123,7 @@ export function buildTargets(workbook: SheetJsWorkbook, whitelist?: Whitelist): 
     名单教师邮箱为空: 0,
     姓名已清洗课次: 0,
     姓名不足两字课次: 0,
+    剔除白名单课次: 0,
     去重后质检人数: 0,
     合并的重复课次: 0,
     未自动合并教师邮箱为空: 0,
@@ -144,6 +145,10 @@ export function buildTargets(workbook: SheetJsWorkbook, whitelist?: Whitelist): 
     const teacherEmail = emailValue(row[columns.email]);
     if (!teacher || !studentName.original) {
       counts.跳过教师或学员为空 += 1;
+      continue;
+    }
+    if (whitelistEntry?.处理方式 === "剔除") {
+      counts.剔除白名单课次 += 1;
       continue;
     }
     if (studentNote) counts.姓名已清洗课次 += 1;
@@ -191,6 +196,6 @@ export function buildTargets(workbook: SheetJsWorkbook, whitelist?: Whitelist): 
   );
   counts.去重后质检人数 = targets.length;
   counts.合并的重复课次 =
-    counts.原始课次行数 - targets.length - counts.跳过教师或学员为空;
+    counts.原始课次行数 - targets.length - counts.跳过教师或学员为空 - counts.剔除白名单课次;
   return { targets, counts, weekCounts, sheetName: found.name };
 }
