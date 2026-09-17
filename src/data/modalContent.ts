@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.8.6",
+    date: "2026-09-17",
+    items: [
+      "修复 Vercel 生产环境根路径未正确打开应用的问题。",
+    ],
+  },
+  {
     version: "v2.8.5",
     date: "2026-09-17",
     items: [
