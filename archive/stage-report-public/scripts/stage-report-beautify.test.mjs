@@ -11,12 +11,12 @@ globalThis.XLSX = {
   SSF: { parse_date_code: () => null },
 };
 
-const { buildStageReportBeautifyOutput } = await import("../worker/stageReportBeautifyWriter.js");
+const { buildStageReportBeautifyOutput } = await import("../../../src/archive/stage-report-public/worker/stageReportBeautifyWriter.js");
 
 const stageHeaders = [
   "教师姓名", "学生姓名", "学号", "暑假最后一节课时间", "师训组长", "助理主管", "教研组",
   "是否发送阶段性报告（系统数据）", "是否申诉", "申诉情况详情", "是否需要发送",
-  "数据变动时间（并非最终导入数据时间）", "申诉是否生效", "是否已发送（申诉+系统）",
+  "数据变动时间（并非最终导入数据时间）", "阶段性报告数据更新时间", "是否通知", "申诉是否生效", "是否已发送（申诉+系统）",
 ];
 const appealHeaders = ["教师姓名", "学生姓名", "申诉情况说明", "申诉情况详情", "相关截图上传处"];
 const teacherHeaders = [
@@ -50,7 +50,7 @@ function fixtureWorkbook({ newDetailOrder, windowUpdateHeader }) {
   const detailValues = {
     教师姓名: "张老师", 学生姓名: "陈一", 学号: "GZ1", 暑假最后一节课时间: "2026-08-24 10:00-12:00",
     师训组长: "组长", 助理主管: "主管", 教研组: "高中双语", "是否发送阶段性报告（系统数据）": "是",
-    "是否已发送（申诉+系统）": "是",
+    "是否已发送（申诉+系统）": "是", "阶段性报告数据更新时间": "2026-08-25 00:22", "是否通知": "是",
   };
   add("窗口期报告发送明细", ["教师姓名", "学生姓名", "学号", "师训组长", "助理主管", "是否发送窗口期报告", "数据变动时间（并非最终导入数据时间）"], [
     ["张老师", "陈一", "GZ1", "组长", "主管", "是", "2026-08-25 00:20"],
@@ -104,6 +104,8 @@ test("公示版兼容 0824、0819、0805 三批数据及新版更新时间字段
       assert.match(workbookXml, /0820之后结课阶段性报告明细/u);
       assert.match(workbookXml, /0820之后结课阶段性报告分母申诉情况/u);
       assert.doesNotMatch(workbookXml, /窗口期报告/u);
+      const sheetXml = Array.from({ length: 10 }, (_, index) => unzipText(written.file, `xl/worksheets/sheet${index + 1}.xml`)).join("\n");
+      assert.doesNotMatch(sheetXml, /数据变动时间|阶段性报告数据更新时间|是否通知|是否已通知/u);
       const groupXml = unzipText(written.file, "xl/worksheets/sheet7.xml");
       assert.match(groupXml, /阶段性报告应发送情况（0820后结课）/u);
       assert.equal((groupXml.match(/阶段性报告应发送数/g) || []).length, 3);

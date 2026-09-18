@@ -11,19 +11,11 @@ export interface ProcessingStatus {
 }
 
 export interface ResultSummary {
-  mode?: "checkin" | "reminder" | "stageReport" | "stageReportBeautify";
   targets: number;
   sent: number;
   unsent: number;
   exempt?: number;
   cleanChats: number;
-  exceptions?: number;
-  chatFiles?: number;
-  summaryFiles?: number;
-  stageRows?: number;
-  teacherRows?: number;
-  appealRows?: number;
-  sheets?: number;
 }
 
 export type WorkerResponse =

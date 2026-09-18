@@ -1,5 +1,5 @@
-import type { DataRow } from "./types";
-import { normalizeMatchText, text } from "./utils";
+import type { DataRow } from "../../../worker/types";
+import { normalizeMatchText, text } from "../../../worker/utils";
 import { reminderProjectGroup } from "./reminderProjectGroup";
 
 export interface HierarchyMetricSpec {
@@ -60,11 +60,16 @@ export function assistantTeachingGroup(value: unknown) {
   if (project !== "文理综项目") return group;
   if (compact.includes("实验P")) return "实验P";
   if (compact.includes("实验C")) return "实验C";
-  return "政史地生";
+  if (compact.includes("实验B")) return "实验B";
+  if (compact.includes("博文H")) return "博文H";
+  if (compact.includes("博文Z")) return "博文Z";
+  if (compact.includes("博文G")) return "博文G";
+  if (/(政史地生|政史地|史地生)/u.test(compact)) return "政史地生";
+  return group;
 }
 
 export function assistantTeachingGroupCompare(a: string, b: string) {
-  const order = ["实验P", "实验C", "政史地生"];
+  const order = ["实验P", "实验C", "实验B", "博文H", "博文Z", "博文G", "政史地生"];
   const ai = order.indexOf(a);
   const bi = order.indexOf(b);
   if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || compareText(a, b);
@@ -127,7 +132,7 @@ export function assistantOwnTeachingGroups(teacherRows: DataRow[]) {
   teacherRows.forEach((row) => {
     const teacher = normalizePersonName(row.教师姓名);
     const assistant = normalizePersonName(row.助理主管);
-    if (teacher && assistant && teacher === assistant && row.教研组) {
+    if (teacher && assistant && teacher === assistant && row.教研组 && projectForResearchGroup(row.教研组) !== "文理综项目") {
       groups.set(assistant, assistantTeachingGroup(row.教研组));
     }
   });
@@ -147,7 +152,9 @@ export function buildAssistantHierarchy(
   const ownGroups = assistantOwnTeachingGroups(teacherRows);
   teacherRows.forEach((row) => {
     const assistant = text(row.助理主管) || "未填写";
-    const group = ownGroups.get(normalizePersonName(assistant)) || assistantTeachingGroup(row.教研组);
+    const group = projectForResearchGroup(row.教研组) === "文理综项目"
+      ? assistantTeachingGroup(row.教研组)
+      : ownGroups.get(normalizePersonName(assistant)) || assistantTeachingGroup(row.教研组);
     const project = projectForResearchGroup(group);
     if (!grouped.has(project)) grouped.set(project, new Map());
     const groups = grouped.get(project)!;

@@ -161,68 +161,6 @@ h1 { margin: 0; font-family: var(--serif); font-size: clamp(42px, 5vw, 62px); li
   white-space: nowrap;
 }
 .logic-button:hover { color: white; border-color: var(--green); background: var(--green); }
-.tool-nav {
-  width: min(540px, 100%);
-  margin-top: 16px;
-  padding: 3px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: 1px solid var(--line);
-  background: var(--field);
-}
-.tool-nav a {
-  min-height: 44px;
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--green);
-  font-size: 14px;
-  font-weight: 700;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.tool-nav a:hover,
-.tool-nav a.active {
-  color: white;
-  background: var(--green);
-}
-.tool-nav a:focus-visible,
-.stage-report-tabs a:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.stage-report-tabs {
-  margin: -8px 0 14px;
-  padding: 3px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  border: 1px solid var(--line);
-  background: var(--field);
-}
-.stage-report-tabs a {
-  min-width: 0;
-  min-height: 58px;
-  padding: 8px 14px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-  text-align: center;
-  text-decoration: none;
-}
-.stage-report-tabs a:hover {
-  color: var(--green);
-  background: var(--green-soft);
-}
-.stage-report-tabs a.active {
-  color: white;
-  background: var(--green);
-}
-.stage-report-tabs strong { font-size: 15px; }
-.stage-report-tabs small { margin-top: 4px; opacity: .76; font-size: 11px; }
-.stage-report-tabs a.active small { opacity: .86; }
 .card, .status-card, .output-grid article {
   border: 1px solid var(--line);
   background: var(--card-translucent);
@@ -231,25 +169,6 @@ h1 { margin: 0; font-family: var(--serif); font-size: clamp(42px, 5vw, 62px); li
 .card { padding: 18px; }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .grid > * { min-width: 0; }
-.beautify-note {
-  min-height: 138px;
-  padding: 16px;
-  border: 1px solid var(--green-line);
-  background: var(--green-soft);
-}
-.beautify-note strong { display: block; margin-top: 13px; font-size: 19px; }
-.beautify-note p { margin: 6px 0 0; color: var(--muted); line-height: 1.55; }
-.beautify-note .rules { margin-bottom: 0; }
-.reminder-upload-layout {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-.reminder-upload-column {
-  min-width: 0;
-  display: grid;
-  gap: 14px;
-}
 .upload {
   position: relative;
   min-width: 0;
@@ -375,7 +294,6 @@ h1 { margin: 0; font-family: var(--serif); font-size: clamp(42px, 5vw, 62px); li
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .switch-row small { display: block; margin-top: 4px; color: var(--muted); line-height: 1.4; }
 .switch-row input { width: 46px; height: 24px; accent-color: var(--accent); }
-.reminder-options { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .rules { display: flex; align-items: center; gap: 7px; margin: 14px 0; color: var(--muted); font-size: 11px; }
 .rules span { margin-right: 5px; color: var(--ink); font-weight: 700; }
 .rules b { padding: 4px 8px; color: var(--green); border: 1px solid var(--green-line); font-weight: 500; }
@@ -551,8 +469,6 @@ button small { opacity: .78; }
   .subtitle { margin-top: 18px; font-size: 16px; line-height: 1.7; }
   .card { padding: 22px; }
   .grid { gap: 16px; }
-  .reminder-upload-layout,
-  .reminder-upload-column { gap: 16px; }
   .upload { min-height: 160px; padding: 20px; }
   .upload-copy { margin-top: 18px; }
   .upload-copy strong { font-size: 19px; line-height: 1.35; }
@@ -584,10 +500,6 @@ button small { opacity: .78; }
   header { margin-bottom: 34px; }
   h1 { font-size: clamp(42px, 12vw, 58px); line-height: 1.08; }
   .subtitle { margin-top: 20px; font-size: 17px; line-height: 1.8; }
-  .tool-nav { width: 100%; margin-top: 18px; }
-  .tool-nav a { padding-inline: 6px; font-size: 13px; }
-  .stage-report-tabs { margin-top: -18px; }
-  .stage-report-tabs a { min-height: 68px; padding-inline: 8px; }
   .header-controls {
     position: static;
     display: flex;
@@ -601,9 +513,8 @@ button small { opacity: .78; }
     position: static;
   }
   .card { padding: 16px; }
-  .grid, .reminder-upload-layout, .options, .output-grid { grid-template-columns: 1fr; }
+  .grid, .options, .output-grid { grid-template-columns: 1fr; }
   .upload { min-height: 168px; }
-  .beautify-note { min-height: 168px; padding: 18px; }
   .upload-copy { margin-top: 20px; }
   .upload-copy strong { font-size: 19px; line-height: 1.35; }
   .upload-copy small { margin-top: 6px; line-height: 1.55; }

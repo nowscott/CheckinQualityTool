@@ -6,22 +6,8 @@ import { buildOutput } from "./excelWriter";
 import { buildTargets } from "./listParser";
 import { matchData } from "./matching";
 import { progress } from "./progress";
-import { buildReminderAppeals } from "./reminderAppealParser";
-import { buildReminderOutput } from "./reminderExcelWriter";
-import { buildReminderTargets } from "./reminderListParser";
-import { matchReminderData } from "./reminderMatching";
-import {
-  applyReminderTouchSummary,
-  mergeReminderTouchInfos,
-  parseReminderTouchSummary,
-  type ReminderTouchInfo,
-} from "./reminderTouchSummary";
 import { ensureSheetJs } from "./sheetJsLoader";
-import { buildStageReportDingTalkOutput } from "./stageReportDingTalkWriter";
-import { buildStageReportBeautifyOutput } from "./stageReportBeautifyWriter";
-import { buildStageReportTargets } from "./stageReportListParser";
-import { matchStageReportData } from "./stageReportMatching";
-import type { ChatInfo, WorkerRequest } from "./types";
+import type { WorkerRequest } from "./types";
 import type { ResultSummary } from "../types/worker";
 import { inferServiceWeek } from "./utils";
 import { buildWhitelist } from "./whitelist";
@@ -32,71 +18,6 @@ interface WorkerScope {
 }
 
 const workerScope = self as unknown as WorkerScope;
-
-function mergeChatInfos(infos: ChatInfo[]): ChatInfo {
-  const counts: ChatInfo["counts"] = {};
-  infos.forEach((info) => {
-    Object.entries(info.counts).forEach(([key, value]) => {
-      counts[key] = (counts[key] || 0) + value;
-    });
-  });
-  return {
-    chats: infos.flatMap((info) => info.chats),
-    counts,
-    sheetName: infos.map((info) => info.sheetName).join("；"),
-  };
-}
-
-function emptyChatInfo(): ChatInfo {
-  return {
-    chats: [],
-    counts: {
-      原始聊天行数: 0,
-      清洗后聊天行数: 0,
-    },
-    sheetName: "",
-  };
-}
-
-async function readSummaryFiles(files: File[], stageStart: number, stageEnd: number): Promise<ReminderTouchInfo> {
-  if (!files.length) throw new Error("请至少上传 1 个聊天质检汇总文件。");
-  const infos: ReminderTouchInfo[] = [];
-  for (let index = 0; index < files.length; index += 1) {
-    const summaryFile = files[index];
-    const fileStart = stageStart + Math.floor((index * (stageEnd - stageStart)) / files.length);
-    const fileEnd = stageStart + Math.floor(((index + 1) * (stageEnd - stageStart)) / files.length);
-    const workbook = await readWorkbook(
-      summaryFile,
-      fileStart,
-      fileEnd,
-      `聊天汇总 ${index + 1}/${files.length}`,
-    );
-    infos.push(parseReminderTouchSummary(workbook, summaryFile.name));
-  }
-  return mergeReminderTouchInfos(infos);
-}
-
-async function readChatFiles(files: File[], stageStart: number, stageEnd: number): Promise<ChatInfo> {
-  if (!files.length) return emptyChatInfo();
-  const chatInfos: ChatInfo[] = [];
-  for (let index = 0; index < files.length; index += 1) {
-    const chatFile = files[index];
-    const fileStart = stageStart + Math.floor((index * (stageEnd - stageStart)) / files.length);
-    const fileEnd = stageStart + Math.floor(((index + 1) * (stageEnd - stageStart)) / files.length);
-    const chatWorkbook = await readWorkbook(
-      chatFile,
-      fileStart,
-      fileEnd,
-      `聊天明细 ${index + 1}/${files.length}`,
-    );
-    chatInfos.push(preprocessChats(chatWorkbook, chatFile.name));
-  }
-  return mergeChatInfos(chatInfos);
-}
-
-function localMonthDay(date = new Date()) {
-  return `${date.getMonth() + 1}.${date.getDate()}`;
-}
 
 function postComplete(chunks: Uint8Array[], filename: string, summary: ResultSummary) {
   const byteLength = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
@@ -109,123 +30,6 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
   try {
     await ensureSheetJs();
 
-    if (data.mode === "reminder") {
-      const whitelist = data.whitelistCsv ? buildWhitelist(data.whitelistCsv) : buildWhitelist("");
-      const listWorkbook = await readWorkbook(data.denominatorFile, 3, 22, "开课提醒学员明细");
-      const listInfo = buildReminderTargets(listWorkbook, whitelist);
-      progress(
-        "分母预处理完成",
-        `原始 ${listInfo.counts.原始分母行数.toLocaleString()} 条，整行去重后 ${listInfo.targets.length.toLocaleString()} 条。`,
-        28,
-      );
-      let appealInfo;
-      if (data.appealFile) {
-        const appealWorkbook = await readWorkbook(data.appealFile, 28, 34, "申诉文件");
-        appealInfo = buildReminderAppeals(appealWorkbook);
-        progress(
-          "申诉文件读取完成",
-          `申诉 ${appealInfo.counts.申诉行数.toLocaleString()} 条，已发送申诉计入分母，其余申诉公示原因并剔除。`,
-          34,
-        );
-      }
-
-      const touchInfo = await readSummaryFiles(data.summaryFiles, 36, 58);
-      progress(
-        "汇总文件读取完成",
-        `${data.summaryFiles.length.toLocaleString()} 个文件，汇总触达 ${touchInfo.counts.汇总触达数.toLocaleString()} 次。`,
-        60,
-      );
-
-      const chatInfo = await readChatFiles(data.chatFiles, 60, 68);
-      progress(
-        data.chatFiles.length ? "聊天预处理完成" : "未上传聊天明细",
-        data.chatFiles.length
-          ? `${data.chatFiles.length.toLocaleString()} 个参考文件，原始 ${chatInfo.counts.原始聊天行数.toLocaleString()} 条，清洗后 ${chatInfo.chats.length.toLocaleString()} 条。`
-          : "将只按汇总文件计算教师及以上维度触达完成率。",
-        68,
-      );
-
-      progress("正在匹配开课提醒", "聊天明细用于学员名单参考；教师汇总会按汇总文件触达数重算。", 72);
-      const baseMatchInfo = matchReminderData(listInfo, chatInfo.chats, appealInfo);
-      const matchInfo = applyReminderTouchSummary(baseMatchInfo, touchInfo);
-      progress(
-        "匹配完成",
-        `应发送 ${matchInfo.counts.应发送数.toLocaleString()}，有效触达 ${matchInfo.counts.有效触达数.toLocaleString()}，异常 ${matchInfo.counts.异常明细行数.toLocaleString()}。`,
-        80,
-      );
-
-      progress("正在生成 Excel", "写入公示表、学员名单及维度汇总。", 84);
-      const output = buildReminderOutput(listInfo, chatInfo, matchInfo, {
-        list: data.denominatorFile.name,
-        chat: data.chatFiles.map((file) => file.name).join("；"),
-        summary: data.summaryFiles.map((file) => file.name).join("；"),
-      }, data.includeCleanChats, data.includeResultColors, data.includeExceptionSheet, data.includeExplanationSheet);
-      postComplete(output, `暑期开课提醒话术发送进度（${localMonthDay()}）.xlsx`, {
-        mode: "reminder",
-        targets: listInfo.targets.length,
-        sent: matchInfo.counts.有效触达数 || 0,
-        unsent: Math.max(0, (matchInfo.counts.应发送数 || 0) - (matchInfo.counts.有效触达数 || 0)),
-        exceptions: matchInfo.counts.异常明细行数,
-        summaryFiles: data.summaryFiles.length,
-        chatFiles: data.chatFiles.length,
-        cleanChats: chatInfo.chats.length,
-      });
-      return;
-    }
-
-    if (data.mode === "stageReport") {
-      const listWorkbook = await readWorkbook(data.denominatorFile, 3, 28, "阶段性报告分母");
-      const listInfo = buildStageReportTargets(listWorkbook);
-      progress(
-        "分母预处理完成",
-        `原始 ${listInfo.counts.原始分母行数.toLocaleString()} 条，整行去重后 ${listInfo.targets.length.toLocaleString()} 条。`,
-        32,
-      );
-      const chatInfo = await readChatFiles(data.chatFiles, 34, 66);
-      progress(
-        "聊天预处理完成",
-        `${data.chatFiles.length.toLocaleString()} 个文件，原始 ${chatInfo.counts.原始聊天行数.toLocaleString()} 条，清洗后 ${chatInfo.chats.length.toLocaleString()} 条。`,
-        68,
-      );
-      progress("正在检查阶段性报告", "教师邮箱优先、缺邮箱按教师姓名兜底；学员按后两字口径匹配。", 74);
-      const matchInfo = matchStageReportData(listInfo, chatInfo.chats);
-      progress(
-        "检查完成",
-        `已发送 ${matchInfo.counts.已发送数.toLocaleString()}，未发送 ${matchInfo.counts.未发送数.toLocaleString()}，字段缺失 ${matchInfo.counts.字段缺失数.toLocaleString()}。`,
-        82,
-      );
-      progress("正在生成公示表", "复刻暑假督课层级和样式，写入管理维度、教师维度及钉钉明细。", 90);
-      const dingTalk = buildStageReportDingTalkOutput(listInfo, matchInfo);
-      postComplete(dingTalk.output, `阶段性报告发送进度（${localMonthDay()}）.xlsx`, {
-        mode: "stageReport",
-        targets: listInfo.targets.length,
-        sent: matchInfo.counts.已发送数,
-        unsent: matchInfo.counts.未发送数 + matchInfo.counts.字段缺失数,
-        cleanChats: chatInfo.chats.length,
-        chatFiles: data.chatFiles.length,
-      });
-      return;
-    }
-
-    if (data.mode === "stageReportBeautify") {
-      const sourceWorkbook = await readWorkbook(data.sourceFile, 3, 70, "阶段性报告原始表单");
-      progress("原始表单读取完成", "已识别明细、管理汇总与申诉工作表，开始整理公示版。", 74);
-      const output = buildStageReportBeautifyOutput(sourceWorkbook);
-      progress("正在生成公示版 Excel", "统一标题、列宽、冻结表头、发送率数据条及完成状态颜色。", 90);
-      postComplete(output.chunks, `非窗口期暑期在读阶段性报告明细（${output.dataTime}）.xlsx`, {
-        mode: "stageReportBeautify",
-        targets: output.counts.stageRows,
-        sent: 0,
-        unsent: 0,
-        cleanChats: 0,
-        stageRows: output.counts.stageRows,
-        teacherRows: output.counts.teacherRows,
-        appealRows: output.counts.appealRows,
-        sheets: output.counts.sheets,
-      });
-      return;
-    }
-
     const whitelist = buildWhitelist(data.whitelistCsv);
     const listWorkbook = await readWorkbook(data.listFile, 3, 18, "课堂反馈名单");
     const listInfo = buildTargets(listWorkbook, whitelist);
@@ -236,7 +40,7 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
     );
 
     const chatWorkbook = await readWorkbook(data.chatFile, 25, 48, "聊天明细");
-    const chatInfo = preprocessChats(chatWorkbook);
+    const chatInfo = preprocessChats(chatWorkbook, data.chatFile.name);
     progress(
       "聊天预处理完成",
       `原始 ${chatInfo.counts.原始聊天行数.toLocaleString()} 条，清洗后 ${chatInfo.chats.length.toLocaleString()} 条。`,

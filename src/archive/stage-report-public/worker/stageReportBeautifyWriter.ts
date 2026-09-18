@@ -1,5 +1,5 @@
-import type { FoundSheet } from "./excelReader";
-import { buildWorkbook } from "./excelWriter";
+import type { FoundSheet } from "../../../worker/excelReader";
+import { buildWorkbook } from "../../../worker/excelWriter";
 import {
   buildAssistantHierarchy,
   buildResearchGroupHierarchy,
@@ -7,8 +7,8 @@ import {
   type HierarchyMetricSpec,
   type HierarchyTable,
 } from "./stageReportHierarchy";
-import type { CellValue, DataRow, SheetDefinition } from "./types";
-import { text } from "./utils";
+import type { CellValue, DataRow, SheetDefinition } from "../../../worker/types";
+import { text } from "../../../worker/utils";
 
 const STYLE = {
   title: 16,
@@ -311,6 +311,10 @@ function isStatusColumn(column: string) {
   return /是否完成|是否已通知/u.test(column);
 }
 
+function isPublicHiddenColumn(column: string) {
+  return /数据变动时间|更新时间|是否(?:已|已经)?通知/u.test(column);
+}
+
 function metricColumn(columns: string[], rateColumn: string, kind: "总发送" | "已发送") {
   const match = rateColumn.match(/^(.*)发送率(\d{4})?$/u);
   if (!match) return undefined;
@@ -327,7 +331,9 @@ function requiredColumn(columns: string[], aliases: readonly string[], label: st
 
 function transformSummary(found: FoundSheet, titleLabel: string, dataTime: string) {
   const { columns: sourceColumns, rows: sourceRows } = rowObjects(found);
-  const columns = orderedSummaryColumns(sourceColumns.filter((column) => !/是否达标|窗口期报告|窗口期数据/u.test(column)));
+  const columns = orderedSummaryColumns(sourceColumns.filter((column) =>
+    !isPublicHiddenColumn(column) && !/是否达标|窗口期报告|窗口期数据/u.test(column),
+  ));
 
   const rows = sourceRows.map((source) => {
     const row: DataRow = { ...source };
@@ -598,7 +604,7 @@ function makeHierarchySheet(
 
 function makeDetailSheet(name: string, found: FoundSheet): SheetDefinition {
   const detail = rowObjects(found);
-  const columns = detail.columns.filter((column) => !/数据变动时间/u.test(column));
+  const columns = detail.columns.filter((column) => !isPublicHiddenColumn(column));
   const rows = detail.rows.map((source) => columns.reduce<DataRow>((result, column) => {
     result[column] = source[column] ?? "";
     return result;
@@ -664,19 +670,26 @@ function buildPeriodReportOutput(workbook: SheetJsWorkbook, dataTime: string) {
   const teacher = transformSummary(teacherFound, "教师维度", dataTime);
   const sheets: SheetDefinition[] = [
     ...stageDetails.map((detail, index) => makeDetailSheet(detailName(detail, index + 1), detail)),
-    ...appeals.map((appeal, index) => ({
-      name: appealName(appeal, index + 1),
-      title: `${appealName(appeal, index + 1)}（数据时间 ${dataTime}）`,
-      rows: rowObjects(appeal).rows,
-      columns: rowObjects(appeal).columns,
-      widths: detailWidths(rowObjects(appeal).columns),
-      titleStyle: STYLE.title,
-      headerStyle: STYLE.header,
-      titleHeight: 42,
-      headerHeight: 38,
-      dataRowHeight: 24,
-      rowStyle: () => STYLE.detail,
-    })),
+    ...appeals.map((appeal, index) => {
+      const source = rowObjects(appeal);
+      const columns = source.columns.filter((column) => !isPublicHiddenColumn(column));
+      return {
+        name: appealName(appeal, index + 1),
+        title: `${appealName(appeal, index + 1)}（数据时间 ${dataTime}）`,
+        rows: source.rows.map((row) => columns.reduce<DataRow>((result, column) => {
+          result[column] = row[column] ?? "";
+          return result;
+        }, {})),
+        columns,
+        widths: detailWidths(columns),
+        titleStyle: STYLE.title,
+        headerStyle: STYLE.header,
+        titleHeight: 42,
+        headerHeight: 38,
+        dataRowHeight: 24,
+        rowStyle: () => STYLE.detail,
+      };
+    }),
     makeHierarchySheet("教研组维度", group, PERIOD_RESEARCH_GROUP_COLUMNS, dataTime, PERIOD_HIERARCHY_METRICS, true),
     makeHierarchySheet("助理主管维度", assistant, PERIOD_ASSISTANT_COLUMNS, dataTime, PERIOD_HIERARCHY_METRICS),
     makeSummarySheet(training),
@@ -708,14 +721,18 @@ export function buildStageReportBeautifyOutput(workbook: SheetJsWorkbook) {
   const assistant = buildAssistantHierarchy(hierarchyTeacherRows, HIERARCHY_METRICS);
   const group = buildResearchGroupHierarchy(hierarchyTeacherRows, HIERARCHY_METRICS, false);
   const appeal = rowObjects(findAppealSheet(workbook));
+  const appealColumns = appeal.columns.filter((column) => !isPublicHiddenColumn(column));
   const sheets: SheetDefinition[] = [
     makeDetailSheet("阶段性报告明细", stageDetail),
     {
       name: "阶段性报告申诉情况",
       title: `阶段性报告申诉情况（数据时间 ${dataTime}）`,
-      rows: appeal.rows,
-      columns: appeal.columns,
-      widths: detailWidths(appeal.columns),
+      rows: appeal.rows.map((row) => appealColumns.reduce<DataRow>((result, column) => {
+        result[column] = row[column] ?? "";
+        return result;
+      }, {})),
+      columns: appealColumns,
+      widths: detailWidths(appealColumns),
       titleStyle: STYLE.title,
       headerStyle: STYLE.header,
       titleHeight: 42,
