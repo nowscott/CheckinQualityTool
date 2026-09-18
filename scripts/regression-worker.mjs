@@ -3,58 +3,12 @@ import { basename, resolve } from "node:path";
 import vm from "node:vm";
 
 const root = resolve(import.meta.dirname, "..");
-const args = process.argv.slice(2);
-const profileIndex = args.indexOf("--profile");
-const profile = profileIndex >= 0;
-if (profile) args.splice(profileIndex, 1);
-const useSingleIndex = args.indexOf("--use-single");
-const useSingle = useSingleIndex >= 0;
-if (useSingle) args.splice(useSingleIndex, 1);
-const includeCleanChatsIndex = args.indexOf("--include-clean-chats");
-const includeCleanChats = includeCleanChatsIndex >= 0;
-if (includeCleanChats) args.splice(includeCleanChatsIndex, 1);
-const appealArgIndex = args.findIndex((arg) => arg.startsWith("--appeal="));
-const appealPath = appealArgIndex >= 0 ? args[appealArgIndex].slice("--appeal=".length) : "";
-if (appealArgIndex >= 0) args.splice(appealArgIndex, 1);
-const summaryPaths = args
-  .filter((arg) => arg.startsWith("--summary="))
-  .map((arg) => arg.slice("--summary=".length));
-for (let index = args.length - 1; index >= 0; index -= 1) {
-  if (args[index].startsWith("--summary=")) args.splice(index, 1);
-}
-const modeArg = args[0]?.startsWith("--mode=") ? args.shift() : "";
-const mode = modeArg ? modeArg.split("=")[1] : "checkin";
-let listPath = "";
-let chatPaths = [];
-let outputPath = mode === "reminder"
-  ? "/tmp/reminder-worker-result.xlsx"
-  : mode === "stageReport"
-    ? "/tmp/stage-report-worker-result.xlsx"
-    : mode === "stageReportBeautify"
-      ? "/tmp/stage-report-beautify-worker-result.xlsx"
-      : "/tmp/typescript-worker-result.xlsx";
-if (mode === "stageReportBeautify") {
-  listPath = args.shift() || "";
-  if (args.length) outputPath = args.shift();
-} else if (["reminder", "stageReport"].includes(mode)) {
-  listPath = args.shift() || "";
-  if (args.length > 1) outputPath = args.pop();
-  chatPaths = args;
-} else {
-  const [currentListPath, chatPath, currentOutputPath = outputPath] = args;
-  listPath = currentListPath;
-  chatPaths = chatPath ? [chatPath] : [];
-  outputPath = currentOutputPath;
+const [listPath, chatPath, outputPath = "/tmp/typescript-worker-result.xlsx"] = process.argv.slice(2);
+if (!listPath || !chatPath) {
+  throw new Error("用法：node scripts/regression-worker.mjs <课堂反馈名单.xlsx> <聊天质检明细.xlsx> [输出.xlsx]");
 }
 
-if (!listPath || (mode !== "stageReportBeautify" && !chatPaths.length)) {
-  throw new Error("用法：node scripts/regression-worker.mjs [--mode=checkin|reminder|stageReport|stageReportBeautify] <名单或源表.xlsx> [聊天.xlsx...] [输出.xlsx]");
-}
-if (!["checkin", "reminder", "stageReport", "stageReportBeautify"].includes(mode)) throw new Error(`不支持的 mode：${mode}`);
-
-const assets = await import("node:fs/promises").then(({ readdir }) =>
-  readdir(resolve(root, "dist/assets")),
-);
+const assets = await import("node:fs/promises").then(({ readdir }) => readdir(resolve(root, "dist/assets")));
 let workerFile = "";
 for (const asset of assets.filter((name) => name.endsWith(".js"))) {
   const source = await readFile(resolve(root, "dist/assets", asset), "utf8");
@@ -66,9 +20,7 @@ for (const asset of assets.filter((name) => name.endsWith(".js"))) {
 if (!workerFile) throw new Error("找不到构建后的 Worker，请先运行 npm run build。");
 
 const listBuffer = await readFile(resolve(listPath));
-const chatBuffers = await Promise.all(chatPaths.map((path) => readFile(resolve(path))));
-const appealBuffer = appealPath ? await readFile(resolve(appealPath)) : null;
-const summaryBuffers = await Promise.all(summaryPaths.map((path) => readFile(resolve(path))));
+const chatBuffer = await readFile(resolve(chatPath));
 const whitelistCsv = await readFile(resolve(root, "public/data/whitelist.csv"), "utf8");
 const workerSources = new Map([
   [
@@ -78,17 +30,16 @@ const workerSources = new Map([
 ]);
 
 let context;
-let complete;
-const progressEvents = [];
-const startedAt = performance.now();
 const result = new Promise((resolveResult, rejectResult) => {
-  complete = (message) => {
-    if (message.type === "progress") {
-      progressEvents.push({ elapsedMs: Number((performance.now() - startedAt).toFixed(1)), title: message.title, progress: message.progress });
-      return;
-    }
-    if (message.type === "complete") resolveResult(message);
+  const startedAt = performance.now();
+  globalThis.__workerComplete = (message) => {
     if (message.type === "error") rejectResult(new Error(message.message));
+    if (message.type === "complete") {
+      resolveResult({
+        ...message,
+        elapsedMs: Number((performance.now() - startedAt).toFixed(1)),
+      });
+    }
   };
 });
 
@@ -107,7 +58,7 @@ const sandbox = {
       text: async () => workerSources.get(resolve(root, "dist/vendor/xlsx.full.min.js")),
     };
   },
-  postMessage: (message) => complete(message),
+  postMessage: (message) => globalThis.__workerComplete(message),
   importScripts: (...urls) => {
     for (const url of urls) {
       const sourcePath = resolve(root, "dist", url.replace(/^\//, ""));
@@ -129,39 +80,14 @@ const file = (path, buffer) => ({
 });
 
 await context.self.onmessage({
-  data: mode === "stageReportBeautify"
-    ? {
-        type: "process",
-        mode: "stageReportBeautify",
-        sourceFile: file(listPath, listBuffer),
-      }
-    : mode === "reminder"
-    ? {
-        type: "process",
-        mode: "reminder",
-        denominatorFile: file(listPath, listBuffer),
-        appealFile: appealPath && appealBuffer ? file(appealPath, appealBuffer) : null,
-        summaryFiles: summaryPaths.map((path, index) => file(path, summaryBuffers[index])),
-        chatFiles: chatPaths.map((path, index) => file(path, chatBuffers[index])),
-        includeCleanChats,
-        includeResultColors: false,
-        whitelistCsv,
-      }
-    : mode === "stageReport"
-      ? {
-          type: "process",
-          mode: "stageReport",
-          denominatorFile: file(listPath, listBuffer),
-          chatFiles: chatPaths.map((path, index) => file(path, chatBuffers[index])),
-        }
-      : {
-        type: "process",
-        listFile: file(listPath, listBuffer),
-        chatFile: file(chatPaths[0], chatBuffers[0]),
-        weekLabel: "auto",
-        useSingle,
-        whitelistCsv,
-      },
+  data: {
+    type: "process",
+    listFile: file(listPath, listBuffer),
+    chatFile: file(chatPath, chatBuffer),
+    weekLabel: "auto",
+    useSingle: false,
+    whitelistCsv,
+  },
 });
 
 const message = await result;
@@ -170,9 +96,8 @@ const outputBytes = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
 await writeFile(resolve(outputPath), outputBytes);
 console.log(JSON.stringify({
   worker: basename(workerFile),
-  mode,
   output: resolve(outputPath),
   bytes: message.byteLength || outputBytes.byteLength,
+  elapsedMs: message.elapsedMs,
   summary: message.summary,
-  ...(profile ? { progress: progressEvents } : {}),
 }, null, 2));

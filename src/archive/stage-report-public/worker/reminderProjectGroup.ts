@@ -1,4 +1,4 @@
-import { text } from "./utils";
+import { text } from "../../../worker/utils";
 
 function compact(value: unknown) {
   return text(value).replace(/\s+/g, "");

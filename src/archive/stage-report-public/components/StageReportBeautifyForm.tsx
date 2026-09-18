@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { UploadCard } from "./UploadCard";
+import { UploadCard } from "../../../components/UploadCard";
 
 interface StageReportBeautifyFormProps {
   sourceFile: File | null;

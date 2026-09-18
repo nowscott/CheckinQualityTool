@@ -79,7 +79,6 @@ export interface MatchInfo {
 export interface SourceNames {
   list: string;
   chat: string;
-  summary?: string;
 }
 
 export interface ProcessRequest {
@@ -92,34 +91,7 @@ export interface ProcessRequest {
   whitelistCsv: string;
 }
 
-export interface ReminderProcessRequest {
-  type: "process";
-  mode: "reminder";
-  denominatorFile: File;
-  appealFile?: File | null;
-  summaryFiles: File[];
-  chatFiles: File[];
-  includeCleanChats: boolean;
-  includeResultColors: boolean;
-  includeExceptionSheet: boolean;
-  includeExplanationSheet: boolean;
-  whitelistCsv: string;
-}
-
-export interface StageReportProcessRequest {
-  type: "process";
-  mode: "stageReport";
-  denominatorFile: File;
-  chatFiles: File[];
-}
-
-export interface StageReportBeautifyProcessRequest {
-  type: "process";
-  mode: "stageReportBeautify";
-  sourceFile: File;
-}
-
-export type WorkerRequest = ProcessRequest | ReminderProcessRequest | StageReportProcessRequest | StageReportBeautifyProcessRequest;
+export type WorkerRequest = ProcessRequest;
 
 export interface SheetDefinition {
   name: string;
