@@ -378,7 +378,6 @@ React 页面
 抽检历史接口：
 
 - `POST /api/inspection/auth/login`：校验用户密码并签发 HttpOnly 会话 Cookie。
-- `POST /api/inspection/auth/register`：公开注册只读账号，注册后自动登录；不能通过此接口创建管理员。
 - `POST /api/inspection/auth/logout`：撤销当前用户会话。
 - `GET /api/inspection/auth/me`：读取当前登录用户和兼容模式状态。
 - `GET /api/inspection/users`、`POST /api/inspection/users`：管理员读取和创建用户。
@@ -393,7 +392,7 @@ React 页面
 - `POST /api/inspection/batches`：按业务周创建或复用批次。
 - `POST /api/inspection/batches/:id/replace`：废弃当前批次并创建新的抽取尝试。
 
-注册账号默认是 `viewer` 只读角色。首个管理员通过 `npm run auth:bootstrap` 创建；需要将已注册账号提升为管理员时，只能在受控环境执行 `npm run auth:promote -- 用户名`，脚本会撤销该账号旧会话并写入审计记录。
+抽检账号不开放公开注册，由管理员在“用户管理”区域创建并分配 `viewer` 或 `operator` 角色。首个管理员通过 `npm run auth:bootstrap` 创建；`npm run auth:promote -- 用户名` 仅作为受控环境下的应急提升工具，执行后会撤销该账号旧会话并写入审计记录。
 
 Worker 使用经典 IIFE 格式，以便继续通过 `importScripts` 加载现有 SheetJS 浏览器构建：
 
