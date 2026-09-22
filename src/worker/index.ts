@@ -11,6 +11,7 @@ import type { WorkerRequest } from "./types";
 import type { ResultSummary } from "../types/worker";
 import { inferServiceWeek } from "./utils";
 import { buildWhitelist } from "./whitelist";
+import { processInspection } from "./inspectionProcess";
 
 interface WorkerScope {
   onmessage: ((event: MessageEvent<WorkerRequest>) => void | Promise<void>) | null;
@@ -29,6 +30,11 @@ workerScope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
   if (data.type !== "process") return;
   try {
     await ensureSheetJs();
+
+    if (data.mode === "inspection") {
+      await processInspection(data, workerScope);
+      return;
+    }
 
     const whitelist = buildWhitelist(data.whitelistCsv);
     const listWorkbook = await readWorkbook(data.listFile, 3, 18, "课堂反馈名单");

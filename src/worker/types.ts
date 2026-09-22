@@ -1,4 +1,5 @@
 import type { WeekLabel } from "../types/worker";
+import type { InspectionRequest } from "../types/worker";
 
 export type CellValue = string | number | boolean | Date | null | undefined;
 export type DataRow = Record<string, unknown>;
@@ -91,7 +92,7 @@ export interface ProcessRequest {
   whitelistCsv: string;
 }
 
-export type WorkerRequest = ProcessRequest;
+export type WorkerRequest = ProcessRequest | InspectionRequest;
 
 export interface SheetDefinition {
   name: string;
@@ -114,4 +115,6 @@ export interface SheetDefinition {
   mergeCells?: string[];
   dataBarColumns?: readonly string[];
   dataBarColor?: string;
+  formula?: (row: DataRow, column: string, rowIndex: number) => string | undefined;
+  dataValidations?: readonly { type: "list"; formula1: string; ranges: readonly string[] }[];
 }

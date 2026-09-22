@@ -5,12 +5,14 @@ import { MatchingGuideDialog } from "./components/MatchingGuideDialog";
 import { OutputGrid } from "./components/OutputGrid";
 import { StatusCard } from "./components/StatusCard";
 import { UploadForm } from "./components/UploadForm";
+import { InspectionPage } from "./components/InspectionPage";
 import { downloadResult } from "./lib/download";
 import { inferWeekFromFilename } from "./lib/week";
 import { useTheme } from "./hooks/useTheme";
 import type { ProcessingStatus, WeekLabel, WorkerResponse } from "./types/worker";
 
 type ActiveModal = "guide" | "changelog" | null;
+type ActivePage = "checkin" | "inspection";
 
 const INITIAL_STATUS: ProcessingStatus = {
   visible: false,
@@ -52,13 +54,14 @@ export default function App() {
   const [processing, setProcessing] = useState(false);
   const [status, setStatus] = useState<ProcessingStatus>(INITIAL_STATUS);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [activePage, setActivePage] = useState<ActivePage>("checkin");
   const workerRef = useRef<Worker | null>(null);
   const { theme, usesSystemTheme, toggleTheme } = useTheme();
 
   useEffect(() => {
-    document.title = "打卡质检数据生成";
+    document.title = activePage === "inspection" ? "课堂反馈抽检" : "打卡质检数据生成";
     return () => workerRef.current?.terminate();
-  }, []);
+  }, [activePage]);
 
   const weekHint = useMemo(() => {
     if (weekLabel !== "auto") return `已手动指定为${weekLabel}`;
@@ -118,6 +121,7 @@ export default function App() {
         finishWorker();
         return;
       }
+      if (data.type !== "error") return;
       updateStatus("处理失败", data.message, 100, "error");
       finishWorker();
     };
@@ -141,27 +145,40 @@ export default function App() {
     <>
       <main className="shell">
         <Header
+          title={activePage === "inspection" ? "课堂反馈抽检" : undefined}
+          subtitle={activePage === "inspection" ? "上传本周课程反馈和最新在职明细。抽检规则：高分每月一次，中高分每两周一次，其余每周至少一次；空余次数优先给普检未发送，再给低分教师加抽。" : undefined}
+          showGuide={activePage === "checkin"}
           theme={theme}
           usesSystemTheme={usesSystemTheme}
           onToggleTheme={toggleTheme}
           onOpenGuide={() => setActiveModal("guide")}
           onOpenChangelog={() => setActiveModal("changelog")}
         />
-        <UploadForm
-          listFile={listFile}
-          chatFile={chatFile}
-          weekLabel={weekLabel}
-          weekHint={weekHint}
-          useSingle={useSingle}
-          processing={processing}
-          onListFileChange={setListFile}
-          onChatFileChange={setChatFile}
-          onWeekLabelChange={setWeekLabel}
-          onUseSingleChange={setUseSingle}
-          onSubmit={handleSubmit}
-        />
-        <StatusCard status={status} />
-        <OutputGrid />
+        <nav className="mode-tabs" aria-label="数据工具页面">
+          <button type="button" className={activePage === "checkin" ? "active" : ""} onClick={() => setActivePage("checkin")}>打卡质检</button>
+          <button type="button" className={activePage === "inspection" ? "active" : ""} onClick={() => setActivePage("inspection")}>课堂反馈抽检</button>
+        </nav>
+        {activePage === "inspection" ? (
+          <InspectionPage />
+        ) : (
+          <>
+            <UploadForm
+              listFile={listFile}
+              chatFile={chatFile}
+              weekLabel={weekLabel}
+              weekHint={weekHint}
+              useSingle={useSingle}
+              processing={processing}
+              onListFileChange={setListFile}
+              onChatFileChange={setChatFile}
+              onWeekLabelChange={setWeekLabel}
+              onUseSingleChange={setUseSingle}
+              onSubmit={handleSubmit}
+            />
+            <StatusCard status={status} />
+            <OutputGrid />
+          </>
+        )}
       </main>
 
       <ChangelogDialog
