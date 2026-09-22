@@ -1,6 +1,6 @@
 /// <reference types="node" />
 
-import { createHash, createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { neon } from "@neondatabase/serverless";
 
@@ -23,6 +23,7 @@ export interface ApiResponse {
 const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
 const RULE_VERSION = "inspection-v1";
 const AUTH_COOKIE = "inspection_auth";
+const AUTH_HINT_COOKIE = "inspection_auth_hint";
 const PASSWORD_MIN_LENGTH = 1;
 const PASSWORD_HASH_PREFIX = "scrypt$v1";
 const scryptAsync = promisify(scrypt) as unknown as (password: string | Buffer, salt: string | Buffer, keylen: number, options?: { N?: number; r?: number; p?: number; maxmem?: number }) => Promise<Buffer>;
@@ -45,55 +46,21 @@ function env(name: string) {
   return process.env[name] || "";
 }
 
-function sessionSecret() {
-  return env("INSPECTION_SESSION_SECRET") || env("INSPECTION_PASSWORD");
-}
-
-function authMode() {
-  const mode = env("INSPECTION_AUTH_MODE").toLowerCase();
-  return mode === "login" || mode === "legacy" || mode === "dual" ? mode : "dual";
-}
-
-function signature(value: string) {
-  return createHmac("sha256", sessionSecret()).update(value).digest("hex");
-}
-
-function cookieHeader(value: string, maxAge: number) {
-  return `inspection_session=${value}; Max-Age=${maxAge}; Path=/; HttpOnly; SameSite=Lax${env("VERCEL_ENV") === "production" ? "; Secure" : ""}`;
-}
-
 export function authCookieHeader(value: string, maxAge: number) {
   return `${AUTH_COOKIE}=${value}; Max-Age=${maxAge}; Path=/; HttpOnly; SameSite=Lax${env("VERCEL_ENV") === "production" ? "; Secure" : ""}`;
 }
 
-export function issueSession() {
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const nonce = `${issuedAt}.${randomBytes(16).toString("hex")}`;
-  return `${nonce}.${signature(nonce)}`;
-}
-
-function requestCookie(request: ApiRequest) {
-  const header = request.headers?.cookie;
-  const cookie = Array.isArray(header) ? header.join(";") : header || "";
-  return cookie.split(";").map((item) => item.trim()).find((item) => item.startsWith("inspection_session="))?.slice("inspection_session=".length) || "";
+export function authHintCookieHeader(user: AuthUser | null, maxAge: number) {
+  const value = user
+    ? Buffer.from(JSON.stringify({ user: publicUser(user), issuedAt: Date.now() })).toString("base64url")
+    : "";
+  return `${AUTH_HINT_COOKIE}=${value}; Max-Age=${maxAge}; Path=/; SameSite=Lax${env("VERCEL_ENV") === "production" ? "; Secure" : ""}`;
 }
 
 function requestCookieValue(request: ApiRequest, name: string) {
   const header = request.headers?.cookie;
   const cookie = Array.isArray(header) ? header.join(";") : header || "";
   return cookie.split(";").map((item) => item.trim()).find((item) => item.startsWith(`${name}=`))?.slice(name.length + 1) || "";
-}
-
-export function hasValidSession(request: ApiRequest) {
-  const token = requestCookie(request);
-  const parts = token.split(".");
-  if (parts.length !== 3 || !sessionSecret()) return false;
-  const nonce = `${parts[0]}.${parts[1]}`;
-  const issuedAt = Number(parts[0]);
-  if (!Number.isFinite(issuedAt) || Math.floor(Date.now() / 1000) - issuedAt > SESSION_MAX_AGE_SECONDS) return false;
-  const actual = Buffer.from(parts[2]);
-  const expected = Buffer.from(signature(nonce));
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
 export async function requireSession(request: ApiRequest, response: ApiResponse, minimumRole: UserRole = "viewer") {
@@ -105,7 +72,6 @@ export async function requireSession(request: ApiRequest, response: ApiResponse,
     }
     return true;
   }
-  if (authMode() !== "login" && env("INSPECTION_PASSWORD") && hasValidSession(request)) return true;
   response.status(401).json({ error: "请先登录抽检系统。" });
   return false;
 }
@@ -357,10 +323,6 @@ export async function database() {
   }
   await schemaPromise;
   return sql;
-}
-
-export function authModeInfo() {
-  return { mode: authMode(), legacyAvailable: authMode() !== "login" && Boolean(env("INSPECTION_PASSWORD")) };
 }
 
 export function publicUser(user: AuthUser) {
@@ -990,8 +952,6 @@ export async function replaceBatch(id: string, rawPayload: unknown, actorUserId:
   if (actorUserId) await audit("inspection_batch_replaced", actorUserId, null, { oldBatchId: id, batchId: result.batch.id, businessWeekStart: payload.batch.businessWeekStart, batchKind: payload.batch.batchKind });
   return result;
 }
-
-export { SESSION_MAX_AGE_SECONDS, cookieHeader, env };
 
 // Vercel treats every TypeScript file below /api as a function entrypoint.
 // This module is shared by the real handlers, but the fallback keeps its

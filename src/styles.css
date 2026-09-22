@@ -490,9 +490,6 @@ button small { opacity: .78; }
 .admin-user-create-form label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
 .inspection-login-form .text-input,
 .admin-user-create-form .text-input { margin-top: 0; }
-.legacy-login-form { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
-.legacy-login-form > div { margin-top: 6px; display: flex; align-items: center; gap: 8px; }
-.legacy-login-form .text-input { flex: 1; margin-top: 0; }
 .inspection-options > label { min-height: 92px; }
 .number-input,
 .text-input {
@@ -715,8 +712,6 @@ button small { opacity: .78; }
   .teacher-week-list { grid-template-columns: 1fr; }
   .admin-user-create-form { grid-template-columns: 1fr; }
   .admin-user-create-form button { width: 100%; }
-  .legacy-login-form > div { align-items: stretch; flex-direction: column; }
-  .legacy-login-form .history-action { width: 100%; }
   .monthly-controls { align-items: stretch; flex-direction: column; }
   .monthly-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .output-grid strong { margin-top: 20px; font-size: 17px; }

@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { downloadResult } from "../lib/download";
+import {
+  clearInspectionAuthCookie,
+  INSPECTION_AUTH_REVALIDATION_MS,
+  isInspectionAuthCookieStale,
+  readInspectionAuthCookie,
+  type InspectionAuthCookie,
+  type InspectionAuthUserCookie,
+} from "../lib/inspectionAuthCookie";
 import { UploadCard } from "./UploadCard";
 import { StatusCard } from "./StatusCard";
 import { buildMonthlyInspectionPlan, monthWeekCount } from "../worker/monthlyPlanner";
@@ -118,13 +126,7 @@ interface TeacherDetailPayload {
   pageSize: number;
 }
 
-interface AuthUser {
-  id: string;
-  username: string;
-  displayName: string;
-  role: "admin" | "operator" | "viewer";
-  lastLoginAt: string | null;
-}
+type AuthUser = InspectionAuthUserCookie;
 
 interface ManagedUser extends AuthUser {
   isActive: boolean;
@@ -182,19 +184,18 @@ async function responseJson(response: Response) {
 }
 
 export function InspectionPage() {
+  const [initialAuthCookie] = useState<InspectionAuthCookie | null>(() => readInspectionAuthCookie());
   const [feedbackFile, setFeedbackFile] = useState<File | null>(null);
   const [rosterFile, setRosterFile] = useState<File | null>(null);
   const [sampleCount, setSampleCount] = useState("200");
   const [includeExplanation, setIncludeExplanation] = useState(false);
   const [batchKind, setBatchKind] = useState<InspectionBatchKind>("formal");
-  const [password, setPassword] = useState("");
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [legacyAvailable, setLegacyAvailable] = useState(false);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(() => initialAuthCookie?.user || null);
+  const [authChecked, setAuthChecked] = useState(() => Boolean(initialAuthCookie));
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
-  const [authenticated, setAuthenticated] = useState(false);
+  const [authenticated, setAuthenticated] = useState(() => Boolean(initialAuthCookie));
   const [processing, setProcessing] = useState(false);
   const [status, setStatus] = useState<ProcessingStatus>(INITIAL_STATUS);
   const [summary, setSummary] = useState<InspectionStats | null>(null);
@@ -236,8 +237,14 @@ export function InspectionPage() {
   const [monthlyData, setMonthlyData] = useState<MonthlyInspectionData | null>(null);
   const [monthlyError, setMonthlyError] = useState("");
   const workerRef = useRef<Worker | null>(null);
+  const authCookieRef = useRef<InspectionAuthCookie | null>(initialAuthCookie);
+  const authRefreshPromiseRef = useRef<Promise<void> | null>(null);
+  const authRefreshTimerRef = useRef<number | null>(null);
 
-  useEffect(() => () => workerRef.current?.terminate(), []);
+  useEffect(() => () => {
+    workerRef.current?.terminate();
+    if (authRefreshTimerRef.current !== null) window.clearTimeout(authRefreshTimerRef.current);
+  }, []);
 
   function updateStatus(title: string, message: string, progress = 0, mode: ProcessingStatus["mode"] = "working") {
     setStatus({ visible: true, title, message, progress, mode });
@@ -253,20 +260,73 @@ export function InspectionPage() {
     await Promise.all([loadHistory(1), loadTeachers(1)]);
   }
 
-  async function loadAuthState() {
-    try {
-      const response = await fetch("/api/inspection/auth/me", { credentials: "same-origin", cache: "no-store" });
-      const body = await responseJson(response);
-      setLegacyAvailable(Boolean(body.legacyAvailable));
-      if (response.ok && body.user) {
-        setAuthUser(body.user as AuthUser);
-        setAuthenticated(true);
-        await loadAuthenticatedData();
+  function scheduleAuthRefresh(cookie: InspectionAuthCookie) {
+    if (authRefreshTimerRef.current !== null) window.clearTimeout(authRefreshTimerRef.current);
+    const elapsed = Math.max(0, Date.now() - cookie.issuedAt);
+    const delay = Math.max(1000, INSPECTION_AUTH_REVALIDATION_MS - elapsed);
+    authRefreshTimerRef.current = window.setTimeout(() => {
+      authRefreshTimerRef.current = null;
+      void loadAuthState(true);
+    }, delay);
+  }
+
+  function cacheAuthUser(user: AuthUser) {
+    const cookie: InspectionAuthCookie = {
+      user,
+      issuedAt: Date.now(),
+    };
+    authCookieRef.current = cookie;
+    scheduleAuthRefresh(cookie);
+  }
+
+  function clearCachedAuth() {
+    authCookieRef.current = null;
+    clearInspectionAuthCookie();
+    if (authRefreshTimerRef.current !== null) {
+      window.clearTimeout(authRefreshTimerRef.current);
+      authRefreshTimerRef.current = null;
+    }
+  }
+
+  function loadInitialAuthenticatedData() {
+    // The visible-view effects load the current table. Load batches in the
+    // background only when that view will not already request them.
+    if (historyView !== "batches") void loadHistory(1);
+  }
+
+  async function loadAuthState(background = false) {
+    if (authRefreshPromiseRef.current) return authRefreshPromiseRef.current;
+    const refresh = (async () => {
+      try {
+        const response = await fetch("/api/inspection/auth/me", { credentials: "same-origin", cache: "no-store" });
+        const body = await responseJson(response);
+        if (response.ok && body.user) {
+          const user = body.user as AuthUser;
+          cacheAuthUser(user);
+          setAuthUser(user);
+          setAuthenticated(true);
+          setAuthChecked(true);
+          if (!authCookieRef.current || !background) loadInitialAuthenticatedData();
+          return;
+        }
+
+        clearCachedAuth();
+        setAuthUser(null);
+        setAuthenticated(false);
+        setAuthChecked(true);
+      } catch (error) {
+        if (!background) {
+          updateStatus("登录状态读取失败", errorMessage(error), 100, "error");
+          setAuthChecked(true);
+        }
+        // A cached page stays usable after a transient background failure.
       }
-    } catch (error) {
-      updateStatus("登录状态读取失败", errorMessage(error), 100, "error");
+    })();
+    authRefreshPromiseRef.current = refresh;
+    try {
+      await refresh;
     } finally {
-      setAuthChecked(true);
+      if (authRefreshPromiseRef.current === refresh) authRefreshPromiseRef.current = null;
     }
   }
 
@@ -283,40 +343,30 @@ export function InspectionPage() {
       });
       const body = await responseJson(response);
       if (!response.ok || !body.user) throw new Error(String(body.error || "登录失败，请检查用户名和密码。"));
-      setAuthUser(body.user as AuthUser);
+      const user = body.user as AuthUser;
+      cacheAuthUser(user);
+      setAuthUser(user);
       setAuthenticated(true);
+      setAuthChecked(true);
       setLoginPassword("");
-      await loadAuthenticatedData();
-      updateStatus("登录成功", "已加载抽检数据。", 100, "done");
+      loadInitialAuthenticatedData();
+      updateStatus("登录成功", "抽检数据正在后台加载。", 100, "done");
     } catch (error) {
+      clearCachedAuth();
       updateStatus("登录失败", errorMessage(error), 100, "error");
     } finally {
       setLoginBusy(false);
     }
   }
 
-  async function legacyUnlock() {
-    if (!password) throw new Error("请输入抽检历史密码。");
-    const response = await fetch("/api/inspection/session", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
-    const body = await responseJson(response);
-    if (!response.ok) throw new Error(String(body.error || "旧密码解锁失败。"));
-    const user: AuthUser = { id: "legacy", username: "legacy", displayName: "兼容密码", role: "admin", lastLoginAt: null };
-    setAuthUser(user);
-    setAuthenticated(true);
-    await loadAuthenticatedData();
-  }
-
   async function logout() {
     try {
       await fetch("/api/inspection/auth/logout", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: "{}" });
     } finally {
+      clearCachedAuth();
       setAuthUser(null);
       setAuthenticated(false);
+      setAuthChecked(true);
       setHistory([]);
       setTeachers([]);
       setTeacherDetail(null);
@@ -406,7 +456,27 @@ export function InspectionPage() {
   }
 
   useEffect(() => {
-    void loadAuthState();
+    const refreshIfStale = () => {
+      const cookie = authCookieRef.current;
+      if (cookie && isInspectionAuthCookieStale(cookie)) void loadAuthState(true);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshIfStale();
+    };
+    window.addEventListener("focus", refreshIfStale);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    if (initialAuthCookie) {
+      // Render from the cookie first; this database check never blocks the page.
+      void loadAuthState(true);
+    } else {
+      void loadAuthState(false);
+    }
+
+    return () => {
+      window.removeEventListener("focus", refreshIfStale);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   async function loadHistory(page = historyPage) {
@@ -532,7 +602,7 @@ export function InspectionPage() {
     try {
       updateStatus("正在读取抽检历史", "只读取历史记录，不会重新抽取课程。", 30);
       if (authenticated) await loadAuthenticatedData();
-      else await legacyUnlock();
+      else throw new Error("请先登录抽检系统。");
       updateStatus("抽检历史已加载", "默认按教师汇总，可按教师、邮箱、项目组或业务周检索，再打开课程明细。", 100, "done");
     } catch (error) {
       updateStatus("历史读取失败", errorMessage(error), 100, "error");
@@ -668,7 +738,7 @@ export function InspectionPage() {
   }, [monthlyPlan, monthlyQuery, monthlyLowOnly, monthlyPendingOnly]);
 
   const canOperate = authUser?.role === "admin" || authUser?.role === "operator";
-  const isAdmin = authUser?.role === "admin" && authUser.id !== "legacy";
+  const isAdmin = authUser?.role === "admin";
 
   if (!authChecked) {
     return <><section className="card inspection-login-card"><div className="inspection-login-copy"><span className="history-kicker">INSPECTION ACCESS</span><strong>正在检查登录状态</strong><p>请稍候，系统正在读取抽检权限。</p></div></section><StatusCard status={status} /></>;
@@ -688,12 +758,6 @@ export function InspectionPage() {
             <label><span>密码</span><input className="text-input" type="password" autoComplete="current-password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} placeholder="输入密码" /></label>
             <button type="submit" disabled={loginBusy}><span>{loginBusy ? "正在登录…" : "登录"}</span><small>仅用于课堂反馈抽检数据</small></button>
           </form>
-          {legacyAvailable ? (
-            <form className="legacy-login-form" onSubmit={async (event) => { event.preventDefault(); try { await legacyUnlock(); updateStatus("兼容密码已解锁", "当前处于兼容模式，请尽快使用正式用户账号。", 100, "done"); } catch (error) { updateStatus("解锁失败", errorMessage(error), 100, "error"); } }}>
-              <span>Preview 兼容入口</span>
-              <div><input className="text-input" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="旧抽检历史密码" /><button className="history-action" type="submit">旧密码解锁</button></div>
-            </form>
-          ) : null}
         </section>
         <StatusCard status={status} />
       </>

@@ -1,14 +1,10 @@
-import { assertSameOrigin, authenticateUser, authModeInfo, authCookieHeader, publicUser, type ApiRequest, type ApiResponse } from "../shared.js";
+import { assertSameOrigin, authenticateUser, authCookieHeader, authHintCookieHeader, publicUser, type ApiRequest, type ApiResponse } from "../shared.js";
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   if (request.method !== "POST") {
     response.status(405);
     response.setHeader("Allow", "POST");
     response.json({ error: "仅支持 POST。" });
-    return;
-  }
-  if (authModeInfo().mode === "legacy") {
-    response.status(404).json({ error: "当前环境未启用用户登录。" });
     return;
   }
   try {
@@ -19,7 +15,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       response.status(401).json({ error: "用户名或密码不正确，或账号暂时被锁定。" });
       return;
     }
-    response.setHeader("Set-Cookie", authCookieHeader(result.token, 8 * 60 * 60));
+    response.setHeader("Set-Cookie", [authCookieHeader(result.token, 8 * 60 * 60), authHintCookieHeader(result.user, 8 * 60 * 60)]);
     response.setHeader("Cache-Control", "no-store");
     response.status(200).json({ user: publicUser(result.user), expiresIn: 8 * 60 * 60 });
   } catch (error) {

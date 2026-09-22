@@ -1,4 +1,4 @@
-import { assertSameOrigin, audit, authCookieHeader, cookieHeader, currentAuthUser, revokeAuthSession, type ApiRequest, type ApiResponse } from "../shared.js";
+import { assertSameOrigin, audit, authCookieHeader, authHintCookieHeader, currentAuthUser, revokeAuthSession, type ApiRequest, type ApiResponse } from "../shared.js";
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   if (request.method !== "POST") {
@@ -12,7 +12,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const user = await currentAuthUser(request);
     await revokeAuthSession(request);
     if (user) await audit("logout", user.id, user.id, {});
-    response.setHeader("Set-Cookie", [authCookieHeader("", 0), cookieHeader("", 0)]);
+    response.setHeader("Set-Cookie", [authCookieHeader("", 0), authHintCookieHeader(null, 0)]);
     response.setHeader("Cache-Control", "no-store");
     response.status(200).json({ ok: true, user: user ? { username: user.username } : null });
   } catch (error) {

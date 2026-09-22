@@ -6,7 +6,7 @@
 - 技术栈：Vite 8、React 19、TypeScript 6、Web Worker
 - Excel 读取：SheetJS 0.20.3 浏览器构建
 - Excel 导出：fflate 流式生成 OOXML/XLSX
-- 当前版本：`v2.9.1`
+- 当前版本：`v2.9.4`
 
 打卡质检源文件不会上传服务器。抽检历史接口只保存批次、来源文件摘要和入选课程的审计字段，不保存原始 Excel、课堂反馈正文或报告链接。
 
@@ -28,11 +28,11 @@
 
 ```text
 DATABASE_URL=Neon Postgres connection string
-INSPECTION_AUTH_MODE=login
-INSPECTION_SESSION_SECRET=独立的随机会话签名密钥
 ```
 
-Preview 可暂时使用 `INSPECTION_AUTH_MODE=dual` 保留旧密码兼容入口；Production 使用 `login` 后，抽检历史只接受用户账号登录。数据库表结构见 `db/inspection.sql`，API 首次访问时也会自动创建抽检和认证表。
+抽检历史统一使用管理员配置的用户账号登录，不再提供兼容密码入口。数据库表结构见 `db/inspection.sql`，API 首次访问时也会自动创建抽检和认证表。
+
+抽检页优先读取浏览器登录提示 Cookie 恢复界面，随后后台静默向数据库复核会话和角色；提示 Cookie 不参与服务端授权。
 
 首次创建管理员：
 
@@ -379,7 +379,7 @@ React 页面
 
 - `POST /api/inspection/auth/login`：校验用户密码并签发 HttpOnly 会话 Cookie。
 - `POST /api/inspection/auth/logout`：撤销当前用户会话。
-- `GET /api/inspection/auth/me`：读取当前登录用户和兼容模式状态。
+- `GET /api/inspection/auth/me`：读取当前登录用户。
 - `GET /api/inspection/users`、`POST /api/inspection/users`：管理员读取和创建用户。
 - `PATCH /api/inspection/users/:id`：管理员修改角色、显示名和启停状态。
 - `POST /api/inspection/users/:id/reset-password`：管理员重置用户密码。
