@@ -10,8 +10,10 @@ test("scrypt password hashes verify and use a fresh salt", async () => {
   assert.equal(await verifyPassword("wrong-password", first), false);
 });
 
-test("password policy rejects short passwords", async () => {
-  await assert.rejects(() => hashPassword("short"), /至少需要|长度应为/);
+test("password policy rejects empty passwords and allows the requested short password", async () => {
+  await assert.rejects(() => hashPassword(""), /不能为空/);
+  const hash = await hashPassword("admin");
+  assert.equal(await verifyPassword("admin", hash), true);
 });
 
 test("same-origin validation accepts same host and rejects foreign origin", () => {

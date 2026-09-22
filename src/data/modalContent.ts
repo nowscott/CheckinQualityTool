@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.9.1",
+    date: "2026-09-22",
+    items: [
+      "管理员创建和重置用户密码时取消最低 10 位限制，但仍禁止空密码并限制最长 200 位。",
+    ],
+  },
+  {
     version: "v2.9.0",
     date: "2026-09-22",
     items: [
