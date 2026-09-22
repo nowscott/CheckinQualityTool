@@ -8,7 +8,6 @@ import currentHandler from "../src/server/inspection/current.js";
 import historyHandler from "../src/server/inspection/history.js";
 import historyDetailHandler from "../src/server/inspection/history/[id].js";
 import monthlyHandler from "../src/server/inspection/monthly.js";
-import sessionHandler from "../src/server/inspection/session.js";
 import teachersHandler from "../src/server/inspection/teachers.js";
 import teacherDetailHandler from "../src/server/inspection/teachers/[teacherKey].js";
 import teachingServiceHandler from "../src/server/inspection/teaching-service.js";
@@ -43,7 +42,6 @@ function route(request: ApiRequest): { handler: Handler; request: ApiRequest } |
   if (root === "history" && second) return { handler: historyDetailHandler as Handler, request: withParam(request, "id", second) };
   if (root === "history") return { handler: historyHandler as Handler, request };
   if (root === "monthly") return { handler: monthlyHandler as Handler, request };
-  if (root === "session") return { handler: sessionHandler as Handler, request };
   if (root === "teachers" && second) return { handler: teacherDetailHandler as Handler, request: withParam(request, "teacherKey", second) };
   if (root === "teachers") return { handler: teachersHandler as Handler, request };
   if (root === "teaching-service") return { handler: teachingServiceHandler as Handler, request };

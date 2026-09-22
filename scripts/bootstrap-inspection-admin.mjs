@@ -86,7 +86,7 @@ try {
   if (password !== confirmation) throw new Error("两次密码不一致。");
   const passwordHash = await hashPassword(password);
   await sql`INSERT INTO inspection_users (id, username, display_name, password_hash, role) VALUES (${crypto.randomUUID()}, ${username}, ${displayName.slice(0, 120)}, ${passwordHash}, 'admin')`;
-  console.log(`管理员 ${username} 已创建。请在 Vercel Production 配置 INSPECTION_AUTH_MODE=login 后重新部署。`);
+  console.log(`管理员 ${username} 已创建。请使用该账号登录抽检系统。`);
 } finally {
   readline.close();
 }
