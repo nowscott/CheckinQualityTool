@@ -50,8 +50,12 @@ function excelColumn(index: number) {
   return result;
 }
 
-function cellXml(value: unknown, columnIndex: number, rowIndex: number, style = 0) {
+function cellXml(value: unknown, columnIndex: number, rowIndex: number, style = 0, formula = "") {
   const reference = `${excelColumn(columnIndex)}${rowIndex}`;
+  if (formula) {
+    const formulaXml = formula.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return `<c r="${reference}" t="str"${style ? ` s="${style}"` : ""}><f>${formulaXml}</f><v>${xmlEscape(value ?? "")}</v></c>`;
+  }
   if (typeof value === "number" && Number.isFinite(value)) {
     return `<c r="${reference}"${style ? ` s="${style}"` : ""}><v>${value}</v></c>`;
   }
@@ -89,6 +93,8 @@ function* worksheetChunks(
   mergeCells: string[] = [],
   dataBarColumns: readonly string[] = [],
   dataBarColor = "00B050",
+  formulaFn?: (row: DataRow, column: string, rowIndex: number) => string | undefined,
+  dataValidations: readonly { type: "list"; formula1: string; ranges: readonly string[] }[] = [],
 ) {
   const groupHeaderRowIndex = title ? 2 : 1;
   const headerRowIndex = groupHeaderRowIndex + (headerGroups.length ? 1 : 0);
@@ -114,6 +120,9 @@ function* worksheetChunks(
       return `<conditionalFormatting sqref="${range}"><cfRule type="dataBar" priority="${index + 1}"><dataBar showValue="1"><cfvo type="num" val="0"/><cfvo type="num" val="1"/><color rgb="FF${dataBarColor}"/></dataBar></cfRule></conditionalFormatting>`;
     })
     .join("");
+  const dataValidationXml = dataValidations.length
+    ? `<dataValidations count="${dataValidations.length}">${dataValidations.map((validation) => `<dataValidation type="${validation.type}" allowBlank="1" showInputMessage="1" showErrorMessage="1" sqref="${validation.ranges.join(" ")}"><formula1>${xmlEscape(validation.formula1)}</formula1></dataValidation>`).join("")}</dataValidations>`
+    : "";
   yield (
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
@@ -134,7 +143,7 @@ function* worksheetChunks(
     const rowIndex = rowOffset + dataStartRow;
     const style = rowStyle ? rowStyle(row) : 0;
     buffer += `<row r="${rowIndex}"${dataRowHeight ? ` ht="${dataRowHeight}" customHeight="1"` : ""}>${columns.map((column, columnIndex) =>
-      cellXml(row[column] ?? "", columnIndex, rowIndex, cellStyle ? cellStyle(row, column, style) : style)
+      cellXml(row[column] ?? "", columnIndex, rowIndex, cellStyle ? cellStyle(row, column, style) : style, formulaFn?.(row, column, rowIndex) || "")
     ).join("")}</row>`;
     if (buffer.length >= 512 * 1024) {
       yield buffer;
@@ -142,7 +151,7 @@ function* worksheetChunks(
     }
   }
   if (buffer) yield buffer;
-  yield `</sheetData>${mergeXml}${dataBarXml}<autoFilter ref="A${headerRowIndex}:${lastCell}"/></worksheet>`;
+  yield `</sheetData>${mergeXml}${dataBarXml}${dataValidationXml}<autoFilter ref="A${headerRowIndex}:${lastCell}"/></worksheet>`;
 }
 
 export function buildOutput(
@@ -278,7 +287,7 @@ export function buildWorkbook(sheets: SheetDefinition[], compressionLevel: Compr
     `<font><b/><color rgb="FFFFFFFF"/><sz val="12"/><name val="PingFang SC"/></font>` +
     `<font><b/><color rgb="FF166534"/><sz val="11"/><name val="PingFang SC"/></font>` +
     `<font><b/><color rgb="FFB42318"/><sz val="11"/><name val="PingFang SC"/></font></fonts>` +
-    `<fills count="19"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>` +
+    `<fills count="20"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>` +
     `<fill><patternFill patternType="solid"><fgColor rgb="FF1F4E78"/><bgColor indexed="64"/></patternFill></fill>` +
     `<fill><patternFill patternType="solid"><fgColor rgb="FFC6EFCE"/><bgColor indexed="64"/></patternFill></fill>` +
     `<fill><patternFill patternType="solid"><fgColor rgb="FFFFC7CE"/><bgColor indexed="64"/></patternFill></fill>` +
@@ -295,12 +304,13 @@ export function buildWorkbook(sheets: SheetDefinition[], compressionLevel: Compr
     `<fill><patternFill patternType="solid"><fgColor rgb="FFDDEBF4"/><bgColor indexed="64"/></patternFill></fill>` +
     `<fill><patternFill patternType="solid"><fgColor rgb="FF2F5F7C"/><bgColor indexed="64"/></patternFill></fill>` +
     `<fill><patternFill patternType="solid"><fgColor rgb="FFD9F0E2"/><bgColor indexed="64"/></patternFill></fill>` +
-    `<fill><patternFill patternType="solid"><fgColor rgb="FFFDE2E2"/><bgColor indexed="64"/></patternFill></fill></fills>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FFFDE2E2"/><bgColor indexed="64"/></patternFill></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FF3399FF"/><bgColor indexed="64"/></patternFill></fill></fills>` +
     `<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border>` +
     `<border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="thin"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border>` +
     `<border><left style="thin"><color rgb="FFA9C1D5"/></left><right style="thin"><color rgb="FFA9C1D5"/></right><top style="thin"><color rgb="FFA9C1D5"/></top><bottom style="thin"><color rgb="FFA9C1D5"/></bottom><diagonal/></border></borders>` +
     `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
-    `<cellXfs count="31"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
+    `<cellXfs count="33"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
     `<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>` +
     `<xf numFmtId="0" fontId="0" fillId="3" borderId="0" xfId="0" applyFill="1"/>` +
     `<xf numFmtId="0" fontId="0" fillId="4" borderId="0" xfId="0" applyFill="1"/>` +
@@ -330,7 +340,9 @@ export function buildWorkbook(sheets: SheetDefinition[], compressionLevel: Compr
     `<xf numFmtId="164" fontId="10" fillId="16" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
     `<xf numFmtId="0" fontId="11" fillId="17" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
     `<xf numFmtId="0" fontId="12" fillId="18" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
-    `<xf numFmtId="0" fontId="6" fillId="11" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs>` +
+    `<xf numFmtId="0" fontId="6" fillId="11" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
+    `<xf numFmtId="0" fontId="1" fillId="19" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+    `<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf></cellXfs>` +
     `<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>` +
     `</styleSheet>`,
   );
@@ -362,6 +374,8 @@ export function buildWorkbook(sheets: SheetDefinition[], compressionLevel: Compr
         sheet.mergeCells,
         sheet.dataBarColumns,
         sheet.dataBarColor,
+        sheet.formula,
+        sheet.dataValidations,
       ),
     );
   });

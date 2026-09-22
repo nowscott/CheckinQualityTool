@@ -49,7 +49,7 @@ function isRecoverableZipSizeWarning(args: unknown[]) {
   return args.length === 1 && /^Bad uncompressed size: \d+ != 0$/u.test(text(args[0]));
 }
 
-function readXlsx(data: ArrayBuffer) {
+function readXlsx(data: ArrayBuffer, nodim = false) {
   const originalWarn = console.warn;
   const originalError = console.error;
   console.warn = (...args: unknown[]) => {
@@ -59,7 +59,7 @@ function readXlsx(data: ArrayBuffer) {
     if (!isRecoverableZipSizeWarning(args)) originalError(...args);
   };
   try {
-    return XLSX.read(data, { type: "array", dense: true, cellDates: true, cellText: false });
+    return XLSX.read(data, { type: "array", dense: true, cellDates: true, cellText: false, nodim });
   } finally {
     console.warn = originalWarn;
     console.error = originalError;
@@ -71,6 +71,7 @@ export async function readWorkbook(
   stageStart: number,
   stageEnd: number,
   label: string,
+  nodim = false,
 ) {
   progress(
     `正在读取${label}`,
@@ -83,7 +84,7 @@ export async function readWorkbook(
     "使用 dense 模式解析 Excel，此步骤耗时取决于文件大小。",
     stageStart + (stageEnd - stageStart) * 0.35,
   );
-  const workbook = readXlsx(data);
+  const workbook = readXlsx(data, nodim);
   progress(`${label}解析完成`, "正在提取必要字段并释放原始工作簿。", stageEnd);
   return workbook;
 }

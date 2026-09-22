@@ -2,6 +2,8 @@ export type WeekLabel = "auto" | "第一周" | "第二周" | "第三周" | "第�
 
 export type StatusMode = "working" | "done" | "error";
 
+import type { InspectionBatchKind, InspectionHistoryPayload, InspectionStats } from "../worker/inspectionTypes";
+
 export interface ProcessingStatus {
   visible: boolean;
   title: string;
@@ -16,6 +18,26 @@ export interface ResultSummary {
   unsent: number;
   exempt?: number;
   cleanChats: number;
+}
+
+export interface InspectionRequest {
+  type: "process";
+  mode: "inspection";
+  feedbackFile: File;
+  rosterFile?: File;
+  sampleCount: number;
+  attempt: number;
+  includeExplanation: boolean;
+  batchKind: InspectionBatchKind;
+}
+
+export interface InspectionWorkerComplete {
+  type: "inspectionComplete";
+  chunks: Uint8Array[];
+  byteLength: number;
+  filename: string;
+  summary: InspectionStats;
+  historyPayload: InspectionHistoryPayload;
 }
 
 export type WorkerResponse =
@@ -35,4 +57,5 @@ export type WorkerResponse =
   | {
       type: "error";
       message: string;
-    };
+    }
+  | InspectionWorkerComplete;
