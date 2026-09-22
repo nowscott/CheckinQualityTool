@@ -463,6 +463,26 @@ export async function authenticateUser(rawUsername: unknown, rawPassword: unknow
   return { user, token: await createAuthSession(user.id) };
 }
 
+export async function registerUser(raw: { username?: unknown; displayName?: unknown; password?: unknown; confirmation?: unknown }) {
+  const username = validateUsername(raw.username);
+  const displayName = safeText(raw.displayName, 120) || username;
+  const password = validatePassword(raw.password);
+  if (raw.confirmation !== undefined && String(raw.confirmation ?? "") !== password) throw new Error("两次密码不一致。");
+  const passwordHash = await hashPassword(password);
+  const sql = await database();
+  const id = crypto.randomUUID();
+  try {
+    await sql`INSERT INTO inspection_users (id, username, display_name, password_hash, role) VALUES (${id}, ${username}, ${displayName}, ${passwordHash}, 'viewer')`;
+  } catch (error) {
+    if ((error as { code?: string })?.code === "23505") throw new Error("该用户名已经存在。");
+    throw error;
+  }
+  const user = mapUser({ id, username, display_name: displayName, role: "viewer", is_active: true, last_login_at: new Date().toISOString() });
+  await sql`UPDATE inspection_users SET last_login_at = now(), updated_at = now() WHERE id = ${id}`;
+  await audit("user_registered", null, id, { username, role: "viewer" });
+  return { user, token: await createAuthSession(id) };
+}
+
 export async function listUsers() {
   const sql = await database();
   const rows = await sql`SELECT id, username, display_name, role, is_active, last_login_at, created_at FROM inspection_users ORDER BY is_active DESC, username ASC`;

@@ -194,6 +194,12 @@ export function InspectionPage() {
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
+  const [showRegistration, setShowRegistration] = useState(false);
+  const [registerUsername, setRegisterUsername] = useState("");
+  const [registerDisplayName, setRegisterDisplayName] = useState("");
+  const [registerPassword, setRegisterPassword] = useState("");
+  const [registerConfirmation, setRegisterConfirmation] = useState("");
+  const [registerBusy, setRegisterBusy] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [status, setStatus] = useState<ProcessingStatus>(INITIAL_STATUS);
@@ -292,6 +298,36 @@ export function InspectionPage() {
       updateStatus("登录失败", errorMessage(error), 100, "error");
     } finally {
       setLoginBusy(false);
+    }
+  }
+
+  async function register(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!registerUsername.trim() || !registerPassword || !registerConfirmation) return;
+    if (registerPassword !== registerConfirmation) {
+      updateStatus("注册失败", "两次密码不一致。", 100, "error");
+      return;
+    }
+    setRegisterBusy(true);
+    try {
+      const response = await fetch("/api/inspection/auth/register", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: registerUsername, displayName: registerDisplayName, password: registerPassword, confirmation: registerConfirmation }),
+      });
+      const body = await responseJson(response);
+      if (!response.ok || !body.user) throw new Error(String(body.error || "注册失败，请稍后重试。"));
+      setAuthUser(body.user as AuthUser);
+      setAuthenticated(true);
+      setRegisterPassword("");
+      setRegisterConfirmation("");
+      await loadAuthenticatedData();
+      updateStatus("注册成功", "当前是只读账号；管理员提升完成后请重新登录或刷新页面。", 100, "done");
+    } catch (error) {
+      updateStatus("注册失败", errorMessage(error), 100, "error");
+    } finally {
+      setRegisterBusy(false);
     }
   }
 
@@ -680,14 +716,25 @@ export function InspectionPage() {
         <section className="card inspection-login-card">
           <div className="inspection-login-copy">
             <span className="history-kicker">INSPECTION ACCESS</span>
-            <strong>登录课堂反馈抽检</strong>
-            <p>登录后才能查看抽检历史、教师统计和课程明细。打卡质检仍可独立使用。</p>
+            <strong>{showRegistration ? "注册课堂反馈抽检账号" : "登录课堂反馈抽检"}</strong>
+            <p>{showRegistration ? "注册成功后默认是只读账号，管理员确认后再分配管理权限。" : "登录后才能查看抽检历史、教师统计和课程明细。打卡质检仍可独立使用。"}</p>
           </div>
-          <form className="inspection-login-form" onSubmit={login}>
-            <label><span>用户名</span><input className="text-input" type="text" autoComplete="username" value={loginUsername} onChange={(event) => setLoginUsername(event.target.value)} placeholder="输入用户名" /></label>
-            <label><span>密码</span><input className="text-input" type="password" autoComplete="current-password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} placeholder="输入密码" /></label>
-            <button type="submit" disabled={loginBusy}><span>{loginBusy ? "正在登录…" : "登录"}</span><small>仅用于课堂反馈抽检数据</small></button>
-          </form>
+          {showRegistration ? (
+            <form className="inspection-login-form" onSubmit={register}>
+              <label><span>用户名</span><input className="text-input" type="text" autoComplete="username" value={registerUsername} onChange={(event) => setRegisterUsername(event.target.value)} placeholder="2～120 位字母、数字或常用符号" /></label>
+              <label><span>显示名称</span><input className="text-input" type="text" autoComplete="name" value={registerDisplayName} onChange={(event) => setRegisterDisplayName(event.target.value)} placeholder="可留空，默认使用用户名" /></label>
+              <label><span>密码</span><input className="text-input" type="password" autoComplete="new-password" value={registerPassword} onChange={(event) => setRegisterPassword(event.target.value)} placeholder="至少 10 位" /></label>
+              <label><span>确认密码</span><input className="text-input" type="password" autoComplete="new-password" value={registerConfirmation} onChange={(event) => setRegisterConfirmation(event.target.value)} placeholder="再次输入密码" /></label>
+              <button type="submit" disabled={registerBusy}><span>{registerBusy ? "正在注册…" : "注册并登录"}</span><small>注册后默认只有查看权限</small></button>
+            </form>
+          ) : (
+            <form className="inspection-login-form" onSubmit={login}>
+              <label><span>用户名</span><input className="text-input" type="text" autoComplete="username" value={loginUsername} onChange={(event) => setLoginUsername(event.target.value)} placeholder="输入用户名" /></label>
+              <label><span>密码</span><input className="text-input" type="password" autoComplete="current-password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} placeholder="输入密码" /></label>
+              <button type="submit" disabled={loginBusy}><span>{loginBusy ? "正在登录…" : "登录"}</span><small>仅用于课堂反馈抽检数据</small></button>
+            </form>
+          )}
+          <button className="history-action" type="button" onClick={() => setShowRegistration((value) => !value)}>{showRegistration ? "返回登录" : "首次使用？注册账号"}</button>
           {legacyAvailable ? (
             <form className="legacy-login-form" onSubmit={async (event) => { event.preventDefault(); try { await legacyUnlock(); updateStatus("兼容密码已解锁", "当前处于兼容模式，请尽快使用正式用户账号。", 100, "done"); } catch (error) { updateStatus("解锁失败", errorMessage(error), 100, "error"); } }}>
               <span>Preview 兼容入口</span>
