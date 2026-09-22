@@ -923,7 +923,7 @@ export function InspectionPage() {
               <form className="admin-user-create-form" onSubmit={createManagedUser}>
                 <div><label>用户名<input className="text-input" value={newUserUsername} onChange={(event) => setNewUserUsername(event.target.value)} placeholder="例如 zhangsan" /></label></div>
                 <div><label>显示名称<input className="text-input" value={newUserDisplayName} onChange={(event) => setNewUserDisplayName(event.target.value)} placeholder="例如 张三" /></label></div>
-                <div><label>初始密码<input className="text-input" type="password" value={newUserPassword} onChange={(event) => setNewUserPassword(event.target.value)} placeholder="至少 10 位" /></label></div>
+                <div><label>初始密码<input className="text-input" type="password" value={newUserPassword} onChange={(event) => setNewUserPassword(event.target.value)} placeholder="不能为空，最多 200 位" /></label></div>
                 <div><label>角色<select className="history-filter-select" value={newUserRole} onChange={(event) => setNewUserRole(event.target.value as AuthUser["role"])}><option value="viewer">只读</option><option value="operator">操作员</option><option value="admin">管理员</option></select></label></div>
                 <button type="submit">新增用户</button>
               </form>

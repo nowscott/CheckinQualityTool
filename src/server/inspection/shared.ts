@@ -23,7 +23,7 @@ export interface ApiResponse {
 const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
 const RULE_VERSION = "inspection-v1";
 const AUTH_COOKIE = "inspection_auth";
-const PASSWORD_MIN_LENGTH = 10;
+const PASSWORD_MIN_LENGTH = 1;
 const PASSWORD_HASH_PREFIX = "scrypt$v1";
 const scryptAsync = promisify(scrypt) as unknown as (password: string | Buffer, salt: string | Buffer, keylen: number, options?: { N?: number; r?: number; p?: number; maxmem?: number }) => Promise<Buffer>;
 
@@ -123,7 +123,7 @@ function validateUsername(value: unknown) {
 export function validatePassword(value: unknown) {
   const password = String(value ?? "");
   const length = Array.from(password).length;
-  if (length < PASSWORD_MIN_LENGTH || length > 200) throw new Error(`密码长度应为 ${PASSWORD_MIN_LENGTH}～200 位。`);
+  if (length < PASSWORD_MIN_LENGTH || length > 200) throw new Error("密码不能为空，且不能超过 200 位。");
   return password;
 }
 

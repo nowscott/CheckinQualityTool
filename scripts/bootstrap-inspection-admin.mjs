@@ -4,7 +4,7 @@ import { createInterface } from "node:readline/promises";
 import { neon } from "@neondatabase/serverless";
 
 const scryptAsync = promisify(scrypt);
-const minPasswordLength = 10;
+const minPasswordLength = 1;
 
 function validateUsername(value) {
   const username = String(value || "").trim().toLowerCase();
@@ -14,7 +14,7 @@ function validateUsername(value) {
 
 async function hashPassword(value) {
   const password = String(value || "");
-  if (Array.from(password).length < minPasswordLength) throw new Error(`密码至少需要 ${minPasswordLength} 位。`);
+  if (Array.from(password).length < minPasswordLength) throw new Error("密码不能为空。");
   const salt = randomBytes(16);
   const derived = await scryptAsync(password, salt, 64, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
   return `scrypt$v1$32768$8$1$${salt.toString("base64url")}$${Buffer.from(derived).toString("base64url")}`;
@@ -81,7 +81,7 @@ try {
   const username = validateUsername(await readline.question("管理员用户名: "));
   const displayName = String(await readline.question("显示名称（可留空）: ")).trim() || username;
   readline.close();
-  const password = await hiddenQuestion("管理员密码（至少 10 位）: ");
+  const password = await hiddenQuestion("管理员密码（不能为空）: ");
   const confirmation = await hiddenQuestion("再次输入密码: ");
   if (password !== confirmation) throw new Error("两次密码不一致。");
   const passwordHash = await hashPassword(password);
