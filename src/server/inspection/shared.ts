@@ -668,16 +668,18 @@ export async function historyBatches(filters: HistoryFilters = {
   const like = `%${filters.query.toLocaleLowerCase()}%`;
   const kindAll = filters.batchKind === "all";
   const statusAll = filters.status === "all";
-  const fromAll = !filters.from;
-  const toAll = !filters.to;
+  const fromDate = filters.from || null;
+  const toDate = filters.to || null;
+  const fromAll = !fromDate;
+  const toAll = !toDate;
   const offset = (filters.page - 1) * filters.pageSize;
   const rows = await sql`
     SELECT *, COUNT(*) OVER() AS total_count
     FROM inspection_batches
     WHERE (${kindAll} OR batch_kind = ${filters.batchKind})
       AND (${statusAll} OR status = ${filters.status})
-      AND (${fromAll} OR business_week_start >= ${filters.from})
-      AND (${toAll} OR business_week_start <= ${filters.to})
+      AND (${fromAll} OR business_week_start >= ${fromDate}::date)
+      AND (${toAll} OR business_week_start <= ${toDate}::date)
       AND (
         ${!filters.query}
         OR LOWER(source_name) LIKE ${like}
@@ -734,8 +736,10 @@ export async function teacherSummaries(filters: HistoryFilters) {
   const like = `%${filters.query.toLocaleLowerCase()}%`;
   const kindAll = filters.batchKind === "all";
   const statusAll = filters.status === "all";
-  const fromAll = !filters.from;
-  const toAll = !filters.to;
+  const fromDate = filters.from || null;
+  const toDate = filters.to || null;
+  const fromAll = !fromDate;
+  const toAll = !toDate;
   const offset = (filters.page - 1) * filters.pageSize;
   const keyExpression = teacherKeyExpression();
   const rows = await sql`
@@ -749,8 +753,8 @@ export async function teacherSummaries(filters: HistoryFilters) {
       JOIN inspection_batches b ON b.id = i.batch_id
       WHERE (${kindAll} OR b.batch_kind = ${filters.batchKind})
         AND (${statusAll} OR b.status = ${filters.status})
-        AND (${fromAll} OR b.business_week_start >= ${filters.from})
-        AND (${toAll} OR b.business_week_start <= ${filters.to})
+        AND (${fromAll} OR b.business_week_start >= ${fromDate}::date)
+        AND (${toAll} OR b.business_week_start <= ${toDate}::date)
     ), matched_keys AS (
       SELECT DISTINCT teacher_key
       FROM base
@@ -809,8 +813,10 @@ export async function teacherDetail(rawKey: string, filters: HistoryFilters) {
   const key = teacherKeyValue(rawKey);
   const kindAll = filters.batchKind === "all";
   const statusAll = filters.status === "all";
-  const fromAll = !filters.from;
-  const toAll = !filters.to;
+  const fromDate = filters.from || null;
+  const toDate = filters.to || null;
+  const fromAll = !fromDate;
+  const toAll = !toDate;
   const offset = (filters.page - 1) * filters.pageSize;
   const isEmail = key.kind === "email";
   const rows = await sql`
@@ -821,8 +827,8 @@ export async function teacherDetail(rawKey: string, filters: HistoryFilters) {
       OR (${!isEmail} AND LOWER(TRIM(i.teacher_email)) = '' AND LOWER(TRIM(i.teacher_name)) = ${key.value}))
       AND (${kindAll} OR b.batch_kind = ${filters.batchKind})
       AND (${statusAll} OR b.status = ${filters.status})
-      AND (${fromAll} OR b.business_week_start >= ${filters.from})
-      AND (${toAll} OR b.business_week_start <= ${filters.to})
+      AND (${fromAll} OR b.business_week_start >= ${fromDate}::date)
+      AND (${toAll} OR b.business_week_start <= ${toDate}::date)
     ORDER BY b.business_week_start DESC, b.attempt DESC, i.position
     LIMIT ${filters.pageSize} OFFSET ${offset}
   `;
@@ -836,8 +842,8 @@ export async function teacherDetail(rawKey: string, filters: HistoryFilters) {
       OR (${!isEmail} AND LOWER(TRIM(i.teacher_email)) = '' AND LOWER(TRIM(i.teacher_name)) = ${key.value}))
       AND (${kindAll} OR b.batch_kind = ${filters.batchKind})
       AND (${statusAll} OR b.status = ${filters.status})
-      AND (${fromAll} OR b.business_week_start >= ${filters.from})
-      AND (${toAll} OR b.business_week_start <= ${filters.to})
+      AND (${fromAll} OR b.business_week_start >= ${fromDate}::date)
+      AND (${toAll} OR b.business_week_start <= ${toDate}::date)
     GROUP BY b.id
     ORDER BY b.business_week_start DESC, b.attempt DESC
   `;
@@ -855,8 +861,8 @@ export async function teacherDetail(rawKey: string, filters: HistoryFilters) {
       OR (${!isEmail} AND LOWER(TRIM(i.teacher_email)) = '' AND LOWER(TRIM(i.teacher_name)) = ${key.value}))
       AND (${kindAll} OR b.batch_kind = ${filters.batchKind})
       AND (${statusAll} OR b.status = ${filters.status})
-      AND (${fromAll} OR b.business_week_start >= ${filters.from})
-      AND (${toAll} OR b.business_week_start <= ${filters.to})
+      AND (${fromAll} OR b.business_week_start >= ${fromDate}::date)
+      AND (${toAll} OR b.business_week_start <= ${toDate}::date)
   `;
   const first = summaryRows[0] as Record<string, any> | undefined;
   return {
