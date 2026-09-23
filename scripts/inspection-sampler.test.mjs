@@ -74,6 +74,41 @@ test("普通抽检数小于教师数时先覆盖有普通课程的教师，风�
   assert.equal(result.riskRows.length, 2);
 });
 
+test("全覆盖后优先用未反馈教师的额外课程加频", () => {
+  const focusRows = [
+    row(10, "a@xdf.cn"),
+    row(11, "a@xdf.cn"),
+    row(12, "b@xdf.cn"),
+    row(13, "b@xdf.cn"),
+    row(14, "c@xdf.cn"),
+    row(15, "c@xdf.cn"),
+  ];
+  const result = buildInspectionSelection(focusRows, roster, {
+    sampleCount: 4,
+    attempt: 1,
+    sourceSha256: "a".repeat(64),
+    rosterSha256: "b".repeat(64),
+    sourceName: "课程反馈.xlsx",
+    sourceColumns: ["老师姓名", "老师邮箱", "课次ID"],
+    priorityMode: "coverage",
+    focusTeacherNames: ["a"],
+  });
+  const selectedByTeacher = new Map();
+  for (const selected of result.selectedRows) {
+    selectedByTeacher.set(selected.teacherEmail, (selectedByTeacher.get(selected.teacherEmail) || 0) + 1);
+  }
+  assert.equal(result.stats.selectedTeachers, 3);
+  assert.equal(result.stats.normalSelectedRows, 4);
+  assert.equal(selectedByTeacher.get("a@xdf.cn"), 2);
+  assert.equal(selectedByTeacher.get("b@xdf.cn"), 1);
+  assert.equal(selectedByTeacher.get("c@xdf.cn"), 1);
+  assert.equal(result.stats.focusTeacherExtraRows, 1);
+  assert.ok(result.selectedRows.some((selected) => selected.teacherEmail === "a@xdf.cn"
+    && selected.selectionReason.includes("未反馈教师剩余名额加频")));
+  assert.equal(result.priority.focusTeacherCount, 1);
+  assert.equal(result.priority.matchedFocusTeacherCount, 1);
+});
+
 test("普通抽检上限为零时仍抽取全部未生成报告课程", () => {
   const result = build(0);
   assert.equal(result.stats.normalSelectedRows, 0);

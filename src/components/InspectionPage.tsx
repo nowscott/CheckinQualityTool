@@ -73,23 +73,33 @@ export function InspectionPage() {
     workerRef.current?.terminate();
     workerRef.current = null;
     setProcessing(true);
-    const priorityLabel = priorityMode === "unreported" ? "优先读取本月未反馈名单" : "优先覆盖不同教师";
+    const priorityLabel = priorityMode === "unreported"
+      ? "优先覆盖本月未反馈教师"
+      : "优先全覆盖教师，剩余名额为未反馈教师加频";
     updateStatus(priorityLabel, "正在准备抽检数据。", 2);
 
     let focusTeacherNames: string[] = [];
     let focusSourceSummary = "";
-    if (priorityMode === "unreported") {
-      try {
-        updateStatus("正在读取腾讯文档", "读取“反馈抽检重点关注”页的本月未反馈教师。", 5);
-        const focus = await loadUnreportedTeacherNames();
-        focusTeacherNames = focus.names;
-        focusSourceSummary = `重点关注表 ${focus.rowCount} 行，其中未反馈 ${focus.unreportedRowCount} 行、${focus.names.length} 位教师。`;
-        if (focus.missingNameRows) focusSourceSummary += ` ${focus.missingNameRows} 行缺少教师姓名，已跳过。`;
-      } catch (error) {
+    try {
+      updateStatus(
+        "正在读取腾讯文档",
+        priorityMode === "coverage"
+          ? "读取未反馈教师名单，以便在全覆盖后给未反馈教师加频。"
+          : "读取“反馈抽检重点关注”页的本月未反馈教师。",
+        5,
+      );
+      const focus = await loadUnreportedTeacherNames();
+      focusTeacherNames = focus.names;
+      focusSourceSummary = `重点关注表 ${focus.rowCount} 行，其中未反馈 ${focus.unreportedRowCount} 行、${focus.names.length} 位教师。`;
+      if (priorityMode === "coverage") focusSourceSummary += " 覆盖教师后，剩余名额优先用于未反馈教师加频。";
+      if (focus.missingNameRows) focusSourceSummary += ` ${focus.missingNameRows} 行缺少教师姓名，已跳过。`;
+    } catch (error) {
+      if (priorityMode === "unreported") {
         updateStatus("读取未反馈名单失败", errorMessage(error), 100, "error");
         setProcessing(false);
         return;
       }
+      focusSourceSummary = `重点关注表读取失败，本次覆盖优先导出将按稳定排序补足剩余名额，不进行未反馈教师加频。${errorMessage(error)}`;
     }
 
     const worker = createProcessingWorker();
@@ -103,12 +113,15 @@ export function InspectionPage() {
         const complete = data as InspectionWorkerComplete;
         downloadResult(complete.chunks, complete.filename);
         const prioritySummary = complete.priority;
-        const focusMessage = prioritySummary.mode === "unreported"
+        const focusMessage = prioritySummary.focusTeacherCount
           ? `；未反馈教师 ${prioritySummary.focusTeacherCount} 位，匹配 ${prioritySummary.matchedFocusTeacherCount} 位，未匹配 ${prioritySummary.unmatchedFocusTeacherCount} 位，同名冲突 ${prioritySummary.ambiguousFocusTeacherCount} 位`
+          : "";
+        const focusExtraMessage = complete.summary.focusTeacherExtraRows
+          ? `；未反馈教师加频 ${complete.summary.focusTeacherExtraRows} 条`
           : "";
         updateStatus(
           "处理完成，结果已下载",
-          `候选 ${complete.summary.eligibleTeachers.toLocaleString()} 位教师、${complete.summary.eligibleRows.toLocaleString()} 条课程；排除管理岗位 ${complete.summary.excludedManagementTeachers.toLocaleString()} 位教师、${complete.summary.excludedManagementRows.toLocaleString()} 条课程；抽检 ${complete.summary.selectedRows.toLocaleString()} 条，命中 ${complete.summary.selectedTeachers.toLocaleString()} 位教师${focusMessage}。${focusSourceSummary}`,
+          `候选 ${complete.summary.eligibleTeachers.toLocaleString()} 位教师、${complete.summary.eligibleRows.toLocaleString()} 条课程；排除管理岗位 ${complete.summary.excludedManagementTeachers.toLocaleString()} 位教师、${complete.summary.excludedManagementRows.toLocaleString()} 条课程；抽检 ${complete.summary.selectedRows.toLocaleString()} 条，命中 ${complete.summary.selectedTeachers.toLocaleString()} 位教师${focusMessage}${focusExtraMessage}。${focusSourceSummary}`,
           100,
           "done",
         );
@@ -183,7 +196,7 @@ export function InspectionPage() {
           </button>
         </div>
         <p className="inspection-local-note">
-          仅排除岗位描述含“经理”的教师，主管仍参与抽检。未反馈优先选项会实时读取腾讯文档；课程与教师文件只在当前浏览器处理，不上传到服务器。
+          仅排除岗位描述含“经理”的教师，主管仍参与抽检。全覆盖优先会先覆盖教师，再用剩余名额给未反馈教师加频；名单实时读取腾讯文档。课程与教师文件只在当前浏览器处理，不上传到服务器。
         </p>
       </section>
       <StatusCard status={status} />
