@@ -202,6 +202,7 @@ export function InspectionPage() {
   const [activeBatch, setActiveBatch] = useState<BatchSummary | null>(null);
   const [pendingReplacement, setPendingReplacement] = useState<BatchSummary | null>(null);
   const [history, setHistory] = useState<BatchSummary[]>([]);
+  const [voidingBatchId, setVoidingBatchId] = useState("");
   const [historyView, setHistoryView] = useState<HistoryView>("teachers");
   const [historyQuery, setHistoryQuery] = useState("");
   const [historyPage, setHistoryPage] = useState(1);
@@ -514,6 +515,37 @@ export function InspectionPage() {
       setHistoryDetailPage(page);
     } catch (error) {
       updateStatus("历史读取失败", errorMessage(error), 100, "error");
+    }
+  }
+
+  async function voidHistoryBatch(batch: BatchSummary) {
+    const kindLabel = batch.batchKind === "trial" ? "试运行" : "正式";
+    const confirmed = window.confirm(
+      `确认作废这个批次？\n业务周：${batch.businessWeekStart}~${batch.businessWeekEnd}\n类型：${kindLabel}\n课程数：${batch.selectedCount.toLocaleString()}\n\n批次和课程明细会保留在已作废历史中，并从当前统计移除；该周可以重新生成同类型批次。`,
+    );
+    if (!confirmed) return;
+
+    setVoidingBatchId(batch.id);
+    try {
+      const response = await fetch(`/api/inspection/batches/${encodeURIComponent(batch.id)}/void`, {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      const body = await responseJson(response);
+      if (!response.ok) {
+        if (response.status === 409) {
+          await Promise.all([loadHistory(1), loadTeachers(1)]);
+        }
+        throw new Error(String(body.error || "批次作废失败。"));
+      }
+      await Promise.all([loadHistory(1), loadTeachers(1)]);
+      if (historyView === "monthly") await loadMonthlyPanelData();
+      updateStatus("批次已作废", "记录和课程明细已保留；该批次已从当前统计中移除。", 100, "done");
+    } catch (error) {
+      updateStatus("批次作废失败", errorMessage(error), 100, "error");
+    } finally {
+      setVoidingBatchId("");
     }
   }
 
@@ -979,7 +1011,12 @@ export function InspectionPage() {
                       <td>{batch.selectedCount.toLocaleString()} / {batch.teacherCount.toLocaleString()}人</td>
                       <td>{batch.unsubmittedCount.toLocaleString()}</td>
                       <td><span className={`history-badge ${batch.batchKind}`}>{batch.batchKind === "trial" ? "试运行" : "正式"}</span> <span className={`history-badge ${batch.status}`}>{batch.status === "active" ? "生效" : "已废弃"}</span></td>
-                      <td><button className="history-action" type="button" onClick={() => void loadHistoryDetail(batch.id)}>查看课程</button></td>
+                      <td>
+                        <div className="history-batch-actions">
+                          <button className="history-action" type="button" onClick={() => void loadHistoryDetail(batch.id)}>查看课程</button>
+                          {isAdmin && batch.status === "active" ? <button className="history-action" type="button" disabled={Boolean(voidingBatchId)} onClick={() => void voidHistoryBatch(batch)}>{voidingBatchId === batch.id ? "正在作废…" : "作废批次"}</button> : null}
+                        </div>
+                      </td>
                     </tr>
                   ))}</tbody>
                 </table>

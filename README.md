@@ -6,7 +6,7 @@
 - 技术栈：Vite 8、React 19、TypeScript 6、Web Worker
 - Excel 读取：SheetJS 0.20.3 浏览器构建
 - Excel 导出：fflate 流式生成 OOXML/XLSX
-- 当前版本：`v2.9.6`
+- 当前版本：`v2.9.7`
 
 打卡质检源文件不会上传服务器。抽检历史接口只保存批次、来源文件摘要和入选课程的审计字段，不保存原始 Excel、课堂反馈正文或报告链接。
 

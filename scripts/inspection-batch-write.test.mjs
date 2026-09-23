@@ -4,6 +4,7 @@ import {
   assertHistoryPayload,
   buildInspectionItemsInsertQueries,
   insertBatch,
+  voidBatch,
 } from "../server/inspection/shared.js";
 
 const sha = "a".repeat(64);
@@ -145,4 +146,45 @@ test("事务失败直接抛错，不执行事务后的读取", async () => {
 
   await assert.rejects(() => insertBatch(sql, payload, "batch-1"), /模拟事务失败/);
   assert.equal(transactions.length, 1);
+});
+
+function fakeVoidSql(results) {
+  const calls = [];
+  const sql = (strings, ...values) => {
+    calls.push({ text: strings.raw.join("?"), values });
+    return Promise.resolve(results.shift() || []);
+  };
+  return { sql, calls };
+}
+
+test("作废只转换仍生效的批次、保留课程明细并原子写审计", async () => {
+  const row = { ...batchRow("batch-void"), status: "voided", voided_at: "2026-09-23T00:00:00.000Z" };
+  const { sql, calls } = fakeVoidSql([[row]]);
+  const result = await voidBatch(sql, "batch-void", "admin-user");
+
+  assert.equal(result.id, "batch-void");
+  assert.equal(result.status, "voided");
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].text, /UPDATE inspection_batches/);
+  assert.match(calls[0].text, /status = 'active'/);
+  assert.match(calls[0].text, /INSERT INTO inspection_audit_log/);
+  assert.match(calls[0].text, /inspection_batch_voided/);
+  assert.doesNotMatch(calls[0].text, /DELETE FROM inspection_items/);
+  assert.ok(calls[0].values.includes("batch-void"));
+  assert.ok(calls[0].values.includes("admin-user"));
+});
+
+test("并发状态已变化时返回冲突，不重复写审计", async () => {
+  const { sql, calls } = fakeVoidSql([[], [{ id: "batch-void", status: "voided" }]]);
+
+  await assert.rejects(() => voidBatch(sql, "batch-void", "admin-user"), /已不是生效状态/);
+  assert.equal(calls.length, 2);
+  assert.doesNotMatch(calls[1].text, /INSERT INTO inspection_audit_log/);
+});
+
+test("作废不存在的批次返回空结果", async () => {
+  const { sql, calls } = fakeVoidSql([[], []]);
+
+  assert.equal(await voidBatch(sql, "missing-batch", "admin-user"), null);
+  assert.equal(calls.length, 2);
 });

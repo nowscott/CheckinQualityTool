@@ -604,6 +604,7 @@ button small { opacity: .78; }
 .history-badge.voided { color: var(--muted); border-color: var(--line); }
 .history-action { width: auto; min-width: auto; padding: 5px 8px; color: var(--green); border: 1px solid var(--green-line); background: transparent; font: 600 12px/1.2 var(--serif); white-space: nowrap; }
 .history-action:hover { color: white; background: var(--green); }
+.history-batch-actions { display: flex; align-items: center; gap: 6px; }
 .history-empty { margin: 0; padding: 18px; color: var(--muted); }
 .history-pagination { padding: 11px 18px; display: flex; align-items: center; justify-content: flex-end; gap: 10px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); }
 .history-pagination button { width: auto; min-width: 62px; padding: 6px 9px; color: var(--green); border: 1px solid var(--green-line); background: transparent; font: 600 12px/1.2 var(--serif); }

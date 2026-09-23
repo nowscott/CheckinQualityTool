@@ -4,6 +4,7 @@ import logoutHandler from "../src/server/inspection/auth/logout.js";
 import meHandler from "../src/server/inspection/auth/me.js";
 import batchesHandler from "../src/server/inspection/batches.js";
 import replaceHandler from "../src/server/inspection/batches/[id]/replace.js";
+import voidHandler from "../src/server/inspection/batches/[id]/void.js";
 import currentHandler from "../src/server/inspection/current.js";
 import historyHandler from "../src/server/inspection/history.js";
 import historyDetailHandler from "../src/server/inspection/history/[id].js";
@@ -36,6 +37,7 @@ function route(request: ApiRequest): { handler: Handler; request: ApiRequest } |
   if (root === "auth" && second === "logout") return { handler: logoutHandler as Handler, request };
   if (root === "auth" && second === "me") return { handler: meHandler as Handler, request };
   if (root === "audit") return { handler: auditHandler as Handler, request };
+  if (root === "batches" && second && third === "void") return { handler: voidHandler as Handler, request: withParam(request, "id", second) };
   if (root === "batches" && second && third === "replace") return { handler: replaceHandler as Handler, request: withParam(request, "id", second) };
   if (root === "batches") return { handler: batchesHandler as Handler, request };
   if (root === "current") return { handler: currentHandler as Handler, request };
