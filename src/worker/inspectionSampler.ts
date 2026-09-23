@@ -10,6 +10,7 @@ import type {
   InspectionSourceRow,
   InspectionPriorityMode,
   RosterInfo,
+  InspectionTeacherScore,
 } from "./inspectionTypes";
 
 function hashString(value: string) {
@@ -113,7 +114,124 @@ function compareDisplayRows(left: InspectionSourceRow, right: InspectionSourceRo
 }
 
 function normalizeTeacherName(value: string) {
-  return value.normalize("NFKC").replace(/\s+/gu, "").trim().toLocaleLowerCase();
+  return value.normalize("NFKC").replace(/[\p{White_Space}\p{Cf}]/gu, "").trim().toLocaleLowerCase();
+}
+
+function normalizeTeacherContext(value: unknown) {
+  return String(value ?? "").normalize("NFKC").replace(/[\p{White_Space}\p{Cf}]/gu, "").trim().toLocaleLowerCase();
+}
+
+function withoutTrailingDigits(value: string) {
+  return value.replace(/[0-9０-９]+$/u, "");
+}
+
+function sourceContext(row: InspectionSourceRow, aliases: readonly string[]) {
+  for (const alias of aliases) {
+    const value = normalizeTeacherContext(row.source[alias]);
+    if (value) return value;
+  }
+  return "";
+}
+
+function resolveTeacherScores(
+  rows: InspectionSourceRow[],
+  scoreRows: readonly InspectionTeacherScore[],
+  directScores: Record<string, number> | undefined,
+) {
+  const emailsByName = new Map<string, Set<string>>();
+  const emailsByBaseName = new Map<string, Set<string>>();
+  const contextsByEmail = new Map<string, { groups: Set<string>; leaders: Set<string> }>();
+  const eligibleTeacherEmails = new Set(rows.map((row) => row.teacherEmail.trim().toLocaleLowerCase()).filter(Boolean));
+
+  const addName = (index: Map<string, Set<string>>, name: string, email: string) => {
+    if (!name || !email) return;
+    if (!index.has(name)) index.set(name, new Set());
+    index.get(name)!.add(email);
+  };
+  for (const row of rows) {
+    const email = row.teacherEmail.trim().toLocaleLowerCase();
+    if (!email) continue;
+    const identity = contextsByEmail.get(email) || { groups: new Set<string>(), leaders: new Set<string>() };
+    const group = sourceContext(row, ["教研组"]);
+    const leader = sourceContext(row, ["师训组长"]);
+    if (group) identity.groups.add(group);
+    if (leader) identity.leaders.add(leader);
+    contextsByEmail.set(email, identity);
+    for (const name of teacherNameKeys(row)) {
+      addName(emailsByName, name, email);
+      addName(emailsByBaseName, withoutTrailingDigits(name), email);
+    }
+  }
+
+  const scoresByEmail = new Map<string, number>();
+  const conflictedEmails = new Set<string>();
+  let ambiguousScoreRowCount = 0;
+  let unmatchedScoreRowCount = 0;
+
+  const keepContextMatches = (
+    candidates: Set<string>,
+    targetValue: string,
+    contextKey: "groups" | "leaders",
+  ) => {
+    if (!targetValue) return candidates;
+    const withContext = [...candidates].filter((email) => contextsByEmail.get(email)?.[contextKey].size);
+    if (!withContext.length) return candidates;
+    return new Set([...candidates].filter((email) => contextsByEmail.get(email)?.[contextKey].has(targetValue)));
+  };
+
+  for (const scoreRow of scoreRows) {
+    if (!scoreRow.teacherName || !Number.isFinite(scoreRow.priorityRank)) continue;
+    const scoreName = normalizeTeacherName(scoreRow.teacherName);
+    let candidates = new Set(emailsByName.get(scoreName) || []);
+    if (!candidates.size) candidates = new Set(emailsByBaseName.get(withoutTrailingDigits(scoreName)) || []);
+    candidates = keepContextMatches(candidates, normalizeTeacherContext(scoreRow.researchGroup), "groups");
+    candidates = keepContextMatches(candidates, normalizeTeacherContext(scoreRow.trainingLeader), "leaders");
+
+    if (!candidates.size) {
+      unmatchedScoreRowCount += 1;
+      continue;
+    }
+    if (candidates.size > 1) {
+      ambiguousScoreRowCount += 1;
+      for (const email of candidates) conflictedEmails.add(email);
+      continue;
+    }
+
+    const email = [...candidates][0];
+    const previous = scoresByEmail.get(email);
+    if (previous !== undefined && previous !== scoreRow.priorityRank) {
+      conflictedEmails.add(email);
+      ambiguousScoreRowCount += 1;
+      continue;
+    }
+    scoresByEmail.set(email, scoreRow.priorityRank);
+  }
+
+  for (const email of conflictedEmails) scoresByEmail.delete(email);
+  for (const [email, score] of Object.entries(directScores || {})) {
+    const normalizedEmail = email.trim().toLocaleLowerCase();
+    if (eligibleTeacherEmails.has(normalizedEmail) && Number.isFinite(score) && !conflictedEmails.has(normalizedEmail)) {
+      scoresByEmail.set(normalizedEmail, score);
+    }
+  }
+
+  const sourceIdentities = new Set(scoreRows
+    .filter((row) => row.teacherName && Number.isFinite(row.priorityRank))
+    .map((row) => [
+      normalizeTeacherName(row.teacherName),
+      normalizeTeacherContext(row.researchGroup),
+      normalizeTeacherContext(row.trainingLeader),
+    ].join("\u0000")));
+  return {
+    scoresByEmail,
+    sourceTeacherCount: sourceIdentities.size,
+    matchedTeacherCount: scoresByEmail.size,
+    missingTeacherCount: [...eligibleTeacherEmails].filter((email) => !scoresByEmail.has(email)).length,
+    ambiguousTeacherCount: conflictedEmails.size,
+    conflictedEmails,
+    unmatchedScoreRowCount,
+    ambiguousScoreRowCount,
+  };
 }
 
 function teacherNameKeys(row: InspectionSourceRow) {
@@ -130,13 +248,12 @@ function selectionReason(
   focusReason?: string,
   scoreReason?: string,
 ) {
-  const reasons: string[] = [];
-  if (row.unsubmitted) reasons.push("报告未生成容量外加抽");
-  if (focusReason) reasons.push(focusReason);
-  if (scoreReason) reasons.push(scoreReason);
-  if (coverage) reasons.push("教师覆盖");
-  if (fill) reasons.push("补足抽检数");
-  return reasons.join("；") || "稳定抽检排序";
+  if (row.unsubmitted) return "报告未生成容量外加抽";
+  if (focusReason) return focusReason;
+  if (scoreReason) return scoreReason;
+  if (coverage) return "教师覆盖";
+  if (fill) return "补足抽检数";
+  return "稳定抽检排序";
 }
 
 export function buildInspectionSelection(
@@ -151,6 +268,7 @@ export function buildInspectionSelection(
     sourceColumns?: string[];
     priorityMode?: InspectionPriorityMode;
     focusTeacherNames?: string[];
+    teacherScoreRows?: InspectionTeacherScore[];
     teacherScoresByEmail?: Record<string, number>;
   },
 ): InspectionSelection {
@@ -169,10 +287,14 @@ export function buildInspectionSelection(
     Boolean(row.teacherEmail) && !roster.emails.has(row.teacherEmail),
   ).length;
   const normalRows = activeRows.filter((row) => !row.unsubmitted);
-  const teacherScoresByEmail = new Map<string, number>();
-  for (const [email, score] of Object.entries(options.teacherScoresByEmail || {})) {
-    if (Number.isFinite(score)) teacherScoresByEmail.set(email.trim().toLocaleLowerCase(), score);
-  }
+  const scoreResolution = resolveTeacherScores(inRosterRows, options.teacherScoreRows || [], options.teacherScoresByEmail);
+  const activeTeacherEmails = new Set(activeRows.map((row) => row.teacherEmail.trim().toLocaleLowerCase()).filter(Boolean));
+  const teacherScoresByEmail = new Map([...scoreResolution.scoresByEmail]
+    .filter(([email]) => activeTeacherEmails.has(email)));
+  const ambiguousActiveTeacherCount = [...scoreResolution.conflictedEmails]
+    .filter((email) => activeTeacherEmails.has(email)).length;
+  const missingActiveTeacherCount = [...activeTeacherEmails]
+    .filter((email) => !teacherScoresByEmail.has(email)).length;
 
   const groups = new Map<string, InspectionSourceRow[]>();
   for (const row of normalRows) {
@@ -216,6 +338,10 @@ export function buildInspectionSelection(
     matchedFocusTeacherCount: matchedFocusTeacherKeys.size,
     unmatchedFocusTeacherCount: Math.max(0, focusNameKeys.size - matchedFocusNameCount - ambiguousFocusTeacherCount),
     ambiguousFocusTeacherCount,
+    scoreSourceTeacherCount: scoreResolution.sourceTeacherCount,
+    matchedScoreTeacherCount: teacherScoresByEmail.size,
+    missingScoreTeacherCount: missingActiveTeacherCount,
+    ambiguousScoreTeacherCount: ambiguousActiveTeacherCount,
   };
   const focusReason = priorityMode === "coverage"
     ? "未反馈教师剩余名额加频"

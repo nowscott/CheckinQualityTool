@@ -481,8 +481,25 @@ button small { opacity: .78; }
 }
 .mode-tabs button:hover { color: var(--ink); background: var(--card-hover); }
 .mode-tabs button.active { color: white; background: var(--green); }
+.page-resource-links { margin: -4px 0 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+.page-resource-link {
+  min-height: 34px;
+  padding: 7px 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--green);
+  border: 1px solid var(--green-line);
+  background: var(--card-translucent);
+  font-size: 13px;
+  text-decoration: none;
+}
+.page-resource-link::after { content: "↗"; font: 700 12px/1 ui-monospace, monospace; }
+.page-resource-link:hover { color: white; border-color: var(--green); background: var(--green); }
 .inspection-card { margin-top: 0; }
 .inspection-count-field { width: min(240px, 100%); margin-top: 18px; display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
+.inspection-explanation-option { margin-top: 14px; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.inspection-explanation-option input { width: 16px; height: 16px; margin: 0; accent-color: var(--green); }
 .inspection-export-actions { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 10px; }
 .inspection-export-actions button { width: auto; min-width: 220px; padding: 11px 16px; }
 .inspection-export-actions button.secondary { color: var(--green); border: 1px solid var(--green-line); background: transparent; }

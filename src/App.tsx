@@ -146,7 +146,7 @@ export default function App() {
       <main className="shell">
         <Header
           title={activePage === "inspection" ? "课堂反馈抽检" : undefined}
-          subtitle={activePage === "inspection" ? "仅排除经理岗位，主管仍参与抽检；支持教师覆盖优先，或按腾讯文档中的本月未反馈教师优先导出。" : undefined}
+          subtitle={activePage === "inspection" ? "仅排除经理岗位，主管仍参与抽检；按教师覆盖、未反馈名单和教学服务赋分安排抽检顺序。" : undefined}
           showGuide={activePage === "checkin"}
           theme={theme}
           usesSystemTheme={usesSystemTheme}
@@ -158,6 +158,37 @@ export default function App() {
           <button type="button" className={activePage === "checkin" ? "active" : ""} onClick={() => setActivePage("checkin")}>打卡质检</button>
           <button type="button" className={activePage === "inspection" ? "active" : ""} onClick={() => setActivePage("inspection")}>课堂反馈抽检</button>
         </nav>
+        <div className="page-resource-links">
+          {activePage === "inspection" ? (
+            <>
+              <a
+                className="page-resource-link"
+                href="https://docs.qq.com/sheet/DUGFUT3dOckJVeXFm?tab=8gfbuz"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                未反馈重点关注
+              </a>
+              <a
+                className="page-resource-link"
+                href="https://docs.qq.com/sheet/DUGFUT3dOckJVeXFm?tab=wlc6il"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                教学服务赋分
+              </a>
+            </>
+          ) : (
+            <a
+              className="page-resource-link"
+              href="https://docs.qq.com/sheet/DUGFUT3dOckJVeXFm?tab=BB08J2"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              白名单
+            </a>
+          )}
+        </div>
         {activePage === "inspection" ? (
           <InspectionPage />
         ) : (
