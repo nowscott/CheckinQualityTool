@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertSameOrigin, hashPassword, verifyPassword } from "../shared.js";
+import { assertSameOrigin, hashPassword, verifyPassword } from "../server/inspection/shared.js";
 
 test("scrypt password hashes verify and use a fresh salt", async () => {
   const first = await hashPassword("a-secure-test-password");

@@ -22,6 +22,7 @@ export type InspectionBatchKind = "formal" | "trial";
 
 export interface RosterInfo {
   emails: Set<string>;
+  roleExcludedEmails: Set<string>;
   sourceName: string;
   snapshotDate: string;
   rowCount: number;
@@ -34,6 +35,13 @@ export interface DefaultRosterAsset {
   sourceSha256: string;
   rowCount: number;
   matchedEmailRows: number;
+  emails: string[];
+  roleExcludedEmails?: string[];
+}
+
+export interface DefaultRosterRoleExclusionAsset {
+  snapshotDate: string;
+  sourceFile: string;
   emails: string[];
 }
 
@@ -64,6 +72,7 @@ export interface InspectionStats {
   excludedRows: number;
   excludedNoEmailRows: number;
   excludedNotInRosterRows: number;
+  excludedRoleRows: number;
   unknownSubmissionRows: number;
 }
 

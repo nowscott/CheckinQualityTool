@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const { buildInspectionSelection } = await import("../worker/inspectionSampler.js");
+const { buildInspectionSelection, historyItems } = await import("../worker/inspectionSampler.js");
+const { displayTeacherName } = await import("../lib/teacherDisplay.js");
 
 const roster = {
   emails: new Set(["a@xdf.cn", "b@xdf.cn", "c@xdf.cn"]),
+  roleExcludedEmails: new Set(),
   sourceName: "在职教师明细20260915.xlsx",
   snapshotDate: "2026-09-15",
   rowCount: 3,
@@ -84,4 +86,50 @@ test("输出展示顺序将同一教师课程连续排列", () => {
     seen.add(email);
     previous = email;
   }
+});
+
+test("岗位描述含主管或经理的教师不进入抽检和未生成报告风险表", () => {
+  const result = buildInspectionSelection(
+    rows,
+    { ...roster, roleExcludedEmails: new Set(["b@xdf.cn"]) },
+    {
+      sampleCount: 20,
+      attempt: 1,
+      sourceSha256: "a".repeat(64),
+      rosterSha256: "b".repeat(64),
+      sourceName: "课程反馈.xlsx",
+      sourceColumns: ["老师姓名", "老师邮箱", "课次ID"],
+    },
+  );
+  assert.equal(result.stats.excludedRoleRows, 1);
+  assert.equal(result.stats.eligibleRows, 3);
+  assert.equal(result.stats.unsubmittedRows, 2);
+  assert.ok(result.selectedRows.every((item) => item.teacherEmail !== "b@xdf.cn"));
+  assert.ok(result.riskRows.every((item) => item.teacherEmail !== "b@xdf.cn"));
+});
+
+test("教师展示姓名按邮箱末尾数字统一，历史记录复用同一规则", () => {
+  assert.equal(displayTeacherName("吴君怡", "wujunyi7@xdf.cn"), "吴君怡7");
+  assert.equal(displayTeacherName("吴君怡3", "wujunyi7@xdf.cn"), "吴君怡7");
+  assert.equal(displayTeacherName("吴君怡", "wujunyi@xdf.cn"), "吴君怡");
+  const items = historyItems([{
+    selectionOrder: 1,
+    teacherName: "吴君怡3",
+    teacherEmail: "wujunyi7@xdf.cn",
+    studentName: "学员",
+    studentId: "S1",
+    courseId: "C1",
+    lessonStart: "2026-09-08 10:00:00",
+    lessonEnd: "2026-09-08 12:00:00",
+    submittedValue: "是",
+    productGroup: "",
+    campus: "",
+    projectGroup: "",
+    unsubmitted: false,
+    selectionKey: "k",
+    sourceRowNumber: 1,
+    source: {},
+    selectionReason: "测试",
+  }]);
+  assert.equal(items[0].teacherName, "吴君怡7");
 });

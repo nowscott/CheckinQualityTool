@@ -1,4 +1,5 @@
 import { excelDate, text } from "./utils";
+import { displayTeacherName } from "../lib/teacherDisplay.js";
 import type {
   InspectionCandidateRow,
   InspectionHistoryItem,
@@ -10,7 +11,7 @@ import type {
   RosterInfo,
 } from "./inspectionTypes";
 
-export const INSPECTION_RULE_VERSION = "inspection-v1";
+export const INSPECTION_RULE_VERSION = "inspection-v2-role-exclusion";
 
 function hashString(value: string) {
   let hash = 2166136261;
@@ -93,9 +94,17 @@ export function buildInspectionSelection(
     ...row,
     selectionKey: hashScore(`${seed}|${row.teacherEmail}|${row.courseId}|${row.sourceRowNumber}`),
   }));
-  const activeRows = sourceRows.filter((row) => row.teacherEmail && roster.emails.has(row.teacherEmail));
+  const roleExcludedEmails = roster.roleExcludedEmails || new Set<string>();
+  const activeRows = sourceRows.filter((row) =>
+    row.teacherEmail && roster.emails.has(row.teacherEmail) && !roleExcludedEmails.has(row.teacherEmail),
+  );
   const excludedNoEmailRows = sourceRows.filter((row) => !row.teacherEmail).length;
-  const excludedNotInRosterRows = sourceRows.filter((row) => Boolean(row.teacherEmail) && !roster.emails.has(row.teacherEmail)).length;
+  const excludedNotInRosterRows = sourceRows.filter((row) =>
+    Boolean(row.teacherEmail) && !roster.emails.has(row.teacherEmail),
+  ).length;
+  const excludedRoleRows = sourceRows.filter((row) =>
+    Boolean(row.teacherEmail) && roster.emails.has(row.teacherEmail) && roleExcludedEmails.has(row.teacherEmail),
+  ).length;
 
   const groups = new Map<string, InspectionSourceRow[]>();
   for (const row of activeRows) {
@@ -176,6 +185,7 @@ export function buildInspectionSelection(
       excludedRows: sourceRows.length - activeRows.length,
       excludedNoEmailRows,
       excludedNotInRosterRows,
+      excludedRoleRows,
       unknownSubmissionRows: activeRows.filter((row) => !["是", "否"].includes(row.submittedValue)).length,
     },
     sourceName: options.sourceName,
@@ -195,7 +205,7 @@ export function buildInspectionSelection(
 export function historyItems(rows: InspectionSelectedRow[]): InspectionHistoryItem[] {
   return rows.map((row) => ({
     position: row.selectionOrder,
-    teacherName: row.teacherName,
+    teacherName: displayTeacherName(row.teacherName, row.teacherEmail),
     teacherEmail: row.teacherEmail,
     studentName: row.studentName,
     studentId: row.studentId,

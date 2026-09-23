@@ -1,4 +1,5 @@
 import { buildWorkbook } from "./excelWriter";
+import { displayTeacherName } from "../lib/teacherDisplay.js";
 import { historyItems } from "./inspectionSampler";
 import type { DataRow, SheetDefinition } from "./types";
 import type { InspectionOutput, InspectionSelection } from "./inspectionTypes";
@@ -44,7 +45,7 @@ function sourceColumns(selection: InspectionSelection) {
 
 function selectedRows(selection: InspectionSelection) {
   return selection.selectedRows.map((row) => ({
-    教师姓名: row.teacherName,
+    教师姓名: displayTeacherName(row.teacherName, row.teacherEmail),
     学员姓名: row.studentName,
     课次日期: manualDate(row.lessonStart),
     课次时间: manualTime(row.lessonStart, row.lessonEnd),
@@ -76,7 +77,7 @@ function selectedRows(selection: InspectionSelection) {
 
 function riskRows(selection: InspectionSelection) {
   return selection.riskRows.map((row) => ({
-    教师姓名: row.teacherName,
+    教师姓名: displayTeacherName(row.teacherName, row.teacherEmail),
     学员姓名: row.studentName,
     课次日期: manualDate(row.lessonStart),
     课次时间: manualTime(row.lessonStart, row.lessonEnd),
@@ -180,7 +181,7 @@ export function buildInspectionOutput(selection: InspectionSelection, includeExp
       { 项目: "未生成报告课程数", 值: selection.stats.unsubmittedRows },
       { 项目: "未生成报告且被抽检数", 值: selection.stats.unsubmittedSelectedRows },
       { 项目: "排除课程数", 值: selection.stats.excludedRows },
-      { 项目: "排除原因", 值: `无邮箱 ${selection.stats.excludedNoEmailRows} 条；邮箱不在职 ${selection.stats.excludedNotInRosterRows} 条` },
+      { 项目: "排除原因", 值: `无邮箱 ${selection.stats.excludedNoEmailRows} 条；邮箱不在职 ${selection.stats.excludedNotInRosterRows} 条；岗位描述含主管/经理 ${selection.stats.excludedRoleRows} 条` },
       { 项目: "提交字段未知值", 值: selection.stats.unknownSubmissionRows },
       { 项目: "数据保存范围", 值: "数据库只保存抽检审计记录，不保存原始 Excel、课堂反馈正文或报告链接" },
     ];

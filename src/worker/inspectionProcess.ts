@@ -6,7 +6,7 @@ import { parseInspectionRoster, parseInspectionRows, sha256File } from "./inspec
 import { progress } from "./progress";
 import { readWorkbook } from "./excelReader";
 import type { InspectionRequest, WorkerResponse } from "../types/worker";
-import type { DefaultRosterAsset, RosterInfo } from "./inspectionTypes";
+import type { DefaultRosterAsset, DefaultRosterRoleExclusionAsset, RosterInfo } from "./inspectionTypes";
 
 interface WorkerScope {
   postMessage(message: unknown, transfer?: Transferable[]): void;
@@ -47,8 +47,17 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     const response = await fetch("/data/inspection-roster.json", { cache: "no-store" });
     if (!response.ok) throw new Error("内置在职明细读取失败，请上传一份最新在职明细。 ");
     const asset = (await response.json()) as DefaultRosterAsset;
+    let roleExcludedEmails = asset.roleExcludedEmails || [];
+    if (!roleExcludedEmails.length) {
+      const roleResponse = await fetch("/data/inspection-role-exclusions.json", { cache: "no-store" });
+      if (roleResponse.ok) {
+        const roleAsset = (await roleResponse.json()) as DefaultRosterRoleExclusionAsset;
+        roleExcludedEmails = Array.isArray(roleAsset.emails) ? roleAsset.emails : [];
+      }
+    }
     roster = {
       emails: new Set(asset.emails),
+      roleExcludedEmails: new Set(roleExcludedEmails),
       sourceName: `${asset.sourceFile}（项目内置）`,
       snapshotDate: asset.snapshotDate,
       rowCount: asset.rowCount,
@@ -56,7 +65,11 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     };
     rosterSha256 = asset.sourceSha256;
   }
-  progress("正在核对在职教师", `在职明细识别到 ${roster.emails.size.toLocaleString()} 个有效邮箱。`, 52);
+  progress(
+    "正在核对在职教师",
+    `在职明细识别到 ${roster.emails.size.toLocaleString()} 个有效邮箱，排除主管/经理 ${roster.roleExcludedEmails.size.toLocaleString()} 人。`,
+    52,
+  );
 
   const sourceSha256 = await sha256File(request.feedbackFile);
   const selection = buildInspectionSelection(rows, roster, {
@@ -74,6 +87,6 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     72,
   );
   const output = buildInspectionOutput(selection, request.includeExplanation);
-  progress("正在准备抽检工作簿", "写入抽检名单和未生成报告风险表。", 84);
+  progress("Excel 已生成", "正在交给页面保存抽检历史。", 90);
   postInspectionComplete(scope, output);
 }

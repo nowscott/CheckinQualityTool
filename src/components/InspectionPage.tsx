@@ -256,6 +256,11 @@ export function InspectionPage() {
     workerRef.current = null;
   }
 
+  function disposeWorker() {
+    workerRef.current?.terminate();
+    workerRef.current = null;
+  }
+
   async function loadAuthenticatedData() {
     await Promise.all([loadHistory(1), loadTeachers(1)]);
   }
@@ -649,13 +654,17 @@ export function InspectionPage() {
       }
       if (data.type !== "inspectionComplete") return;
       const complete = data as InspectionWorkerComplete;
-      finishWorker();
+      disposeWorker();
       setSummary(complete.summary);
       try {
         let saved: SaveResponse | null = null;
-        if (saveHistory) saved = await savePayload(complete.historyPayload, action, replaceBatchId);
+        if (saveHistory) {
+          updateStatus("正在保存抽检历史", "正在批量保存抽检课程，Excel 内容已经生成。", 92);
+          saved = await savePayload(complete.historyPayload, action, replaceBatchId);
+        }
         if (saved?.conflict && saved.batch) {
           setPendingReplacement(saved.batch);
+          setProcessing(false);
           updateStatus("本周已有抽检批次", `已有第 ${saved.batch.attempt} 次抽检记录。确认替换后才会生成新名单。`, 100, "error");
           return;
         }
@@ -664,6 +673,7 @@ export function InspectionPage() {
           await runInspection(saved.batch.attempt, "reuse", "", false);
           return;
         }
+        setProcessing(false);
         if (saved?.batch) {
           setActiveBatch(saved.batch);
           setPendingReplacement(null);
@@ -680,7 +690,8 @@ export function InspectionPage() {
         downloadResult(complete.chunks, complete.filename);
       } catch (error) {
         const message = errorMessage(error);
-        updateStatus("结果已下载，历史保存失败", message, 100, "error");
+        setProcessing(false);
+        updateStatus("Excel 已生成，历史保存失败", message, 100, "error");
         downloadResult(complete.chunks, complete.filename);
       }
     };
@@ -850,7 +861,8 @@ export function InspectionPage() {
 
       {summary ? (
         <section className="inspection-summary">
-          <article><span>候选课程</span><strong>{summary.eligibleRows.toLocaleString()}</strong><small>已通过在职邮箱过滤</small></article>
+          <article><span>候选课程</span><strong>{summary.eligibleRows.toLocaleString()}</strong><small>已通过在职和岗位过滤</small></article>
+          <article><span>主管/经理排除</span><strong>{summary.excludedRoleRows.toLocaleString()}</strong><small>不进入抽检和风险表</small></article>
           <article><span>抽检课程</span><strong>{summary.selectedRows.toLocaleString()}</strong><small>不超过负责人填写的上限</small></article>
           <article><span>覆盖教师</span><strong>{summary.selectedTeachers.toLocaleString()}</strong><small>优先保证教师覆盖</small></article>
           <article><span>未生成报告</span><strong>{summary.unsubmittedRows.toLocaleString()}</strong><small>风险表会完整列出</small></article>
