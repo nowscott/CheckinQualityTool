@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.10.3",
+    date: "2026-09-23",
+    items: [
+      "抽检仅排除岗位含“经理”的教师，主管和助理主管继续参与抽检；同步更新内置岗位名单与名单生成规则。",
+    ],
+  },
+  {
     version: "v2.10.2",
     date: "2026-09-23",
     items: [

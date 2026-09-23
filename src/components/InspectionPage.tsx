@@ -156,7 +156,7 @@ export function InspectionPage() {
             name="inspection_roster_file"
             step="02 / 可选"
             title="上传最新在职教师明细"
-            description="不上传时使用 2026-09-22 内置名单；上传表需含岗位描述字段。主管、经理和纠偏名单教师会排除。"
+            description="不上传时使用 2026-09-22 内置名单；上传表需含岗位描述字段。经理岗位排除，主管仍参与抽检。"
             file={rosterFile}
             required={false}
             onChange={setRosterFile}
@@ -183,7 +183,7 @@ export function InspectionPage() {
           </button>
         </div>
         <p className="inspection-local-note">
-          岗位描述含“主管”或“经理”的教师及岗位纠偏名单人员不参与抽检。未反馈优先选项会实时读取腾讯文档；课程与教师文件只在当前浏览器处理，不上传到服务器。
+          仅排除岗位描述含“经理”的教师，主管仍参与抽检。未反馈优先选项会实时读取腾讯文档；课程与教师文件只在当前浏览器处理，不上传到服务器。
         </p>
       </section>
       <StatusCard status={status} />
