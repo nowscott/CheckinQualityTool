@@ -850,7 +850,8 @@ export function InspectionPage() {
 
       {summary ? (
         <section className="inspection-summary">
-          <article><span>候选课程</span><strong>{summary.eligibleRows.toLocaleString()}</strong><small>已通过在职邮箱过滤</small></article>
+          <article><span>候选课程</span><strong>{summary.eligibleRows.toLocaleString()}</strong><small>已通过在职和岗位过滤</small></article>
+          <article><span>主管/经理排除</span><strong>{summary.excludedRoleRows.toLocaleString()}</strong><small>不进入抽检和风险表</small></article>
           <article><span>抽检课程</span><strong>{summary.selectedRows.toLocaleString()}</strong><small>不超过负责人填写的上限</small></article>
           <article><span>覆盖教师</span><strong>{summary.selectedTeachers.toLocaleString()}</strong><small>优先保证教师覆盖</small></article>
           <article><span>未生成报告</span><strong>{summary.unsubmittedRows.toLocaleString()}</strong><small>风险表会完整列出</small></article>

@@ -1,4 +1,5 @@
 import type { ChatRow, DataRow, MatchInfo, TargetRow, Whitelist } from "./types";
+import { displayTeacherName } from "../lib/teacherDisplay.js";
 import { excelDate, normalizeMatchText, sortDate } from "./utils";
 import { findWhitelistEntry } from "./whitelist";
 
@@ -31,13 +32,6 @@ interface TargetPlan {
   aliasKeywords: string[];
   whitelistEntry: ReturnType<typeof findWhitelistEntry>;
   whitelistExempt: boolean;
-}
-
-function listTeacherNameWithEmailSuffix(listTeacherName: string, listTeacherEmail: string) {
-  const localPart = String(listTeacherEmail || "").split("@")[0];
-  const emailDigits = localPart.match(/(\d+)$/)?.[1] || "";
-  if (!emailDigits) return listTeacherName;
-  return `${String(listTeacherName || "").replace(/[0-9０-９]+$/u, "")}${emailDigits}`;
 }
 
 function hitLocations(item: NormalizedChat, keyword: string) {
@@ -213,7 +207,7 @@ export function matchData(
     const id = targetIndex + 1;
     finalRows.push({
       序号: id,
-      教师姓名: listTeacherNameWithEmailSuffix(target.教师姓名, target.教师邮箱),
+      教师姓名: displayTeacherName(target.教师姓名, target.教师邮箱),
       教师邮箱: target.教师邮箱,
       学生姓名: target.原始学员姓名,
       匹配学员姓名: target.学员姓名,

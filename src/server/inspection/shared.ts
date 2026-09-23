@@ -3,6 +3,7 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { neon } from "@neondatabase/serverless";
+import { displayTeacherName } from "../../lib/teacherDisplay.js";
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -199,7 +200,7 @@ export function assertHistoryPayload(value: unknown) {
     const row = (item || {}) as Record<string, unknown>;
     return {
       position: safeInt(row.position, index + 1),
-      teacherName: safeText(row.teacherName, 80),
+      teacherName: displayTeacherName(safeText(row.teacherName, 80), safeText(row.teacherEmail, 160).toLowerCase()),
       teacherEmail: safeText(row.teacherEmail, 160).toLowerCase(),
       studentName: safeText(row.studentName, 80),
       studentId: safeText(row.studentId, 120),
@@ -534,7 +535,7 @@ async function itemsFor(sql: any, batchId: string) {
   const rows: Array<Record<string, any>> = await sql`SELECT position, teacher_name, teacher_email, student_name, student_id, course_id, lesson_start, lesson_end, submitted_value, product_group, campus, project_group, selection_reason FROM inspection_items WHERE batch_id = ${batchId} ORDER BY position`;
   return rows.map((row) => ({
     position: row.position,
-    teacherName: row.teacher_name,
+    teacherName: displayTeacherName(row.teacher_name, row.teacher_email),
     teacherEmail: row.teacher_email,
     studentName: row.student_name,
     studentId: row.student_id,
@@ -658,7 +659,7 @@ function mapInspectionItem(row: Record<string, any>) {
     status: row.status,
     batchKind: row.batch_kind === "trial" ? "trial" : "formal",
     position: row.position,
-    teacherName: row.teacher_name,
+    teacherName: displayTeacherName(row.teacher_name, row.teacher_email),
     teacherEmail: row.teacher_email,
     studentName: row.student_name,
     studentId: row.student_id,
@@ -734,7 +735,7 @@ export async function teacherSummaries(filters: HistoryFilters) {
   return {
     teachers: rows.map((row: Record<string, any>) => ({
       teacherKey: row.teacher_key,
-      teacherName: row.teacher_name || "未命名教师",
+      teacherName: displayTeacherName(row.teacher_name || "未命名教师", row.teacher_email),
       teacherEmail: row.teacher_email || "",
       courseCount: row.course_count,
       batchCount: row.batch_count,
@@ -810,7 +811,7 @@ export async function teacherDetail(rawKey: string, filters: HistoryFilters) {
   return {
     teacher: first && first.course_count ? {
       teacherKey: rawKey,
-      teacherName: first.teacher_name || "未命名教师",
+      teacherName: displayTeacherName(first.teacher_name || "未命名教师", first.teacher_email),
       teacherEmail: first.teacher_email || "",
       courseCount: safeInt(first.course_count),
       batchCount: safeInt(first.batch_count),
@@ -849,7 +850,7 @@ export async function historyBatch(id: string, page = 1, pageSize = 100) {
     ...mapBatch(rows[0]),
     items: itemRows.map((row: Record<string, any>) => ({
       position: row.position,
-      teacherName: row.teacher_name,
+      teacherName: displayTeacherName(row.teacher_name, row.teacher_email),
       teacherEmail: row.teacher_email,
       studentName: row.student_name,
       studentId: row.student_id,
@@ -893,7 +894,7 @@ export async function monthlyInspection(month: string) {
       businessWeekEnd: databaseDate(row.business_week_end),
       attempt: row.attempt,
       position: row.position,
-      teacherName: row.teacher_name,
+      teacherName: displayTeacherName(row.teacher_name, row.teacher_email),
       teacherEmail: row.teacher_email,
       studentName: row.student_name,
       studentId: row.student_id,

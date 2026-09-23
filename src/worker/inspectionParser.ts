@@ -3,6 +3,8 @@ import { emailValue, excelDate, excelTime, text } from "./utils";
 import type { CellValue, DataRow } from "./types";
 import type { InspectionSourceRow, RosterInfo } from "./inspectionTypes";
 
+const ROLE_DESCRIPTION_HEADERS = ["岗位描述", "岗位短描述", "职位描述", "职位"] as const;
+
 function firstIndex(map: Map<string, number[]>, aliases: readonly string[]) {
   for (const alias of aliases) {
     const index = map.get(alias)?.[0];
@@ -92,17 +94,23 @@ export function parseInspectionRoster(workbook: SheetJsWorkbook, fileName: strin
   }).filter((item) => item.emailIndex >= 0).sort((left, right) => right.candidate.rows.length - left.candidate.rows.length);
   if (!candidates.length) throw new Error("找不到在职明细中的邮箱列。需要“邮箱”或“教师邮箱”字段。");
   const found = candidates[0];
+  const roleDescriptionIndex = firstIndex(found.candidate.map, ROLE_DESCRIPTION_HEADERS);
   const emails = new Set<string>();
+  const roleExcludedEmails = new Set<string>();
   let matchedEmailRows = 0;
   for (const row of found.candidate.rows.slice(1)) {
     const email = emailValue(row[found.emailIndex]);
     if (!email) continue;
     matchedEmailRows += 1;
     emails.add(email);
+    if (roleDescriptionIndex >= 0 && /主管|经理/u.test(text(row[roleDescriptionIndex]))) {
+      roleExcludedEmails.add(email);
+    }
   }
   if (!emails.size) throw new Error("在职明细的邮箱列没有有效邮箱，无法进行在职教师过滤。");
   return {
     emails,
+    roleExcludedEmails,
     sourceName: fileName,
     snapshotDate: rosterDate(fileName),
     rowCount: Math.max(0, found.candidate.rows.length - 1),
