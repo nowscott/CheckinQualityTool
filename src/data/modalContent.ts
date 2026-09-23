@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.10.1",
+    date: "2026-09-23",
+    items: [
+      "恢复 /remind、/report 与 /stage-report 旧入口回退到首页，修复抽检简化版本发布后的路径 404。",
+    ],
+  },
+  {
     version: "v2.10.0",
     date: "2026-09-23",
     items: [

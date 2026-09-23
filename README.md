@@ -6,7 +6,7 @@
 - 技术栈：Vite 8、React 19、TypeScript 6、Web Worker
 - Excel 读取：SheetJS 0.20.3 浏览器构建
 - Excel 导出：fflate 流式生成 OOXML/XLSX
-- 当前版本：`v2.10.0`
+- 当前版本：`v2.10.1`
 
 上传的 Excel 不会上传或保存到服务器。抽检仅调用腾讯文档接口读取“反馈抽检重点关注”页中的未反馈教师名单。
 
