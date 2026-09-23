@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 const { buildInspectionSelection, historyItems } = await import("../worker/inspectionSampler.js");
+const { hasExcludedInspectionRole } = await import("../worker/inspectionRoleRules.js");
 const { displayTeacherName } = await import("../lib/teacherDisplay.js");
 
 const roster = {
@@ -101,7 +102,15 @@ test("输出展示顺序将同一教师课程连续排列", () => {
   }
 });
 
-test("岗位含主管或经理的教师从普通抽检和容量外加抽中全部排除", () => {
+test("只排除经理岗位；主管岗位继续参与抽检", () => {
+  assert.equal(hasExcludedInspectionRole("经理"), true);
+  assert.equal(hasExcludedInspectionRole("课程经理"), true);
+  assert.equal(hasExcludedInspectionRole("主管"), false);
+  assert.equal(hasExcludedInspectionRole("助理主管"), false);
+  assert.equal(hasExcludedInspectionRole("师训主管"), false);
+});
+
+test("经理邮箱名单中的教师从普通抽检和容量外加抽中全部排除", () => {
   const managerRows = [...rows, row(6, "b@xdf.cn", "否")];
   const result = buildInspectionSelection(
     managerRows,

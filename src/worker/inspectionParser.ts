@@ -97,7 +97,7 @@ export function parseInspectionRoster(workbook: SheetJsWorkbook, fileName: strin
   const found = candidates[0];
   const roleDescriptionIndex = firstIndex(found.candidate.map, ROLE_DESCRIPTION_HEADERS);
   if (roleDescriptionIndex < 0) {
-    throw new Error("在职明细缺少岗位描述字段。请上传包含“岗位短描述”等岗位字段的完整明细，确保主管和经理岗位能从抽检范围排除。");
+    throw new Error("在职明细缺少岗位描述字段。请上传包含“岗位短描述”等岗位字段的完整明细，以便排除经理岗位。");
   }
   const emails = new Set<string>();
   const roleRows: Array<{ email: unknown; roleDescription?: unknown }> = [];

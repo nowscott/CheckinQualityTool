@@ -51,10 +51,10 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     let roleExcludedEmails = asset.roleExcludedEmails || [];
     if (!roleExcludedEmails.length) {
       const roleResponse = await fetch("/data/inspection-role-exclusions.json", { cache: "no-store" });
-      if (!roleResponse.ok) throw new Error("内置管理岗位排除名单读取失败，请稍后重试。");
+      if (!roleResponse.ok) throw new Error("内置经理岗位排除名单读取失败，请稍后重试。");
       const roleAsset = (await roleResponse.json()) as DefaultRosterRoleExclusionAsset;
       if (!Array.isArray(roleAsset.emails) || roleAsset.emails.some((email) => typeof email !== "string")) {
-        throw new Error("内置管理岗位排除名单格式无效，请更新页面后重试。");
+        throw new Error("内置经理岗位排除名单格式无效，请更新页面后重试。");
       }
       roleExcludedEmails = roleAsset.emails;
     }
@@ -71,7 +71,7 @@ export async function processInspection(request: InspectionRequest, scope: Worke
   const excludedRosterRoleCount = [...roster.roleExcludedEmails].filter((email) => roster.emails.has(email)).length;
   progress(
     "正在核对在职教师",
-    `在职明细识别到 ${roster.emails.size.toLocaleString()} 个有效邮箱；岗位含“主管”或“经理”及纠偏名单中的 ${excludedRosterRoleCount.toLocaleString()} 人已排除抽检。`,
+    `在职明细识别到 ${roster.emails.size.toLocaleString()} 个有效邮箱；岗位含“经理”的 ${excludedRosterRoleCount.toLocaleString()} 人已排除抽检，主管仍参与抽检。`,
     52,
   );
 

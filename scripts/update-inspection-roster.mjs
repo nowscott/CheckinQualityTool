@@ -107,7 +107,7 @@ for (const row of selected.rows.slice(1)) {
   matchedEmailRows += 1;
   emails.add(email);
   const role = selected.roleIndex >= 0 ? cellText(row[selected.roleIndex]) : "";
-  if (/主管|经理/u.test(role)) roleExcludedEmails.add(email);
+  if (/经理/u.test(role)) roleExcludedEmails.add(email);
 }
 
 if (!emails.size) throw new Error("邮箱列没有可识别的邮箱，未更新名单。");
@@ -132,4 +132,4 @@ atomicJsonWrite(resolve(projectRoot, "public/data/inspection-role-exclusions.jso
 console.log(`来源工作表：${selected.name}`);
 console.log(`快照日期：${date}`);
 console.log(`明细行：${roster.rowCount}；有效邮箱行：${matchedEmailRows}；唯一邮箱：${emails.size}`);
-console.log(`主管/经理岗位邮箱：${roleExcludedEmails.size}；非空但无法解析的邮箱单元格：${unmatchedNonemptyEmailRows}`);
+console.log(`经理岗位邮箱：${roleExcludedEmails.size}；非空但无法解析的邮箱单元格：${unmatchedNonemptyEmailRows}`);
