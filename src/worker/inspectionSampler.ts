@@ -11,7 +11,7 @@ import type {
   RosterInfo,
 } from "./inspectionTypes";
 
-export const INSPECTION_RULE_VERSION = "inspection-v2-role-exclusion";
+export const INSPECTION_RULE_VERSION = "inspection-v3-role-risk-only";
 
 function hashString(value: string) {
   let hash = 2166136261;
@@ -95,16 +95,12 @@ export function buildInspectionSelection(
     selectionKey: hashScore(`${seed}|${row.teacherEmail}|${row.courseId}|${row.sourceRowNumber}`),
   }));
   const roleExcludedEmails = roster.roleExcludedEmails || new Set<string>();
-  const activeRows = sourceRows.filter((row) =>
-    row.teacherEmail && roster.emails.has(row.teacherEmail) && !roleExcludedEmails.has(row.teacherEmail),
-  );
+  const activeRows = sourceRows.filter((row) => row.teacherEmail && roster.emails.has(row.teacherEmail));
   const excludedNoEmailRows = sourceRows.filter((row) => !row.teacherEmail).length;
   const excludedNotInRosterRows = sourceRows.filter((row) =>
     Boolean(row.teacherEmail) && !roster.emails.has(row.teacherEmail),
   ).length;
-  const excludedRoleRows = sourceRows.filter((row) =>
-    Boolean(row.teacherEmail) && roster.emails.has(row.teacherEmail) && roleExcludedEmails.has(row.teacherEmail),
-  ).length;
+  const excludedRoleRows = activeRows.filter((row) => row.unsubmitted && roleExcludedEmails.has(row.teacherEmail)).length;
 
   const groups = new Map<string, InspectionSourceRow[]>();
   for (const row of activeRows) {
@@ -155,7 +151,7 @@ export function buildInspectionSelection(
     .map((row, index) => ({ ...row, selectionOrder: index + 1 }));
   const selectedOrders = new Map(selectedRows.map((row) => [rowKey(row), row]));
   const riskRows: InspectionRiskRow[] = activeRows
-    .filter((row) => row.unsubmitted)
+    .filter((row) => row.unsubmitted && !roleExcludedEmails.has(row.teacherEmail))
     .sort(compareDisplayRows)
     .map((row) => {
       const picked = selectedOrders.get(rowKey(row));
@@ -180,8 +176,8 @@ export function buildInspectionSelection(
       eligibleTeachers: teacherGroups.length,
       selectedRows: selectedRows.length,
       selectedTeachers: selectedTeachers.size,
-      unsubmittedRows: activeRows.filter((row) => row.unsubmitted).length,
-      unsubmittedSelectedRows: selectedRows.filter((row) => row.unsubmitted).length,
+      unsubmittedRows: riskRows.length,
+      unsubmittedSelectedRows: selectedRows.filter((row) => row.unsubmitted && !roleExcludedEmails.has(row.teacherEmail)).length,
       excludedRows: sourceRows.length - activeRows.length,
       excludedNoEmailRows,
       excludedNotInRosterRows,
