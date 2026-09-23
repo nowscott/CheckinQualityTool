@@ -999,6 +999,38 @@ export async function replaceBatch(id: string, rawPayload: unknown, actorUserId:
   return result;
 }
 
+export async function voidBatch(sql: any, id: string, actorUserId: string) {
+  const rows = await sql`
+    WITH changed AS (
+      UPDATE inspection_batches
+      SET status = 'voided', voided_at = now()
+      WHERE id = ${id} AND status = 'active'
+      RETURNING *
+    ), logged AS (
+      INSERT INTO inspection_audit_log (id, actor_user_id, action, metadata)
+      SELECT ${crypto.randomUUID()}, ${actorUserId}, 'inspection_batch_voided',
+        jsonb_build_object(
+          'batchId', id,
+          'businessWeekStart', TO_CHAR(business_week_start, 'YYYY-MM-DD'),
+          'batchKind', batch_kind,
+          'selectedCount', selected_count
+        )
+      FROM changed
+      RETURNING id
+    )
+    SELECT changed.* FROM changed JOIN logged ON true
+  `;
+  if (rows.length) return mapBatch(rows[0]);
+
+  const existing = await sql`SELECT id, status FROM inspection_batches WHERE id = ${id} LIMIT 1`;
+  if (!existing.length) return null;
+  throw new Error("当前批次已不是生效状态，请刷新后重试。");
+}
+
+export async function voidInspectionBatch(id: string, actorUserId: string) {
+  return voidBatch(await database(), id, actorUserId);
+}
+
 // Vercel treats every TypeScript file below /api as a function entrypoint.
 // This module is shared by the real handlers, but the fallback keeps its
 // accidental direct URL non-operational if the platform packages it too.
