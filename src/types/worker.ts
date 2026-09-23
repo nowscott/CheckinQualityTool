@@ -30,6 +30,8 @@ export interface InspectionRequest {
   includeExplanation: boolean;
   priorityMode: InspectionPriorityMode;
   focusTeacherNames: string[];
+  /** Optional future score source, keyed by normalized teacher email. */
+  teacherScoresByEmail?: Record<string, number>;
 }
 
 export interface InspectionWorkerComplete {

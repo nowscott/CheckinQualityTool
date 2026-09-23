@@ -32,6 +32,53 @@ function compareRows(left: InspectionSourceRow, right: InspectionSourceRow) {
   );
 }
 
+interface TeacherCourseGroup {
+  key: string;
+  rows: InspectionSourceRow[];
+  sortKey: string;
+}
+
+type TeacherScoresByEmail = ReadonlyMap<string, number>;
+
+function teacherScore(row: InspectionSourceRow, scores: TeacherScoresByEmail) {
+  const score = scores.get(row.teacherEmail.trim().toLocaleLowerCase());
+  return typeof score === "number" && Number.isFinite(score) ? score : undefined;
+}
+
+function compareRowsByLowScore(
+  left: InspectionSourceRow,
+  right: InspectionSourceRow,
+  scores: TeacherScoresByEmail,
+) {
+  const leftScore = teacherScore(left, scores);
+  const rightScore = teacherScore(right, scores);
+  if (leftScore === undefined && rightScore !== undefined) return 1;
+  if (leftScore !== undefined && rightScore === undefined) return -1;
+  return leftScore === undefined || rightScore === undefined
+    ? compareRows(left, right)
+    : leftScore - rightScore || compareRows(left, right);
+}
+
+function compareGroupsForShortage(
+  left: TeacherCourseGroup,
+  right: TeacherCourseGroup,
+  focusedGroupKeys: Set<string>,
+  scores: TeacherScoresByEmail,
+) {
+  const leftFocused = focusedGroupKeys.has(left.key);
+  const rightFocused = focusedGroupKeys.has(right.key);
+  if (leftFocused !== rightFocused) return leftFocused ? -1 : 1;
+  if (leftFocused) return left.sortKey.localeCompare(right.sortKey) || left.key.localeCompare(right.key);
+
+  const leftScore = teacherScore(left.rows[0], scores);
+  const rightScore = teacherScore(right.rows[0], scores);
+  if (leftScore === undefined && rightScore !== undefined) return -1;
+  if (leftScore !== undefined && rightScore === undefined) return 1;
+  return leftScore === undefined || rightScore === undefined
+    ? left.sortKey.localeCompare(right.sortKey) || left.key.localeCompare(right.key)
+    : leftScore - rightScore || left.sortKey.localeCompare(right.sortKey) || left.key.localeCompare(right.key);
+}
+
 function uniqueTeacherKey(row: InspectionSourceRow) {
   return row.teacherEmail || `${row.teacherName}\u0000${row.sourceRowNumber}`;
 }
@@ -80,12 +127,13 @@ function selectionReason(
   row: InspectionSourceRow,
   coverage: boolean,
   fill: boolean,
-  focus: boolean,
-  focusReason: string,
+  focusReason?: string,
+  scoreReason?: string,
 ) {
   const reasons: string[] = [];
   if (row.unsubmitted) reasons.push("报告未生成容量外加抽");
-  if (focus) reasons.push(focusReason);
+  if (focusReason) reasons.push(focusReason);
+  if (scoreReason) reasons.push(scoreReason);
   if (coverage) reasons.push("教师覆盖");
   if (fill) reasons.push("补足抽检数");
   return reasons.join("；") || "稳定抽检排序";
@@ -103,6 +151,7 @@ export function buildInspectionSelection(
     sourceColumns?: string[];
     priorityMode?: InspectionPriorityMode;
     focusTeacherNames?: string[];
+    teacherScoresByEmail?: Record<string, number>;
   },
 ): InspectionSelection {
   const sampleCount = Math.max(0, Math.floor(options.sampleCount));
@@ -120,6 +169,10 @@ export function buildInspectionSelection(
     Boolean(row.teacherEmail) && !roster.emails.has(row.teacherEmail),
   ).length;
   const normalRows = activeRows.filter((row) => !row.unsubmitted);
+  const teacherScoresByEmail = new Map<string, number>();
+  for (const [email, score] of Object.entries(options.teacherScoresByEmail || {})) {
+    if (Number.isFinite(score)) teacherScoresByEmail.set(email.trim().toLocaleLowerCase(), score);
+  }
 
   const groups = new Map<string, InspectionSourceRow[]>();
   for (const row of normalRows) {
@@ -127,7 +180,7 @@ export function buildInspectionSelection(
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(row);
   }
-  const teacherGroups = [...groups.entries()].map(([key, teacherRows]) => ({
+  const teacherGroups: TeacherCourseGroup[] = [...groups.entries()].map(([key, teacherRows]) => ({
     key,
     rows: teacherRows,
     sortKey: [...teacherRows].sort((left, right) => left.selectionKey.localeCompare(right.selectionKey))[0]?.selectionKey || "",
@@ -167,18 +220,30 @@ export function buildInspectionSelection(
   const focusReason = priorityMode === "coverage"
     ? "未反馈教师剩余名额加频"
     : "本月未反馈教师优先";
+  const coverageShortage = sampleCount < teacherGroups.length;
+  const focusedGroups = teacherGroups.filter((group) => focusedGroupKeys.has(group.key));
+  const otherGroups = teacherGroups.filter((group) => !focusedGroupKeys.has(group.key));
+  const groupsForPruning = [...otherGroups].sort((left, right) =>
+    compareGroupsForShortage(left, right, focusedGroupKeys, teacherScoresByEmail),
+  );
   const orderedGroups = priorityMode === "unreported"
-    ? [
-      ...teacherGroups.filter((group) => focusedGroupKeys.has(group.key)),
-      ...teacherGroups.filter((group) => !focusedGroupKeys.has(group.key)),
-    ]
-    : teacherGroups;
+    ? [...focusedGroups, ...(coverageShortage ? groupsForPruning : otherGroups)]
+    : coverageShortage
+      ? [...focusedGroups, ...groupsForPruning]
+      : teacherGroups;
 
   const selectedNormal = new Map<string, InspectionSelectedRow>();
   const selectedSourceRows = new Set<string>();
   let focusTeacherExtraRows = 0;
   const rowKey = (row: InspectionSourceRow) => `${row.teacherEmail}\u0000${row.courseId}\u0000${row.sourceRowNumber}`;
-  const add = (row: InspectionSourceRow, coverage: boolean, fill: boolean, focus: boolean) => {
+  const add = (
+    row: InspectionSourceRow,
+    coverage: boolean,
+    fill: boolean,
+    focusReason?: string,
+    scoreReason?: string,
+    countAsFocusExtra = false,
+  ) => {
     if (selectedNormal.size >= sampleCount) return false;
     const key = rowKey(row);
     if (selectedSourceRows.has(key)) return false;
@@ -186,27 +251,48 @@ export function buildInspectionSelection(
     selectedNormal.set(key, {
       ...row,
       selectionOrder: selectedNormal.size + 1,
-      selectionReason: selectionReason(row, coverage, fill, focus, focusReason),
+      selectionReason: selectionReason(row, coverage, fill, focusReason, scoreReason),
     });
-    if (fill && focus) focusTeacherExtraRows += 1;
+    if (fill && countAsFocusExtra) focusTeacherExtraRows += 1;
     return true;
   };
 
   for (const group of orderedGroups) {
     if (selectedNormal.size >= sampleCount) break;
-    add(chooseRow(group.rows), true, false, priorityMode === "unreported" && focusedGroupKeys.has(group.key));
+    const isFocused = focusedGroupKeys.has(group.key);
+    const focusReasonForCoverage = isFocused
+      ? priorityMode === "unreported"
+        ? "本月未反馈教师优先"
+        : coverageShortage
+          ? "未反馈名单保护"
+          : undefined
+      : undefined;
+    const scoreReason = !isFocused && coverageShortage && teacherScore(group.rows[0], teacherScoresByEmail) !== undefined
+      ? "低分优先保留"
+      : undefined;
+    add(chooseRow(group.rows), true, false, focusReasonForCoverage, scoreReason);
   }
 
   const remaining = normalRows
     .filter((row) => !selectedSourceRows.has(rowKey(row)))
     .sort((left, right) => {
-      const leftFocused = focusedGroupKeys.has(uniqueTeacherKey(left));
-      const rightFocused = focusedGroupKeys.has(uniqueTeacherKey(right));
-      return Number(rightFocused) - Number(leftFocused) || compareRows(left, right);
+      if (priorityMode === "coverage") {
+        const leftFocused = focusedGroupKeys.has(uniqueTeacherKey(left));
+        const rightFocused = focusedGroupKeys.has(uniqueTeacherKey(right));
+        if (leftFocused !== rightFocused) return leftFocused ? -1 : 1;
+      }
+      return compareRowsByLowScore(left, right, teacherScoresByEmail);
     });
   for (const row of remaining) {
     if (selectedNormal.size >= sampleCount) break;
-    add(row, false, true, focusedGroupKeys.has(uniqueTeacherKey(row)));
+    const isFocused = focusedGroupKeys.has(uniqueTeacherKey(row));
+    const focusReasonForCoverage = priorityMode === "coverage" && isFocused ? focusReason : undefined;
+    const scoreReason = priorityMode === "unreported" || !isFocused
+      ? teacherScore(row, teacherScoresByEmail) !== undefined
+        ? "低分优先加抽"
+        : undefined
+      : undefined;
+    add(row, false, true, focusReasonForCoverage, scoreReason, isFocused);
   }
 
   const selectedExtra: InspectionSelectedRow[] = activeRows
@@ -215,13 +301,7 @@ export function buildInspectionSelection(
     .map((row, index) => ({
       ...row,
       selectionOrder: selectedNormal.size + index + 1,
-      selectionReason: selectionReason(
-        row,
-        false,
-        false,
-        priorityMode === "unreported" && focusedGroupKeys.has(uniqueTeacherKey(row)),
-        focusReason,
-      ),
+      selectionReason: selectionReason(row, false, false),
     }));
   const unorderedRows = [...selectedNormal.values(), ...selectedExtra];
   const teacherOrder = new Map<string, number>();

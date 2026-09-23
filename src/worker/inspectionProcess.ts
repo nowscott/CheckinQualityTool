@@ -85,6 +85,7 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     sourceColumns: parsed.columns,
     priorityMode: request.priorityMode,
     focusTeacherNames: request.focusTeacherNames,
+    teacherScoresByEmail: request.teacherScoresByEmail,
   });
   progress(
     "抽检名单生成完成",
