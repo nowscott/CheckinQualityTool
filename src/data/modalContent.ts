@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.10.7",
+    date: "2026-09-23",
+    items: [
+      "修正评分匹配：唯一教师姓名直接关联评分；仅在重名时用教研组和师训组长消歧，避免唯一匹配被组织字段变化误删。",
+    ],
+  },
+  {
     version: "v2.10.6",
     date: "2026-09-23",
     items: [

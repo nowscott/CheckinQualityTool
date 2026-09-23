@@ -173,10 +173,11 @@ function resolveTeacherScores(
     targetValue: string,
     contextKey: "groups" | "leaders",
   ) => {
-    if (!targetValue) return candidates;
+    if (candidates.size < 2 || !targetValue) return candidates;
     const withContext = [...candidates].filter((email) => contextsByEmail.get(email)?.[contextKey].size);
     if (!withContext.length) return candidates;
-    return new Set([...candidates].filter((email) => contextsByEmail.get(email)?.[contextKey].has(targetValue)));
+    const matches = new Set([...candidates].filter((email) => contextsByEmail.get(email)?.[contextKey].has(targetValue)));
+    return matches.size ? matches : candidates;
   };
 
   for (const scoreRow of scoreRows) {

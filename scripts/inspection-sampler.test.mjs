@@ -197,6 +197,27 @@ test("评分姓名与组织信息都不能消歧时不套用分数", () => {
   assert.equal(result.priority.missingScoreTeacherCount, 2);
 });
 
+test("唯一姓名匹配时保留评分，不因组织字段变化误判", () => {
+  const candidate = {
+    ...row(35, "a@xdf.cn"),
+    lessonStart: "2026-09-14 10:00:00",
+    teacherName: "唯一教师",
+    source: { 教研组: "当前教研组", 师训组长: "当前组长" },
+  };
+  const result = buildInspectionSelection([candidate], roster, {
+    sampleCount: 1,
+    attempt: 1,
+    sourceSha256: "a".repeat(64),
+    rosterSha256: "b".repeat(64),
+    sourceName: "课程反馈.xlsx",
+    teacherScoreRows: [
+      { teacherName: "唯一教师", researchGroup: "历史教研组", trainingLeader: "历史组长", priorityRank: 1 },
+    ],
+  });
+  assert.equal(result.priority.matchedScoreTeacherCount, 1);
+  assert.equal(result.priority.missingScoreTeacherCount, 0);
+});
+
 test("余量时全覆盖模式先给未反馈教师加频，再按低分排序；未反馈模式按低分加频", () => {
   const scoreRows = [
     row(10, "a@xdf.cn"), row(11, "a@xdf.cn"),

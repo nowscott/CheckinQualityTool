@@ -1,6 +1,6 @@
 import type { CellValue, DataRow, SheetDefinition } from "./types";
 
-export const INSPECTION_RULE_VERSION = "inspection-v9-live-score-source";
+export const INSPECTION_RULE_VERSION = "inspection-v10-unique-score-name-match";
 
 export type InspectionPriorityMode = "coverage" | "unreported";
 
