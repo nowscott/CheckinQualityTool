@@ -1,14 +1,14 @@
 # 打卡质检数据生成工具
 
-课堂反馈质检与抽检工具。打卡质检和课堂反馈抽检的 Excel 解析、清洗、匹配和抽样均在浏览器本地完成；抽检历史只向受用户登录保护的服务端接口提交必要的审计记录。
+课堂反馈质检与抽检工具。打卡质检和课堂反馈抽检的 Excel 解析、清洗、匹配和抽样均在浏览器本地完成；抽检重点名单从腾讯文档实时读取，不保存登录状态或抽检历史。
 
 - 生产地址：[https://daka.0211120.xyz](https://daka.0211120.xyz)
 - 技术栈：Vite 8、React 19、TypeScript 6、Web Worker
 - Excel 读取：SheetJS 0.20.3 浏览器构建
 - Excel 导出：fflate 流式生成 OOXML/XLSX
-- 当前版本：`v2.9.8`
+- 当前版本：`v2.10.0`
 
-打卡质检源文件不会上传服务器。抽检历史接口只保存批次、来源文件摘要和入选课程的审计字段，不保存原始 Excel、课堂反馈正文或报告链接。
+上传的 Excel 不会上传或保存到服务器。抽检仅调用腾讯文档接口读取“反馈抽检重点关注”页中的未反馈教师名单。
 
 ## 当前功能范围
 
@@ -16,33 +16,13 @@
 
 ### 课堂反馈抽检
 
-抽检页接收周度课程反馈明细和可选的最新在职明细，使用教师邮箱精确过滤非在职教师；岗位描述（兼容“岗位短描述”等表头）含“主管”或“经理”的教师仍参与教师覆盖和课程抽检，但其未生成报告记录不进入“未生成报告风险”Sheet。不上传在职明细时，默认使用 `public/data/inspection-roster.json` 和对应的岗位排除快照；上传 Excel 时以本次上传版本覆盖默认快照。抽检数按课程条数控制，在上限内先尽量覆盖不同教师，再优先纳入“是否生成报告=否”的课程。结果包含“抽检名单”和“未生成报告风险”两个 Sheet，处理说明可选导出。抽检历史使用用户账号登录，按角色限制查看、生成和管理权限。
+抽检页接收周度课程反馈明细和可选的最新在职明细，使用教师邮箱精确过滤非在职教师；岗位描述（兼容“岗位短描述”等表头）含“主管”或“经理”的教师，以及 `src/data/inspectionRoleCorrections.ts` 中手动纠偏的教师会排除。不上传在职明细时，默认使用截至 2026-09-22 的 `public/data/inspection-roster.json` 和对应岗位排除快照；上传表需带岗位描述字段。结果提供“优先覆盖所有教师”和“优先本月未反馈教师”两种导出；第二种实时读取腾讯文档中的未反馈教师，先为命中教师选课，再覆盖其他教师。符合候选条件且 `是否生成报告=否` 的课程仍会容量外加抽。结果包含“抽检名单”“未生成报告风险”和“处理说明”三个 Sheet；处理说明列出管理岗位排除人数与课程数。
 
 更新内置在职名单时，把最新的 `在职教师明细YYYYMMDD.xlsx` 放入本机专用目录 `data/inspection/roster-source/`，目录内只保留这一份表，然后运行 `node scripts/update-inspection-roster.mjs`。脚本复用项目内置的 SheetJS 和抽检页邮箱、岗位识别口径，生成 `public/data/inspection-roster.json` 与 `public/data/inspection-role-exclusions.json`。源表受 `.gitignore` 的 `*.xlsx` 规则保护，不进入公开仓库或网站；发布时只提交生成后的名单 JSON。脚本会报告无法识别的非空邮箱值数量，需确认后再上线。
 
-抽检历史按“业务周 + 批次类型”幂等保存。同一周同一类型重复生成不会新增批次；更换源文件时需要显式废弃当前批次并重新抽取，旧批次保留为 `voided` 历史。批次类型分为正式和试运行，试运行只用于验证，不占用正式周次或教师频次统计。结果表和历史页面中的教师姓名均按教师邮箱 `@` 前本地部分的末尾数字展示；邮箱无末尾数字时保留原姓名。历史页面默认按教师汇总，展示抽检课程数、批次数、业务周数、最近抽检周和未生成报告数量；批次历史和课程明细通过独立视图及分页查看。
-
 抽检导出兼容手动模板 `9.7-9.13企业微信反馈质检.xlsx`：前 13 列保持原列顺序、蓝色表头、黑色边框、列宽、行高、下拉选项和扣罚公式；历史人工结果不会复制。后续字段追加抽检序号、入选原因、业务周、课次 ID、教师邮箱和报告生成状态等追溯信息。课程源表采用 `nodim` 兼容模式读取实际行数为 833 行但 OOXML dimension 错写为 `A1` 的文件。
 
-抽检名单导出时会把同一教师课程连续排列。抽检历史解锁后，页面还会加载 `data/inspection/teaching-service-q1.json` 的教师维度评分快照，按 2026 年 6–8 月“赋分”模拟月度频次：赋分 95 分及以上每月 1 次，80–95 分每两周 1 次，80 分以下按当月业务周数每周抽检；最低频次完成后，空余次数优先给普检未发送（当前数据对应 `是否生成报告=否`），再给低分教师加抽。季度无分数教师保底 1 次并标记待确认。页面按每周可用抽检次数模拟，默认 900 次，可调整；正式月度已抽次数只统计 `formal` 且 `active` 的数据库批次。
-
-生产环境需要配置以下 Vercel 环境变量：
-
-```text
-DATABASE_URL=Neon Postgres connection string
-```
-
-抽检历史统一使用管理员配置的用户账号登录，不再提供兼容密码入口。数据库表结构见 `db/inspection.sql`，API 首次访问时也会自动创建抽检和认证表。
-
-抽检页优先读取浏览器登录提示 Cookie 恢复界面，随后后台静默向数据库复核会话和角色；提示 Cookie 不参与服务端授权。
-
-首次创建管理员：
-
-```bash
-npm run auth:bootstrap
-```
-
-该命令从本地 `.env.local` 读取 `DATABASE_URL`，交互式创建首个管理员，不会把密码写入代码或数据库明文。
+抽检名单按教师覆盖与未反馈优先级排列。操作员输入的课程条数是普通抽检数；符合现有候选条件且 `是否生成报告=否` 的课程全部容量外加抽，因此总数可以超过输入数。教师姓名去空格后匹配重点关注页，并兼容邮箱末尾数字生成的教师姓名；同名冲突和未匹配数量会显示在导出完成提示中。
 
 ## 业务目标
 
@@ -106,7 +86,7 @@ React 页面负责：
 4. 启动 TypeScript Web Worker。
 5. 展示处理进度并下载结果。
 
-抽检页面另外负责用户登录、上传在职明细、填写抽检数，并将抽检审计记录提交到 `/api/inspection/*`。
+抽检页面负责上传在职明细、填写抽检数，并在本地生成两种优先级的名单。
 
 名单和聊天文件通过结构化克隆传给 Worker，不会发送到服务器；腾讯文档白名单由服务端接口读取后传给本地 Worker。
 
@@ -365,8 +345,8 @@ CSV 字段：
 React 页面
   ├─ 打卡质检：上传文件、选项和状态展示
   ├─ 课堂反馈抽检：在职过滤、稳定抽样和风险表导出
-  ├─ 请求 `/api/whitelist`
-  ├─ 抽检历史：用户会话、角色权限和 Neon Postgres 审计接口
+  ├─ 请求 `/api/whitelist` 读取打卡白名单
+  ├─ 按需请求 `/api/feedback-focus` 读取未反馈教师
   └─ 启动 Vite 打包的经典 Web Worker
        ├─ Vercel API 读取腾讯文档 MCP
        ├─ SheetJS 解析名单与聊天
@@ -377,24 +357,7 @@ React 页面
        └─ fflate 流式生成多 Sheet XLSX
 ```
 
-抽检历史接口：
-
-- `POST /api/inspection/auth/login`：校验用户密码并签发 HttpOnly 会话 Cookie。
-- `POST /api/inspection/auth/logout`：撤销当前用户会话。
-- `GET /api/inspection/auth/me`：读取当前登录用户。
-- `GET /api/inspection/users`、`POST /api/inspection/users`：管理员读取和创建用户。
-- `PATCH /api/inspection/users/:id`：管理员修改角色、显示名和启停状态。
-- `POST /api/inspection/users/:id/reset-password`：管理员重置用户密码。
-- `GET /api/inspection/audit`：管理员读取最近操作审计。
-- `GET /api/inspection/current`：读取当前有效批次。
-- `GET /api/inspection/history`：按关键词、日期、批次类型、状态和分页读取历史批次。
-- `GET /api/inspection/history/:id`：分页读取指定批次的入选课程明细。
-- `GET /api/inspection/teachers`：按教师、邮箱、教研组、项目组、日期、批次类型和状态读取教师汇总。
-- `GET /api/inspection/teachers/:teacherKey`：读取指定教师的业务周、批次和分页课程明细。
-- `POST /api/inspection/batches`：按业务周创建或复用批次。
-- `POST /api/inspection/batches/:id/replace`：废弃当前批次并创建新的抽取尝试。
-
-抽检账号不开放公开注册，由管理员在“用户管理”区域创建并分配 `viewer` 或 `operator` 角色。首个管理员通过 `npm run auth:bootstrap` 创建；`npm run auth:promote -- 用户名` 仅作为受控环境下的应急提升工具，执行后会撤销该账号旧会话并写入审计记录。
+抽检重点名单接口 `GET /api/feedback-focus` 只返回在线表格中标记未反馈的教师姓名和行数；腾讯文档 Token 仅保存在 Vercel 环境变量中。
 
 Worker 使用经典 IIFE 格式，以便继续通过 `importScripts` 加载现有 SheetJS 浏览器构建：
 
@@ -412,7 +375,7 @@ worker: {
 
 - `src/App.tsx`：页面状态、白名单加载、Worker 生命周期、结果下载。
 - `src/components/`：上传表单、状态卡片、结果说明、更新记录和匹配规则弹窗。
-- `src/components/InspectionPage.tsx`：课堂反馈抽检页面、用户登录、角色权限和批次保存。
+- `src/components/InspectionPage.tsx`：课堂反馈抽检页面和两种导出优先级。
 - `src/data/modalContent.ts`：版本更新记录和页面匹配规则文案。
 - `src/hooks/useTheme.ts`：设备主题识别、手动切换和浏览器偏好持久化。
 - `src/styles.css`：全部页面样式。
@@ -431,23 +394,18 @@ worker: {
 - `src/worker/excelWriter.ts`：OOXML 工作表和 ZIP 流式导出。
 - `src/worker/utils.ts`：文本、邮箱、姓名、日期和服务周工具。
 - `src/worker/inspectionParser.ts`：抽检课程和在职明细的动态表头解析。
-- `src/worker/inspectionSampler.ts`：在职过滤、教师覆盖、未生成报告优先和稳定排序。
+- `src/worker/inspectionSampler.ts`：在职过滤、教师覆盖、未反馈教师优先、容量外未生成报告加抽和稳定排序。
 - `src/worker/inspectionWriter.ts`：抽检名单、风险表和可选处理说明导出。
 - `src/worker/types.ts`：Worker 内部数据结构。
 - `src/worker/sheetjs.d.ts`：当前使用到的 SheetJS 最小类型声明。
 - `src/worker/progress.ts`：处理进度消息。
 
-### 抽检历史 API
-
-- `api/inspection.ts`：抽检 API 总入口，按原有路径分发到服务端处理器。
-- `src/server/inspection/shared.ts`：用户会话、角色校验、密码哈希、审计字段校验、Neon 连接和数据库初始化。
-- `src/server/inspection/`：登录、用户管理、抽检批次、历史、教师统计和月度计划处理器。
-- `docs/inspection-auth-plan.md`：用户登录、管理员和角色权限说明。
-
 ### 静态资源和配置
 
 - `public/data/whitelist.csv`：项目内置白名单。
 - `public/data/inspection-roster.json`：默认在职邮箱快照及来源日期。
+- `api/feedback-focus.ts`：读取腾讯文档中的本月未反馈教师。
+- `src/server/tencentDocs.ts`：腾讯文档 MCP 读取和 CSV 解析。
 - `public/vendor/xlsx.full.min.js`：SheetJS 0.20.3 浏览器构建。
 - `scripts/regression-worker.mjs`：构建产物真实数据回归脚本。
 - `vite.config.ts`：React 和经典 Worker 构建配置。

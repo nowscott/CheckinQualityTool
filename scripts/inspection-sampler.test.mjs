@@ -52,19 +52,32 @@ function build(sampleCount, attempt = 1) {
   });
 }
 
-test("抽检数不超过上限，优先覆盖教师并保留风险课程", () => {
+test("普通抽检不超过上限，未生成报告课程在上限外全部加抽", () => {
   const result = build(3);
-  assert.equal(result.selectedRows.length, 3);
+  assert.equal(result.stats.normalSelectedRows, 2);
+  assert.equal(result.stats.extraSelectedRows, 2);
+  assert.equal(result.selectedRows.length, 4);
   assert.equal(new Set(result.selectedRows.map((item) => item.teacherEmail)).size, 3);
   assert.equal(result.stats.unsubmittedRows, 2);
   assert.equal(result.stats.excludedNotInRosterRows, 1);
   assert.equal(result.riskRows.length, 2);
+  assert.ok(result.riskRows.every((item) => item.inspected));
 });
 
-test("抽检数小于教师数时仍按风险优先选择不同教师", () => {
+test("普通抽检数小于教师数时先覆盖有普通课程的教师，风险课程仍全部加抽", () => {
   const result = build(2);
+  assert.equal(result.stats.normalSelectedRows, 2);
+  assert.equal(result.selectedRows.length, 4);
+  assert.equal(new Set(result.selectedRows.map((item) => item.teacherEmail)).size, 3);
+  assert.equal(result.selectedRows.filter((item) => !item.unsubmitted).length, 2);
+  assert.equal(result.riskRows.length, 2);
+});
+
+test("普通抽检上限为零时仍抽取全部未生成报告课程", () => {
+  const result = build(0);
+  assert.equal(result.stats.normalSelectedRows, 0);
+  assert.equal(result.stats.extraSelectedRows, 2);
   assert.equal(result.selectedRows.length, 2);
-  assert.equal(new Set(result.selectedRows.map((item) => item.teacherEmail)).size, 2);
   assert.ok(result.selectedRows.every((item) => item.unsubmitted));
 });
 
@@ -88,10 +101,8 @@ test("输出展示顺序将同一教师课程连续排列", () => {
   }
 });
 
-test("岗位含主管或经理的教师仍参与抽检，但其未生成报告不进入风险表", () => {
-  const managerRows = rows.map((item) => item.teacherEmail === "b@xdf.cn"
-    ? { ...item, submittedValue: "否", unsubmitted: true }
-    : item);
+test("岗位含主管或经理的教师从普通抽检和容量外加抽中全部排除", () => {
+  const managerRows = [...rows, row(6, "b@xdf.cn", "否")];
   const result = buildInspectionSelection(
     managerRows,
     { ...roster, roleExcludedEmails: new Set(["b@xdf.cn"]) },
@@ -104,15 +115,17 @@ test("岗位含主管或经理的教师仍参与抽检，但其未生成报告�
       sourceColumns: ["老师姓名", "老师邮箱", "课次ID"],
     },
   );
-  assert.equal(result.stats.excludedRoleRows, 1);
-  assert.equal(result.stats.eligibleRows, 4);
-  assert.equal(result.stats.eligibleTeachers, 3);
-  assert.equal(result.stats.excludedRows, 1);
+  assert.equal(result.stats.excludedManagementRows, 2);
+  assert.equal(result.stats.excludedManagementTeachers, 1);
+  assert.equal(result.stats.eligibleRows, 3);
+  assert.equal(result.stats.eligibleTeachers, 2);
+  assert.equal(result.stats.excludedRows, 3);
   assert.equal(result.stats.unsubmittedRows, 2);
   assert.equal(result.stats.unsubmittedSelectedRows, 2);
-  assert.ok(result.selectedRows.some((item) => item.teacherEmail === "b@xdf.cn"));
-  assert.ok(result.allEligibleRows.some((item) => item.teacherEmail === "b@xdf.cn"));
+  assert.ok(result.selectedRows.every((item) => item.teacherEmail !== "b@xdf.cn"));
+  assert.ok(result.allEligibleRows.every((item) => item.teacherEmail !== "b@xdf.cn"));
   assert.ok(result.riskRows.every((item) => item.teacherEmail !== "b@xdf.cn"));
+  assert.ok(result.riskRows.every((item) => item.inspected));
 });
 
 test("教师展示姓名按邮箱末尾数字统一，历史记录复用同一规则", () => {

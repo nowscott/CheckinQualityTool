@@ -2,6 +2,7 @@
 
 import { buildInspectionOutput } from "./inspectionWriter";
 import { buildInspectionSelection, normalizeInspectionNumber } from "./inspectionSampler";
+import { normalizedRoleExcludedEmails } from "./inspectionRoleRules";
 import { parseInspectionRoster, parseInspectionRows, sha256File } from "./inspectionParser";
 import { progress } from "./progress";
 import { readWorkbook } from "./excelReader";
@@ -21,7 +22,7 @@ function postInspectionComplete(scope: WorkerScope, output: ReturnType<typeof bu
     byteLength,
     filename: output.filename,
     summary: output.summary,
-    historyPayload: output.historyPayload,
+    priority: output.priority,
   } satisfies WorkerResponse, transfer);
 }
 
@@ -50,14 +51,16 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     let roleExcludedEmails = asset.roleExcludedEmails || [];
     if (!roleExcludedEmails.length) {
       const roleResponse = await fetch("/data/inspection-role-exclusions.json", { cache: "no-store" });
-      if (roleResponse.ok) {
-        const roleAsset = (await roleResponse.json()) as DefaultRosterRoleExclusionAsset;
-        roleExcludedEmails = Array.isArray(roleAsset.emails) ? roleAsset.emails : [];
+      if (!roleResponse.ok) throw new Error("内置管理岗位排除名单读取失败，请稍后重试。");
+      const roleAsset = (await roleResponse.json()) as DefaultRosterRoleExclusionAsset;
+      if (!Array.isArray(roleAsset.emails) || roleAsset.emails.some((email) => typeof email !== "string")) {
+        throw new Error("内置管理岗位排除名单格式无效，请更新页面后重试。");
       }
+      roleExcludedEmails = roleAsset.emails;
     }
     roster = {
       emails: new Set(asset.emails),
-      roleExcludedEmails: new Set(roleExcludedEmails),
+      roleExcludedEmails: normalizedRoleExcludedEmails(roleExcludedEmails),
       sourceName: `${asset.sourceFile}（项目内置）`,
       snapshotDate: asset.snapshotDate,
       rowCount: asset.rowCount,
@@ -65,9 +68,10 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     };
     rosterSha256 = asset.sourceSha256;
   }
+  const excludedRosterRoleCount = [...roster.roleExcludedEmails].filter((email) => roster.emails.has(email)).length;
   progress(
     "正在核对在职教师",
-    `在职明细识别到 ${roster.emails.size.toLocaleString()} 个有效邮箱；岗位含主管/经理的 ${roster.roleExcludedEmails.size.toLocaleString()} 人仍参与抽检，只略过其未生成报告风险记录。`,
+    `在职明细识别到 ${roster.emails.size.toLocaleString()} 个有效邮箱；岗位含“主管”或“经理”及纠偏名单中的 ${excludedRosterRoleCount.toLocaleString()} 人已排除抽检。`,
     52,
   );
 
@@ -79,7 +83,8 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     rosterSha256,
     sourceName: request.feedbackFile.name,
     sourceColumns: parsed.columns,
-    batchKind: request.batchKind,
+    priorityMode: request.priorityMode,
+    focusTeacherNames: request.focusTeacherNames,
   });
   progress(
     "抽检名单生成完成",
@@ -87,6 +92,6 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     72,
   );
   const output = buildInspectionOutput(selection, request.includeExplanation);
-  progress("Excel 已生成", "正在交给页面保存抽检历史。", 90);
+  progress("Excel 已生成", "正在准备下载抽检名单。", 90);
   postInspectionComplete(scope, output);
 }
