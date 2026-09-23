@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.10.2",
+    date: "2026-09-23",
+    items: [
+      "课堂反馈抽检条数默认值调整为 1000，仍可按需要修改。",
+    ],
+  },
+  {
     version: "v2.10.1",
     date: "2026-09-23",
     items: [
