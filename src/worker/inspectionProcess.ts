@@ -67,7 +67,7 @@ export async function processInspection(request: InspectionRequest, scope: Worke
   }
   progress(
     "正在核对在职教师",
-    `在职明细识别到 ${roster.emails.size.toLocaleString()} 个有效邮箱，排除主管/经理 ${roster.roleExcludedEmails.size.toLocaleString()} 人。`,
+    `在职明细识别到 ${roster.emails.size.toLocaleString()} 个有效邮箱；岗位含主管/经理的 ${roster.roleExcludedEmails.size.toLocaleString()} 人仍参与抽检，只略过其未生成报告风险记录。`,
     52,
   );
 

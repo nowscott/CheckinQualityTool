@@ -181,7 +181,7 @@ export function buildInspectionOutput(selection: InspectionSelection, includeExp
       { 项目: "未生成报告课程数", 值: selection.stats.unsubmittedRows },
       { 项目: "未生成报告且被抽检数", 值: selection.stats.unsubmittedSelectedRows },
       { 项目: "排除课程数", 值: selection.stats.excludedRows },
-      { 项目: "排除原因", 值: `无邮箱 ${selection.stats.excludedNoEmailRows} 条；邮箱不在职 ${selection.stats.excludedNotInRosterRows} 条；岗位描述含主管/经理 ${selection.stats.excludedRoleRows} 条` },
+      { 项目: "排除原因", 值: `无邮箱 ${selection.stats.excludedNoEmailRows} 条；邮箱不在职 ${selection.stats.excludedNotInRosterRows} 条；岗位含主管/经理且未生成报告 ${selection.stats.excludedRoleRows} 条（仍参与抽检）` },
       { 项目: "提交字段未知值", 值: selection.stats.unknownSubmissionRows },
       { 项目: "数据保存范围", 值: "数据库只保存抽检审计记录，不保存原始 Excel、课堂反馈正文或报告链接" },
     ];

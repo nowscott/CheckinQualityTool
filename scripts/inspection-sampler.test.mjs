@@ -88,9 +88,12 @@ test("输出展示顺序将同一教师课程连续排列", () => {
   }
 });
 
-test("岗位描述含主管或经理的教师不进入抽检和未生成报告风险表", () => {
+test("岗位含主管或经理的教师仍参与抽检，但其未生成报告不进入风险表", () => {
+  const managerRows = rows.map((item) => item.teacherEmail === "b@xdf.cn"
+    ? { ...item, submittedValue: "否", unsubmitted: true }
+    : item);
   const result = buildInspectionSelection(
-    rows,
+    managerRows,
     { ...roster, roleExcludedEmails: new Set(["b@xdf.cn"]) },
     {
       sampleCount: 20,
@@ -102,9 +105,13 @@ test("岗位描述含主管或经理的教师不进入抽检和未生成报告�
     },
   );
   assert.equal(result.stats.excludedRoleRows, 1);
-  assert.equal(result.stats.eligibleRows, 3);
+  assert.equal(result.stats.eligibleRows, 4);
+  assert.equal(result.stats.eligibleTeachers, 3);
+  assert.equal(result.stats.excludedRows, 1);
   assert.equal(result.stats.unsubmittedRows, 2);
-  assert.ok(result.selectedRows.every((item) => item.teacherEmail !== "b@xdf.cn"));
+  assert.equal(result.stats.unsubmittedSelectedRows, 2);
+  assert.ok(result.selectedRows.some((item) => item.teacherEmail === "b@xdf.cn"));
+  assert.ok(result.allEligibleRows.some((item) => item.teacherEmail === "b@xdf.cn"));
   assert.ok(result.riskRows.every((item) => item.teacherEmail !== "b@xdf.cn"));
 });
 

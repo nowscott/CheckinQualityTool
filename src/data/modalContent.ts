@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.9.6",
+    date: "2026-09-23",
+    items: [
+      "修正主管/经理岗位规则：仍参与教师覆盖和课程抽检，仅从未生成报告风险表中略过。",
+    ],
+  },
+  {
     version: "v2.9.5",
     date: "2026-09-23",
     items: [
