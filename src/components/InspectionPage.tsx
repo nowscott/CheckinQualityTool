@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { downloadResult } from "../lib/download";
 import { UploadCard } from "./UploadCard";
 import { StatusCard } from "./StatusCard";
-import type { InspectionPriorityMode } from "../worker/inspectionTypes";
+import type { InspectionPriorityMode, InspectionTeacherScore } from "../worker/inspectionTypes";
 import type { InspectionWorkerComplete, ProcessingStatus, WorkerResponse } from "../types/worker";
 
 interface FeedbackFocusResponse {
@@ -11,6 +11,14 @@ interface FeedbackFocusResponse {
   unreportedRowCount?: number;
   unreportedTeacherNames?: string[];
   missingNameRows?: number;
+}
+
+interface TeacherScoresResponse {
+  error?: string;
+  rowCount?: number;
+  missingNameRows?: number;
+  missingScoreRows?: number;
+  rows?: InspectionTeacherScore[];
 }
 
 const INITIAL_STATUS: ProcessingStatus = {
@@ -42,10 +50,24 @@ async function loadUnreportedTeacherNames() {
   };
 }
 
+async function loadTeacherScores() {
+  const response = await fetch(`/api/teacher-scores?ts=${Date.now()}`, { cache: "no-store" });
+  const body = (await response.json().catch(() => ({}))) as TeacherScoresResponse;
+  if (!response.ok) throw new Error(body.error || "教学服务评分页读取失败。");
+  if (!Array.isArray(body.rows) || !body.rows.length) throw new Error("教学服务评分页没有可用的评分记录。");
+  return {
+    rows: body.rows,
+    rowCount: Number(body.rowCount || 0),
+    missingNameRows: Number(body.missingNameRows || 0),
+    missingScoreRows: Number(body.missingScoreRows || 0),
+  };
+}
+
 export function InspectionPage() {
   const [feedbackFile, setFeedbackFile] = useState<File | null>(null);
   const [rosterFile, setRosterFile] = useState<File | null>(null);
   const [sampleCount, setSampleCount] = useState("1000");
+  const [includeExplanation, setIncludeExplanation] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [status, setStatus] = useState<ProcessingStatus>(INITIAL_STATUS);
   const workerRef = useRef<Worker | null>(null);
@@ -79,6 +101,7 @@ export function InspectionPage() {
     updateStatus(priorityLabel, "正在准备抽检数据。", 2);
 
     let focusTeacherNames: string[] = [];
+    let teacherScoreRows: InspectionTeacherScore[];
     let focusSourceSummary = "";
     try {
       updateStatus(
@@ -102,6 +125,19 @@ export function InspectionPage() {
       focusSourceSummary = `重点关注表读取失败，本次覆盖优先导出将按稳定排序补足剩余名额，不进行未反馈教师加频。${errorMessage(error)}`;
     }
 
+    try {
+      updateStatus("正在读取评分来源", "按教师姓名及组织信息匹配评分排序；只取优先顺序，不读取原始分值。经理岗位继续排除。", 9);
+      const scores = await loadTeacherScores();
+      teacherScoreRows = scores.rows;
+      focusSourceSummary += ` 评分源 ${scores.rowCount} 行，读取到 ${scores.rows.length} 位教师赋分。`;
+      if (scores.missingNameRows) focusSourceSummary += ` ${scores.missingNameRows} 行缺少教师姓名，已跳过。`;
+      if (scores.missingScoreRows) focusSourceSummary += ` ${scores.missingScoreRows} 行缺少有效赋分，已跳过。`;
+    } catch (error) {
+      updateStatus("读取评分失败", errorMessage(error), 100, "error");
+      setProcessing(false);
+      return;
+    }
+
     const worker = createProcessingWorker();
     workerRef.current = worker;
     worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
@@ -119,9 +155,10 @@ export function InspectionPage() {
         const focusExtraMessage = complete.summary.focusTeacherExtraRows
           ? `；未反馈教师加频 ${complete.summary.focusTeacherExtraRows} 条`
           : "";
+        const scoreMessage = `；评分 ${prioritySummary.matchedScoreTeacherCount}/${prioritySummary.scoreSourceTeacherCount} 位教师匹配，缺分 ${prioritySummary.missingScoreTeacherCount} 位，身份歧义 ${prioritySummary.ambiguousScoreTeacherCount} 位`;
         updateStatus(
           "处理完成，结果已下载",
-          `候选 ${complete.summary.eligibleTeachers.toLocaleString()} 位教师、${complete.summary.eligibleRows.toLocaleString()} 条课程；排除管理岗位 ${complete.summary.excludedManagementTeachers.toLocaleString()} 位教师、${complete.summary.excludedManagementRows.toLocaleString()} 条课程；抽检 ${complete.summary.selectedRows.toLocaleString()} 条，命中 ${complete.summary.selectedTeachers.toLocaleString()} 位教师${focusMessage}${focusExtraMessage}。${focusSourceSummary}`,
+          `候选 ${complete.summary.eligibleTeachers.toLocaleString()} 位教师、${complete.summary.eligibleRows.toLocaleString()} 条课程；排除管理岗位 ${complete.summary.excludedManagementTeachers.toLocaleString()} 位教师、${complete.summary.excludedManagementRows.toLocaleString()} 条课程；抽检 ${complete.summary.selectedRows.toLocaleString()} 条，命中 ${complete.summary.selectedTeachers.toLocaleString()} 位教师${focusMessage}${focusExtraMessage}${scoreMessage}。${focusSourceSummary}`,
           100,
           "done",
         );
@@ -145,9 +182,10 @@ export function InspectionPage() {
       rosterFile: rosterFile || undefined,
       sampleCount: count,
       attempt: 1,
-      includeExplanation: true,
+      includeExplanation,
       priorityMode,
       focusTeacherNames,
+      teacherScoreRows,
     });
   }
 
@@ -187,6 +225,14 @@ export function InspectionPage() {
             onChange={(event) => setSampleCount(event.target.value)}
           />
         </label>
+        <label className="inspection-explanation-option">
+          <input
+            type="checkbox"
+            checked={includeExplanation}
+            onChange={(event) => setIncludeExplanation(event.target.checked)}
+          />
+          同时导出处理说明页
+        </label>
         <div className="inspection-export-actions">
           <button type="button" disabled={!feedbackFile || processing} onClick={() => void exportSelection("coverage")}>
             {processing ? "正在生成…" : "导出：优先全覆盖教师"}
@@ -196,7 +242,7 @@ export function InspectionPage() {
           </button>
         </div>
         <p className="inspection-local-note">
-          仅排除岗位描述含“经理”的教师，主管仍参与抽检。全覆盖优先会先覆盖教师，再用剩余名额给未反馈教师加频；名单实时读取腾讯文档。课程与教师文件只在当前浏览器处理，不上传到服务器。
+          仅排除岗位描述含“经理”的教师，主管仍参与抽检。两种优先方式均从腾讯文档读取本月未反馈名单和教学服务赋分排序；按教师姓名匹配，重名时使用教研组、师训组长消歧。课程与教师文件只在当前浏览器处理，不上传到服务器。
         </p>
       </section>
       <StatusCard status={status} />

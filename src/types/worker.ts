@@ -2,7 +2,7 @@ export type WeekLabel = "auto" | "第一周" | "第二周" | "第三周" | "第�
 
 export type StatusMode = "working" | "done" | "error";
 
-import type { InspectionPriorityMode, InspectionPrioritySummary, InspectionStats } from "../worker/inspectionTypes";
+import type { InspectionPriorityMode, InspectionPrioritySummary, InspectionStats, InspectionTeacherScore } from "../worker/inspectionTypes";
 
 export interface ProcessingStatus {
   visible: boolean;
@@ -30,7 +30,8 @@ export interface InspectionRequest {
   includeExplanation: boolean;
   priorityMode: InspectionPriorityMode;
   focusTeacherNames: string[];
-  /** Optional future score source, keyed by normalized teacher email. */
+  teacherScoreRows: InspectionTeacherScore[];
+  /** Optional direct score map, reserved for deterministic internal fixtures. */
   teacherScoresByEmail?: Record<string, number>;
 }
 

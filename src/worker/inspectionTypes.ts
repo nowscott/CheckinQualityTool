@@ -1,6 +1,6 @@
 import type { CellValue, DataRow, SheetDefinition } from "./types";
 
-export const INSPECTION_RULE_VERSION = "inspection-v8-score-aware-priority-ladder";
+export const INSPECTION_RULE_VERSION = "inspection-v9-live-score-source";
 
 export type InspectionPriorityMode = "coverage" | "unreported";
 
@@ -10,6 +10,17 @@ export interface InspectionPrioritySummary {
   matchedFocusTeacherCount: number;
   unmatchedFocusTeacherCount: number;
   ambiguousFocusTeacherCount: number;
+  scoreSourceTeacherCount: number;
+  matchedScoreTeacherCount: number;
+  missingScoreTeacherCount: number;
+  ambiguousScoreTeacherCount: number;
+}
+
+export interface InspectionTeacherScore {
+  teacherName: string;
+  researchGroup: string;
+  trainingLeader: string;
+  priorityRank: number;
 }
 
 export interface InspectionSourceRow {

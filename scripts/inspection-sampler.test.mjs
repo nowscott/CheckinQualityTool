@@ -4,6 +4,7 @@ import test from "node:test";
 const { buildInspectionSelection, historyItems } = await import("../worker/inspectionSampler.js");
 const { hasExcludedInspectionRole } = await import("../worker/inspectionRoleRules.js");
 const { displayTeacherName } = await import("../lib/teacherDisplay.js");
+const { parseTeacherScoreCsv } = await import("../server/teacherScores.js");
 
 const roster = {
   emails: new Set(["a@xdf.cn", "b@xdf.cn", "c@xdf.cn", "d@xdf.cn"]),
@@ -143,6 +144,57 @@ test("名额不足时保留未反馈重点教师，再按低分优先覆盖", ()
     assert.ok(focusRow?.selectionReason.includes(priorityMode === "coverage" ? "未反馈名单保护" : "本月未反馈教师优先"));
     assert.ok(lowScoreRow?.selectionReason.includes("低分优先保留"));
   }
+});
+
+test("评分源按姓名和组织信息匹配邮箱，并在低分优先前排除经理", () => {
+  const candidates = [
+    { ...row(30, "a@xdf.cn"), lessonStart: "2026-09-09 10:00:00", teacherName: "同名教师", source: { 教研组: "甲组", 师训组长: "甲组长" } },
+    { ...row(31, "b@xdf.cn"), lessonStart: "2026-09-10 10:00:00", teacherName: "同名教师", source: { 教研组: "乙组", 师训组长: "乙组长" } },
+    { ...row(32, "c@xdf.cn"), lessonStart: "2026-09-11 10:00:00", teacherName: "其他教师", source: { 教研组: "丙组", 师训组长: "丙组长" } },
+  ];
+  const result = buildInspectionSelection(candidates, {
+    ...roster,
+    roleExcludedEmails: new Set(["c@xdf.cn"]),
+  }, {
+    sampleCount: 1,
+    attempt: 1,
+    sourceSha256: "a".repeat(64),
+    rosterSha256: "b".repeat(64),
+    sourceName: "课程反馈.xlsx",
+    priorityMode: "coverage",
+    teacherScoreRows: [
+      { teacherName: "同名教师", researchGroup: "甲组", trainingLeader: "甲组长", priorityRank: 3 },
+      { teacherName: "同名教师", researchGroup: "乙组", trainingLeader: "乙组长", priorityRank: 2 },
+      { teacherName: "其他教师", researchGroup: "丙组", trainingLeader: "丙组长", priorityRank: 1 },
+    ],
+  });
+  assert.deepEqual(result.selectedRows.map((selected) => selected.teacherEmail), ["b@xdf.cn"]);
+  assert.equal(result.priority.scoreSourceTeacherCount, 3);
+  assert.equal(result.priority.matchedScoreTeacherCount, 2);
+  assert.equal(result.priority.missingScoreTeacherCount, 0);
+  assert.equal(result.priority.ambiguousScoreTeacherCount, 0);
+  assert.equal(result.stats.excludedManagementTeachers, 1);
+  assert.ok(result.selectedRows.every((selected) => selected.teacherEmail !== "c@xdf.cn"));
+});
+
+test("评分姓名与组织信息都不能消歧时不套用分数", () => {
+  const candidates = [
+    { ...row(33, "a@xdf.cn"), lessonStart: "2026-09-12 10:00:00", teacherName: "重名", source: { 教研组: "甲组" } },
+    { ...row(34, "b@xdf.cn"), lessonStart: "2026-09-13 10:00:00", teacherName: "重名", source: { 教研组: "乙组" } },
+  ];
+  const result = buildInspectionSelection(candidates, roster, {
+    sampleCount: 1,
+    attempt: 1,
+    sourceSha256: "a".repeat(64),
+    rosterSha256: "b".repeat(64),
+    sourceName: "课程反馈.xlsx",
+    teacherScoreRows: [
+      { teacherName: "重名", researchGroup: "", trainingLeader: "", priorityRank: 1 },
+    ],
+  });
+  assert.equal(result.priority.matchedScoreTeacherCount, 0);
+  assert.equal(result.priority.ambiguousScoreTeacherCount, 2);
+  assert.equal(result.priority.missingScoreTeacherCount, 2);
 });
 
 test("余量时全覆盖模式先给未反馈教师加频，再按低分排序；未反馈模式按低分加频", () => {
@@ -323,4 +375,23 @@ test("教师展示姓名按邮箱末尾数字统一，历史记录复用同一�
     selectionReason: "测试",
   }]);
   assert.equal(items[0].teacherName, "吴君怡7");
+});
+
+test("评分源按语义表头解析，跳过缺姓名或缺赋分行", () => {
+  const parsed = parseTeacherScoreCsv([
+    "教学服务赋分来源,,,,",
+    "教师姓名,教研组,师训组长,教学服务赋分",
+    '"教师,甲",项目A,组长甲,88.5',
+    "教师乙,项目B,组长乙,",
+    ",项目C,组长丙,70",
+  ].join("\n"));
+  assert.deepEqual(parsed.rows, [{
+    teacherName: "教师,甲",
+    researchGroup: "项目A",
+    trainingLeader: "组长甲",
+    score: 88.5,
+  }]);
+  assert.equal(parsed.rowCount, 3);
+  assert.equal(parsed.missingNameRows, 1);
+  assert.equal(parsed.missingScoreRows, 1);
 });
