@@ -232,8 +232,43 @@ export function assertHistoryPayload(value: unknown) {
     batchKind: batch.batchKind === "trial" ? "trial" : "formal",
   };
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(normalized.businessWeekStart) || !/^\d{4}-\d{2}-\d{2}$/u.test(normalized.businessWeekEnd)) throw new Error("业务周日期格式不正确。");
-  if (!normalized.sourceName || !normalized.rosterName || !items.length) throw new Error("抽检历史记录缺少来源文件或抽检课程。");
+  if (!normalized.sourceName || !normalized.rosterName) throw new Error("抽检历史记录缺少来源文件。");
   return { batch: normalized, items };
+}
+
+const INSPECTION_ITEM_INSERT_CHUNK_SIZE = 2000;
+const INSPECTION_ITEM_COLUMNS = [
+  "batch_id", "position", "teacher_name", "teacher_email", "student_name", "student_id", "course_id",
+  "lesson_start", "lesson_end", "submitted_value", "product_group", "campus", "project_group", "selection_reason",
+] as const;
+
+type NormalizedInspectionItem = ReturnType<typeof assertHistoryPayload>["items"][number];
+
+export interface InspectionItemsInsertQuery {
+  query: string;
+  params: unknown[];
+}
+
+export function buildInspectionItemsInsertQueries(id: string, items: readonly NormalizedInspectionItem[]): InspectionItemsInsertQuery[] {
+  const queries: InspectionItemsInsertQuery[] = [];
+  for (let offset = 0; offset < items.length; offset += INSPECTION_ITEM_INSERT_CHUNK_SIZE) {
+    const chunk = items.slice(offset, offset + INSPECTION_ITEM_INSERT_CHUNK_SIZE);
+    const params: unknown[] = [];
+    const values = chunk.map((item) => {
+      const row = [
+        id, item.position, item.teacherName, item.teacherEmail, item.studentName, item.studentId, item.courseId,
+        item.lessonStart, item.lessonEnd, item.submittedValue, item.productGroup, item.campus, item.projectGroup, item.selectionReason,
+      ];
+      const firstPlaceholder = params.length + 1;
+      params.push(...row);
+      return `(${row.map((_, index) => `$${firstPlaceholder + index}`).join(", ")})`;
+    });
+    queries.push({
+      query: `INSERT INTO inspection_items (${INSPECTION_ITEM_COLUMNS.join(", ")}) VALUES ${values.join(", ")}`,
+      params,
+    });
+  }
+  return queries;
 }
 
 export async function database() {
@@ -910,13 +945,24 @@ export async function monthlyInspection(month: string) {
   };
 }
 
-async function insertBatch(sql: any, payload: ReturnType<typeof assertHistoryPayload>, id: string) {
+export async function insertBatch(
+  sql: any,
+  payload: ReturnType<typeof assertHistoryPayload>,
+  id: string,
+  voidedBatchId = "",
+) {
   const { batch, items } = payload;
-  await sql`INSERT INTO inspection_batches (id, business_week_start, business_week_end, source_name, source_sha256, roster_name, roster_sha256, roster_snapshot_date, sample_limit, eligible_count, selected_count, teacher_count, unsubmitted_count, rule_version, attempt, batch_kind, status) VALUES (${id}, ${batch.businessWeekStart}, ${batch.businessWeekEnd}, ${batch.sourceName}, ${batch.sourceSha256}, ${batch.rosterName}, ${batch.rosterSha256}, ${batch.rosterSnapshotDate || null}, ${batch.sampleLimit}, ${batch.eligibleCount}, ${batch.selectedCount}, ${batch.teacherCount}, ${batch.unsubmittedCount}, ${batch.ruleVersion}, ${batch.attempt}, ${batch.batchKind}, 'active')`;
-  for (const item of items) {
-    await sql`INSERT INTO inspection_items (batch_id, position, teacher_name, teacher_email, student_name, student_id, course_id, lesson_start, lesson_end, submitted_value, product_group, campus, project_group, selection_reason) VALUES (${id}, ${item.position}, ${item.teacherName}, ${item.teacherEmail}, ${item.studentName}, ${item.studentId}, ${item.courseId}, ${item.lessonStart}, ${item.lessonEnd}, ${item.submittedValue}, ${item.productGroup}, ${item.campus}, ${item.projectGroup}, ${item.selectionReason})`;
+  const queries: unknown[] = [];
+  if (voidedBatchId) {
+    queries.push(sql`UPDATE inspection_batches SET status = 'voided', voided_at = now() WHERE id = ${voidedBatchId} AND status = 'active'`);
   }
-  const rows = await sql`SELECT * FROM inspection_batches WHERE id = ${id}`;
+  queries.push(sql`INSERT INTO inspection_batches (id, business_week_start, business_week_end, source_name, source_sha256, roster_name, roster_sha256, roster_snapshot_date, sample_limit, eligible_count, selected_count, teacher_count, unsubmitted_count, rule_version, attempt, batch_kind, status) VALUES (${id}, ${batch.businessWeekStart}, ${batch.businessWeekEnd}, ${batch.sourceName}, ${batch.sourceSha256}, ${batch.rosterName}, ${batch.rosterSha256}, ${batch.rosterSnapshotDate || null}, ${batch.sampleLimit}, ${batch.eligibleCount}, ${batch.selectedCount}, ${batch.teacherCount}, ${batch.unsubmittedCount}, ${batch.ruleVersion}, ${batch.attempt}, ${batch.batchKind}, 'active')`);
+  for (const insert of buildInspectionItemsInsertQueries(id, items)) {
+    queries.push(sql.query(insert.query, insert.params));
+  }
+  queries.push(sql`SELECT * FROM inspection_batches WHERE id = ${id}`);
+  const results = await sql.transaction(queries);
+  const rows = results[results.length - 1] as Array<Record<string, unknown>>;
   return { ...mapBatch(rows[0]), items };
 }
 
@@ -948,8 +994,7 @@ export async function replaceBatch(id: string, rawPayload: unknown, actorUserId:
   const sql = await database();
   const rows = await sql`SELECT id FROM inspection_batches WHERE id = ${id} AND status = 'active' LIMIT 1`;
   if (!rows.length) throw new Error("当前抽检批次不存在或已经被替换。");
-  await sql`UPDATE inspection_batches SET status = 'voided', voided_at = now() WHERE id = ${id}`;
-  const result = { reused: false, batch: await insertBatch(sql, payload, crypto.randomUUID()) };
+  const result = { reused: false, batch: await insertBatch(sql, payload, crypto.randomUUID(), id) };
   if (actorUserId) await audit("inspection_batch_replaced", actorUserId, null, { oldBatchId: id, batchId: result.batch.id, businessWeekStart: payload.batch.businessWeekStart, batchKind: payload.batch.batchKind });
   return result;
 }

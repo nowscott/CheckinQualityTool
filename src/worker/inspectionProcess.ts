@@ -87,6 +87,6 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     72,
   );
   const output = buildInspectionOutput(selection, request.includeExplanation);
-  progress("正在准备抽检工作簿", "写入抽检名单和未生成报告风险表。", 84);
+  progress("Excel 已生成", "正在交给页面保存抽检历史。", 90);
   postInspectionComplete(scope, output);
 }
