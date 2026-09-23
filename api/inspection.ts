@@ -25,10 +25,16 @@ function queryValue(request: ApiRequest, key: string) {
 }
 
 function withParam(request: ApiRequest, key: string, value: string): ApiRequest & { query: Record<string, string | string[] | undefined> } {
-  return { ...request, query: { ...(request.query || {}), [key]: value } };
+  return {
+    ...request,
+    method: request.method,
+    body: request.body,
+    headers: request.headers,
+    query: { ...(request.query || {}), [key]: value },
+  };
 }
 
-function route(request: ApiRequest): { handler: Handler; request: ApiRequest } | null {
+export function route(request: ApiRequest): { handler: Handler; request: ApiRequest } | null {
   const rawPath = queryValue(request, "path");
   const parts = rawPath.split("/").filter(Boolean);
   if (!parts.length) return null;

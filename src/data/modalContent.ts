@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.9.8",
+    date: "2026-09-23",
+    items: [
+      "修复按批次 ID 读取课程明细和作废批次时登录状态丢失的问题。",
+    ],
+  },
+  {
     version: "v2.9.7",
     date: "2026-09-23",
     items: [
