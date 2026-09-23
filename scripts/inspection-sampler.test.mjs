@@ -6,12 +6,12 @@ const { hasExcludedInspectionRole } = await import("../worker/inspectionRoleRule
 const { displayTeacherName } = await import("../lib/teacherDisplay.js");
 
 const roster = {
-  emails: new Set(["a@xdf.cn", "b@xdf.cn", "c@xdf.cn"]),
+  emails: new Set(["a@xdf.cn", "b@xdf.cn", "c@xdf.cn", "d@xdf.cn"]),
   roleExcludedEmails: new Set(),
   sourceName: "在职教师明细20260915.xlsx",
   snapshotDate: "2026-09-15",
-  rowCount: 3,
-  matchedEmailRows: 3,
+  rowCount: 4,
+  matchedEmailRows: 4,
 };
 
 function row(index, teacherEmail, submittedValue = "是") {
@@ -107,6 +107,133 @@ test("全覆盖后优先用未反馈教师的额外课程加频", () => {
     && selected.selectionReason.includes("未反馈教师剩余名额加频")));
   assert.equal(result.priority.focusTeacherCount, 1);
   assert.equal(result.priority.matchedFocusTeacherCount, 1);
+});
+
+test("名额不足时保留未反馈重点教师，再按低分优先覆盖", () => {
+  const scoreRows = [
+    row(20, "a@xdf.cn"),
+    row(21, "b@xdf.cn"),
+    row(22, "c@xdf.cn"),
+    row(23, "d@xdf.cn"),
+  ];
+  const teacherScoresByEmail = {
+    "a@xdf.cn": 100,
+    "b@xdf.cn": 90,
+    "c@xdf.cn": 60,
+    "d@xdf.cn": 20,
+  };
+  for (const priorityMode of ["coverage", "unreported"]) {
+    const result = buildInspectionSelection(scoreRows, roster, {
+      sampleCount: 2,
+      attempt: 1,
+      sourceSha256: "a".repeat(64),
+      rosterSha256: "b".repeat(64),
+      sourceName: "课程反馈.xlsx",
+      sourceColumns: ["老师姓名", "老师邮箱", "课次ID"],
+      priorityMode,
+      focusTeacherNames: ["a"],
+      teacherScoresByEmail,
+    });
+    assert.deepEqual(
+      result.selectedRows.map((selected) => selected.teacherEmail).sort(),
+      ["a@xdf.cn", "d@xdf.cn"],
+    );
+    const focusRow = result.selectedRows.find((selected) => selected.teacherEmail === "a@xdf.cn");
+    const lowScoreRow = result.selectedRows.find((selected) => selected.teacherEmail === "d@xdf.cn");
+    assert.ok(focusRow?.selectionReason.includes(priorityMode === "coverage" ? "未反馈名单保护" : "本月未反馈教师优先"));
+    assert.ok(lowScoreRow?.selectionReason.includes("低分优先保留"));
+  }
+});
+
+test("余量时全覆盖模式先给未反馈教师加频，再按低分排序；未反馈模式按低分加频", () => {
+  const scoreRows = [
+    row(10, "a@xdf.cn"), row(11, "a@xdf.cn"),
+    row(12, "b@xdf.cn"), row(13, "b@xdf.cn"),
+    row(14, "c@xdf.cn"), row(15, "c@xdf.cn"),
+    row(16, "d@xdf.cn"), row(17, "d@xdf.cn"),
+  ];
+  const teacherScoresByEmail = {
+    "a@xdf.cn": 100,
+    "b@xdf.cn": 90,
+    "c@xdf.cn": 60,
+    "d@xdf.cn": 20,
+  };
+  const buildScored = (priorityMode) => buildInspectionSelection(scoreRows, roster, {
+    sampleCount: 6,
+    attempt: 1,
+    sourceSha256: "a".repeat(64),
+    rosterSha256: "b".repeat(64),
+    sourceName: "课程反馈.xlsx",
+    sourceColumns: ["老师姓名", "老师邮箱", "课次ID"],
+    priorityMode,
+    focusTeacherNames: ["a"],
+    teacherScoresByEmail,
+  });
+  const coverage = buildScored("coverage");
+  const coverageCounts = new Map();
+  for (const selected of coverage.selectedRows) {
+    coverageCounts.set(selected.teacherEmail, (coverageCounts.get(selected.teacherEmail) || 0) + 1);
+  }
+  assert.equal(coverageCounts.get("a@xdf.cn"), 2);
+  assert.equal(coverageCounts.get("d@xdf.cn"), 2);
+  assert.equal(coverageCounts.get("b@xdf.cn"), 1);
+  assert.equal(coverageCounts.get("c@xdf.cn"), 1);
+  assert.equal(coverage.stats.focusTeacherExtraRows, 1);
+  assert.ok(coverage.selectedRows.some((selected) => selected.teacherEmail === "a@xdf.cn"
+    && selected.selectionReason.includes("未反馈教师剩余名额加频")));
+
+  const unreported = buildScored("unreported");
+  const unreportedCounts = new Map();
+  for (const selected of unreported.selectedRows) {
+    unreportedCounts.set(selected.teacherEmail, (unreportedCounts.get(selected.teacherEmail) || 0) + 1);
+  }
+  assert.equal(unreportedCounts.get("a@xdf.cn"), 1);
+  assert.equal(unreportedCounts.get("d@xdf.cn"), 2);
+  assert.equal(unreportedCounts.get("c@xdf.cn"), 2);
+  assert.equal(unreportedCounts.get("b@xdf.cn"), 1);
+  assert.equal(unreported.stats.focusTeacherExtraRows, 0);
+});
+
+test("名额不足时把高分教师顺位后移，但保留未反馈重点教师", () => {
+  const scoreRows = [
+    row(18, "a@xdf.cn"),
+    row(19, "b@xdf.cn"),
+    row(20, "c@xdf.cn"),
+    row(21, "d@xdf.cn"),
+  ];
+  const teacherScoresByEmail = {
+    "a@xdf.cn": 100,
+    "b@xdf.cn": 90,
+    "c@xdf.cn": 60,
+    "d@xdf.cn": 20,
+  };
+  for (const priorityMode of ["coverage", "unreported"]) {
+    const result = buildInspectionSelection(scoreRows, roster, {
+      sampleCount: 2,
+      attempt: 1,
+      sourceSha256: "a".repeat(64),
+      rosterSha256: "b".repeat(64),
+      sourceName: "课程反馈.xlsx",
+      sourceColumns: ["老师姓名", "老师邮箱", "课次ID"],
+      priorityMode,
+      focusTeacherNames: ["a"],
+      teacherScoresByEmail,
+    });
+    assert.deepEqual(
+      result.selectedRows.map((selected) => selected.teacherEmail).sort(),
+      ["a@xdf.cn", "d@xdf.cn"],
+    );
+    const focused = result.selectedRows.find((selected) => selected.teacherEmail === "a@xdf.cn");
+    const lowScored = result.selectedRows.find((selected) => selected.teacherEmail === "d@xdf.cn");
+    assert.ok(focused?.selectionReason.includes(priorityMode === "coverage" ? "未反馈名单保护" : "本月未反馈教师优先"));
+    assert.ok(lowScored?.selectionReason.includes("低分优先保留"));
+  }
+});
+
+test("未接入分数时保持稳定顺序", () => {
+  const first = build(2);
+  const second = build(2);
+  assert.deepEqual(first.selectedRows.map((selected) => selected.courseId), second.selectedRows.map((selected) => selected.courseId));
 });
 
 test("普通抽检上限为零时仍抽取全部未生成报告课程", () => {

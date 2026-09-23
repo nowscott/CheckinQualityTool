@@ -1,6 +1,6 @@
 import type { CellValue, DataRow, SheetDefinition } from "./types";
 
-export const INSPECTION_RULE_VERSION = "inspection-v7-focus-leftover-frequency";
+export const INSPECTION_RULE_VERSION = "inspection-v8-score-aware-priority-ladder";
 
 export type InspectionPriorityMode = "coverage" | "unreported";
 
