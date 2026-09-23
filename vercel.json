@@ -4,6 +4,28 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/remind",
+      "destination": "/"
+    },
+    {
+      "source": "/remind/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/report",
+      "destination": "/"
+    },
+    {
+      "source": "/stage-report",
+      "destination": "/"
+    },
+    {
+      "source": "/stage-report/:path*",
+      "destination": "/"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
