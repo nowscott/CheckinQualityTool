@@ -1,5 +1,6 @@
 import { headerMap, sheetCandidates } from "./excelReader";
 import { emailValue, excelDate, excelTime, text } from "./utils";
+import { inspectionRoleExcludedEmails } from "./inspectionRoleRules";
 import type { CellValue, DataRow } from "./types";
 import type { InspectionSourceRow, RosterInfo } from "./inspectionTypes";
 
@@ -95,19 +96,21 @@ export function parseInspectionRoster(workbook: SheetJsWorkbook, fileName: strin
   if (!candidates.length) throw new Error("找不到在职明细中的邮箱列。需要“邮箱”或“教师邮箱”字段。");
   const found = candidates[0];
   const roleDescriptionIndex = firstIndex(found.candidate.map, ROLE_DESCRIPTION_HEADERS);
+  if (roleDescriptionIndex < 0) {
+    throw new Error("在职明细缺少岗位描述字段。请上传包含“岗位短描述”等岗位字段的完整明细，确保主管和经理岗位能从抽检范围排除。");
+  }
   const emails = new Set<string>();
-  const roleExcludedEmails = new Set<string>();
+  const roleRows: Array<{ email: unknown; roleDescription?: unknown }> = [];
   let matchedEmailRows = 0;
   for (const row of found.candidate.rows.slice(1)) {
     const email = emailValue(row[found.emailIndex]);
     if (!email) continue;
     matchedEmailRows += 1;
     emails.add(email);
-    if (roleDescriptionIndex >= 0 && /主管|经理/u.test(text(row[roleDescriptionIndex]))) {
-      roleExcludedEmails.add(email);
-    }
+    roleRows.push({ email, roleDescription: roleDescriptionIndex >= 0 ? row[roleDescriptionIndex] : "" });
   }
   if (!emails.size) throw new Error("在职明细的邮箱列没有有效邮箱，无法进行在职教师过滤。");
+  const roleExcludedEmails = inspectionRoleExcludedEmails(roleRows);
   return {
     emails,
     roleExcludedEmails,

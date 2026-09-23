@@ -2,7 +2,7 @@ export type WeekLabel = "auto" | "第一周" | "第二周" | "第三周" | "第�
 
 export type StatusMode = "working" | "done" | "error";
 
-import type { InspectionBatchKind, InspectionHistoryPayload, InspectionStats } from "../worker/inspectionTypes";
+import type { InspectionPriorityMode, InspectionPrioritySummary, InspectionStats } from "../worker/inspectionTypes";
 
 export interface ProcessingStatus {
   visible: boolean;
@@ -28,7 +28,8 @@ export interface InspectionRequest {
   sampleCount: number;
   attempt: number;
   includeExplanation: boolean;
-  batchKind: InspectionBatchKind;
+  priorityMode: InspectionPriorityMode;
+  focusTeacherNames: string[];
 }
 
 export interface InspectionWorkerComplete {
@@ -37,7 +38,7 @@ export interface InspectionWorkerComplete {
   byteLength: number;
   filename: string;
   summary: InspectionStats;
-  historyPayload: InspectionHistoryPayload;
+  priority: InspectionPrioritySummary;
 }
 
 export type WorkerResponse =

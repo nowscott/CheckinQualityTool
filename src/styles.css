@@ -482,6 +482,13 @@ button small { opacity: .78; }
 .mode-tabs button:hover { color: var(--ink); background: var(--card-hover); }
 .mode-tabs button.active { color: white; background: var(--green); }
 .inspection-card { margin-top: 0; }
+.inspection-count-field { width: min(240px, 100%); margin-top: 18px; display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
+.inspection-export-actions { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 10px; }
+.inspection-export-actions button { width: auto; min-width: 220px; padding: 11px 16px; }
+.inspection-export-actions button.secondary { color: var(--green); border: 1px solid var(--green-line); background: transparent; }
+.inspection-export-actions button.secondary:hover:not(:disabled) { color: white; background: var(--green); }
+.inspection-export-actions button:disabled { cursor: not-allowed; opacity: .55; }
+.inspection-local-note { margin: 13px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .inspection-login-card { margin-top: 0; max-width: 620px; }
 .inspection-login-copy strong { display: block; margin-top: 8px; font-size: 22px; }
 .inspection-login-copy p { margin: 8px 0 0; color: var(--muted); line-height: 1.55; }
@@ -693,6 +700,7 @@ button small { opacity: .78; }
   .output-grid { gap: 12px; margin-top: 20px; }
   .output-grid article { min-height: 132px; padding: 18px; }
   .inspection-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .inspection-export-actions button { width: 100%; }
   .inspection-data-summary { grid-template-columns: 1fr; }
   .inspection-alert { align-items: stretch; flex-direction: column; }
   .inspection-alert button { width: 100%; }

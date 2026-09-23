@@ -1,5 +1,17 @@
 import type { CellValue, DataRow, SheetDefinition } from "./types";
 
+export const INSPECTION_RULE_VERSION = "inspection-v6-priority-options";
+
+export type InspectionPriorityMode = "coverage" | "unreported";
+
+export interface InspectionPrioritySummary {
+  mode: InspectionPriorityMode;
+  focusTeacherCount: number;
+  matchedFocusTeacherCount: number;
+  unmatchedFocusTeacherCount: number;
+  ambiguousFocusTeacherCount: number;
+}
+
 export interface InspectionSourceRow {
   sourceRowNumber: number;
   source: DataRow;
@@ -17,8 +29,6 @@ export interface InspectionSourceRow {
   unsubmitted: boolean;
   selectionKey: string;
 }
-
-export type InspectionBatchKind = "formal" | "trial";
 
 export interface RosterInfo {
   emails: Set<string>;
@@ -66,13 +76,16 @@ export interface InspectionStats {
   eligibleRows: number;
   eligibleTeachers: number;
   selectedRows: number;
+  normalSelectedRows: number;
+  extraSelectedRows: number;
   selectedTeachers: number;
   unsubmittedRows: number;
   unsubmittedSelectedRows: number;
   excludedRows: number;
   excludedNoEmailRows: number;
   excludedNotInRosterRows: number;
-  excludedRoleRows: number;
+  excludedManagementRows: number;
+  excludedManagementTeachers: number;
   unknownSubmissionRows: number;
 }
 
@@ -91,7 +104,7 @@ export interface InspectionSelection {
   rosterSha256: string;
   sourceColumns: string[];
   sampleLimit: number;
-  batchKind: InspectionBatchKind;
+  priority: InspectionPrioritySummary;
 }
 
 export interface InspectionHistoryItem {
@@ -110,109 +123,11 @@ export interface InspectionHistoryItem {
   selectionReason: string;
 }
 
-export interface InspectionHistoryPayload {
-  batch: {
-    businessWeekStart: string;
-    businessWeekEnd: string;
-    sourceName: string;
-    sourceSha256: string;
-    rosterName: string;
-    rosterSha256: string;
-    rosterSnapshotDate: string;
-    sampleLimit: number;
-    eligibleCount: number;
-    selectedCount: number;
-    teacherCount: number;
-    unsubmittedCount: number;
-    ruleVersion: string;
-    attempt: number;
-    batchKind: InspectionBatchKind;
-  };
-  items: InspectionHistoryItem[];
-}
-
 export interface InspectionOutput {
   chunks: Uint8Array[];
   filename: string;
-  historyPayload: InspectionHistoryPayload;
   summary: InspectionStats;
-}
-
-export type TeachingServiceScoreStatus = "matched" | "ambiguous" | "missing_score";
-
-export interface TeachingServiceTeacher {
-  teacherName: string;
-  teacherEmail: string;
-  researchGroup: string;
-  trainingLeader: string;
-  trainingSupervisor: string;
-  campus: string;
-  score: number | null;
-  scoreStatus: TeachingServiceScoreStatus;
-  scoreTeacherName: string;
-  scoreResearchGroup: string;
-  scoreTrainingLeader: string;
-  scoreCampus: string;
-  suggestedMonthlyCount: number;
-}
-
-export interface TeachingServiceSnapshot {
-  schemaVersion: number;
-  snapshotDate: string;
-  scorePeriod: string;
-  scoreSourceFile: string;
-  scoreSourceSha256: string;
-  candidateSourceFile: string;
-  candidateSourceSha256: string;
-  rosterSourceFile: string;
-  rosterSourceSha256: string;
-  generatedAt: string;
-  scoreRule: string;
-  matchRule: string;
-  matchSummary: {
-    candidateTeachers: number;
-    matched: number;
-    ambiguous: number;
-    missingScore: number;
-  };
-  teachers: TeachingServiceTeacher[];
-}
-
-export interface MonthlyInspectionItem extends InspectionHistoryItem {
-  batchId: string;
-  businessWeekStart: string;
-  businessWeekEnd: string;
-  attempt: number;
-}
-
-export interface MonthlyInspectionData {
-  month: string;
-  items: MonthlyInspectionItem[];
-}
-
-export interface MonthlyTeacherPlan extends TeachingServiceTeacher {
-  recommendedCount: number;
-  assignedCount: number;
-  actualCount: number;
-  unsubmittedCount: number;
-  remainingCount: number;
-  lastInspectionWeek: string;
-  focusReason: string;
-  items: MonthlyInspectionItem[];
-}
-
-export interface MonthlyInspectionPlan {
-  month: string;
-  availableSlots: number;
-  candidateTeachers: number;
-  assignedSlots: number;
-  coverageShortfall: number;
-  recommendedSlots: number;
-  frequencyShortfall: number;
-  extraSlots: number;
-  lowScoreTeachers: number;
-  missingScoreTeachers: number;
-  teachers: MonthlyTeacherPlan[];
+  priority: InspectionPrioritySummary;
 }
 
 export interface InspectionSheetDefinition extends SheetDefinition {

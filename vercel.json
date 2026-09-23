@@ -4,12 +4,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "trailingSlash": false,
-  "rewrites": [
-    {
-      "source": "/api/inspection/(.*)",
-      "destination": "/api/inspection?path=$1"
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",

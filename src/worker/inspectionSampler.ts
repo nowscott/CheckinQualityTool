@@ -1,5 +1,6 @@
 import { excelDate, text } from "./utils";
 import { displayTeacherName } from "../lib/teacherDisplay.js";
+import { INSPECTION_RULE_VERSION } from "./inspectionTypes";
 import type {
   InspectionCandidateRow,
   InspectionHistoryItem,
@@ -7,11 +8,9 @@ import type {
   InspectionSelectedRow,
   InspectionSelection,
   InspectionSourceRow,
-  InspectionBatchKind,
+  InspectionPriorityMode,
   RosterInfo,
 } from "./inspectionTypes";
-
-export const INSPECTION_RULE_VERSION = "inspection-v3-role-risk-only";
 
 function hashString(value: string) {
   let hash = 2166136261;
@@ -28,7 +27,6 @@ function hashScore(value: string) {
 
 function compareRows(left: InspectionSourceRow, right: InspectionSourceRow) {
   return (
-    Number(right.unsubmitted) - Number(left.unsubmitted) ||
     left.selectionKey.localeCompare(right.selectionKey) ||
     left.sourceRowNumber - right.sourceRowNumber
   );
@@ -67,9 +65,21 @@ function compareDisplayRows(left: InspectionSourceRow, right: InspectionSourceRo
   );
 }
 
-function selectionReason(row: InspectionSourceRow, coverage: boolean, fill: boolean) {
+function normalizeTeacherName(value: string) {
+  return value.normalize("NFKC").replace(/\s+/gu, "").trim().toLocaleLowerCase();
+}
+
+function teacherNameKeys(row: InspectionSourceRow) {
+  return new Set([
+    normalizeTeacherName(row.teacherName),
+    normalizeTeacherName(displayTeacherName(row.teacherName, row.teacherEmail)),
+  ].filter(Boolean));
+}
+
+function selectionReason(row: InspectionSourceRow, coverage: boolean, fill: boolean, focus: boolean) {
   const reasons: string[] = [];
-  if (row.unsubmitted) reasons.push("高中工作台未生成报告");
+  if (row.unsubmitted) reasons.push("报告未生成容量外加抽");
+  if (focus) reasons.push("本月未反馈教师优先");
   if (coverage) reasons.push("教师覆盖");
   if (fill) reasons.push("补足抽检数");
   return reasons.join("；") || "稳定抽检排序";
@@ -85,7 +95,8 @@ export function buildInspectionSelection(
     rosterSha256: string;
     sourceName: string;
     sourceColumns?: string[];
-    batchKind?: InspectionBatchKind;
+    priorityMode?: InspectionPriorityMode;
+    focusTeacherNames?: string[];
   },
 ): InspectionSelection {
   const sampleCount = Math.max(0, Math.floor(options.sampleCount));
@@ -95,15 +106,17 @@ export function buildInspectionSelection(
     selectionKey: hashScore(`${seed}|${row.teacherEmail}|${row.courseId}|${row.sourceRowNumber}`),
   }));
   const roleExcludedEmails = roster.roleExcludedEmails || new Set<string>();
-  const activeRows = sourceRows.filter((row) => row.teacherEmail && roster.emails.has(row.teacherEmail));
+  const inRosterRows = sourceRows.filter((row) => row.teacherEmail && roster.emails.has(row.teacherEmail));
+  const excludedManagementRows = inRosterRows.filter((row) => roleExcludedEmails.has(row.teacherEmail));
+  const activeRows = inRosterRows.filter((row) => !roleExcludedEmails.has(row.teacherEmail));
   const excludedNoEmailRows = sourceRows.filter((row) => !row.teacherEmail).length;
   const excludedNotInRosterRows = sourceRows.filter((row) =>
     Boolean(row.teacherEmail) && !roster.emails.has(row.teacherEmail),
   ).length;
-  const excludedRoleRows = activeRows.filter((row) => row.unsubmitted && roleExcludedEmails.has(row.teacherEmail)).length;
+  const normalRows = activeRows.filter((row) => !row.unsubmitted);
 
   const groups = new Map<string, InspectionSourceRow[]>();
-  for (const row of activeRows) {
+  for (const row of normalRows) {
     const key = uniqueTeacherKey(row);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(row);
@@ -111,77 +124,134 @@ export function buildInspectionSelection(
   const teacherGroups = [...groups.entries()].map(([key, teacherRows]) => ({
     key,
     rows: teacherRows,
-    priority: teacherRows.some((row) => row.unsubmitted) ? 0 : 1,
     sortKey: [...teacherRows].sort((left, right) => left.selectionKey.localeCompare(right.selectionKey))[0]?.selectionKey || "",
-  })).sort((left, right) => left.priority - right.priority || left.sortKey.localeCompare(right.sortKey) || left.key.localeCompare(right.key));
+  })).sort((left, right) => left.sortKey.localeCompare(right.sortKey) || left.key.localeCompare(right.key));
 
-  const selected = new Map<string, InspectionSelectedRow>();
+  const focusNameKeys = new Set((options.focusTeacherNames || []).map(normalizeTeacherName).filter(Boolean));
+  const groupsByName = new Map<string, Set<string>>();
+  for (const row of activeRows) {
+    const teacherKey = uniqueTeacherKey(row);
+    for (const nameKey of teacherNameKeys(row)) {
+      if (!groupsByName.has(nameKey)) groupsByName.set(nameKey, new Set());
+      groupsByName.get(nameKey)!.add(teacherKey);
+    }
+  }
+  const normalGroupKeys = new Set(teacherGroups.map((group) => group.key));
+  const focusedGroupKeys = new Set<string>();
+  const matchedFocusTeacherKeys = new Set<string>();
+  let matchedFocusNameCount = 0;
+  let ambiguousFocusTeacherCount = 0;
+  for (const focusName of focusNameKeys) {
+    const candidates = groupsByName.get(focusName) || new Set<string>();
+    if (candidates.size === 1) {
+      matchedFocusNameCount += 1;
+      const teacherKey = [...candidates][0];
+      matchedFocusTeacherKeys.add(teacherKey);
+      if (normalGroupKeys.has(teacherKey)) focusedGroupKeys.add(teacherKey);
+    } else if (candidates.size > 1) ambiguousFocusTeacherCount += 1;
+  }
+  const priorityMode = options.priorityMode || "coverage";
+  const priority: InspectionSelection["priority"] = {
+    mode: priorityMode,
+    focusTeacherCount: priorityMode === "unreported" ? focusNameKeys.size : 0,
+    matchedFocusTeacherCount: priorityMode === "unreported" ? matchedFocusTeacherKeys.size : 0,
+    unmatchedFocusTeacherCount: priorityMode === "unreported"
+      ? Math.max(0, focusNameKeys.size - matchedFocusNameCount - ambiguousFocusTeacherCount)
+      : 0,
+    ambiguousFocusTeacherCount: priorityMode === "unreported" ? ambiguousFocusTeacherCount : 0,
+  };
+  const orderedGroups = priorityMode === "unreported"
+    ? [
+      ...teacherGroups.filter((group) => focusedGroupKeys.has(group.key)),
+      ...teacherGroups.filter((group) => !focusedGroupKeys.has(group.key)),
+    ]
+    : teacherGroups;
+
+  const selectedNormal = new Map<string, InspectionSelectedRow>();
   const selectedSourceRows = new Set<string>();
   const rowKey = (row: InspectionSourceRow) => `${row.teacherEmail}\u0000${row.courseId}\u0000${row.sourceRowNumber}`;
-  const add = (row: InspectionSourceRow, coverage: boolean, fill: boolean) => {
-    if (selected.size >= sampleCount) return false;
+  const add = (row: InspectionSourceRow, coverage: boolean, fill: boolean, focus: boolean) => {
+    if (selectedNormal.size >= sampleCount) return false;
     const key = rowKey(row);
     if (selectedSourceRows.has(key)) return false;
     selectedSourceRows.add(key);
-    selected.set(key, {
+    selectedNormal.set(key, {
       ...row,
-      selectionOrder: selected.size + 1,
-      selectionReason: selectionReason(row, coverage, fill),
+      selectionOrder: selectedNormal.size + 1,
+      selectionReason: selectionReason(row, coverage, fill, focus),
     });
     return true;
   };
 
-  for (const group of teacherGroups) {
-    if (selected.size >= sampleCount) break;
-    if (sampleCount >= teacherGroups.length || selected.size < sampleCount) {
-      add(chooseRow(group.rows), true, false);
-    }
+  for (const group of orderedGroups) {
+    if (selectedNormal.size >= sampleCount) break;
+    add(chooseRow(group.rows), true, false, focusedGroupKeys.has(group.key));
   }
 
-  const remaining = activeRows
+  const remaining = normalRows
     .filter((row) => !selectedSourceRows.has(rowKey(row)))
     .sort(compareRows);
   for (const row of remaining) {
-    if (selected.size >= sampleCount) break;
-    add(row, false, true);
+    if (selectedNormal.size >= sampleCount) break;
+    add(row, false, true, focusedGroupKeys.has(uniqueTeacherKey(row)));
   }
 
-  const selectedRows = [...selected.values()]
+  const selectedExtra: InspectionSelectedRow[] = activeRows
+    .filter((row) => row.unsubmitted)
     .sort(compareDisplayRows)
+    .map((row, index) => ({
+      ...row,
+      selectionOrder: selectedNormal.size + index + 1,
+      selectionReason: selectionReason(row, false, false, focusedGroupKeys.has(uniqueTeacherKey(row))),
+    }));
+  const unorderedRows = [...selectedNormal.values(), ...selectedExtra];
+  const teacherOrder = new Map<string, number>();
+  for (const row of unorderedRows) {
+    const teacherKey = uniqueTeacherKey(row);
+    if (!teacherOrder.has(teacherKey)) teacherOrder.set(teacherKey, teacherOrder.size);
+  }
+  const selectedRows: InspectionSelectedRow[] = unorderedRows
+    .sort((left, right) =>
+      (teacherOrder.get(uniqueTeacherKey(left)) ?? Number.MAX_SAFE_INTEGER)
+        - (teacherOrder.get(uniqueTeacherKey(right)) ?? Number.MAX_SAFE_INTEGER)
+      || compareDisplayRows(left, right),
+    )
     .map((row, index) => ({ ...row, selectionOrder: index + 1 }));
   const selectedOrders = new Map(selectedRows.map((row) => [rowKey(row), row]));
-  const riskRows: InspectionRiskRow[] = activeRows
-    .filter((row) => row.unsubmitted && !roleExcludedEmails.has(row.teacherEmail))
-    .sort(compareDisplayRows)
-    .map((row) => {
-      const picked = selectedOrders.get(rowKey(row));
-      return {
-        ...row,
-        inspected: Boolean(picked),
-        inspectionOrder: picked?.selectionOrder ?? "",
-        inspectionReason: picked?.selectionReason || "未进入抽检上限，列入风险清单",
-      };
-    });
+  const finalizedRiskRows: InspectionRiskRow[] = selectedExtra.map((row) => {
+    const picked = selectedOrders.get(rowKey(row));
+    return {
+      ...row,
+      inspected: Boolean(picked),
+      inspectionOrder: picked?.selectionOrder ?? "",
+      inspectionReason: picked?.selectionReason || "报告未生成容量外加抽",
+    };
+  });
 
   const dates = activeRows.map((row) => excelDate(row.lessonStart)).filter(Boolean).sort();
   const week = businessWeek(dates[0] || "");
   const selectedTeachers = new Set(selectedRows.map(uniqueTeacherKey));
+  const eligibleTeachers = new Set(activeRows.map(uniqueTeacherKey));
+  const excludedManagementTeachers = new Set(excludedManagementRows.map(uniqueTeacherKey));
   return {
     selectedRows,
-    riskRows,
+    riskRows: finalizedRiskRows,
     allEligibleRows: activeRows.map((row) => ({ ...row, active: true, excludedReason: "" })),
     stats: {
       sourceRows: rows.length,
       eligibleRows: activeRows.length,
-      eligibleTeachers: teacherGroups.length,
+      eligibleTeachers: eligibleTeachers.size,
       selectedRows: selectedRows.length,
+      normalSelectedRows: selectedNormal.size,
+      extraSelectedRows: finalizedRiskRows.length,
       selectedTeachers: selectedTeachers.size,
-      unsubmittedRows: riskRows.length,
-      unsubmittedSelectedRows: selectedRows.filter((row) => row.unsubmitted && !roleExcludedEmails.has(row.teacherEmail)).length,
+      unsubmittedRows: finalizedRiskRows.length,
+      unsubmittedSelectedRows: finalizedRiskRows.filter((row) => row.inspected).length,
       excludedRows: sourceRows.length - activeRows.length,
       excludedNoEmailRows,
       excludedNotInRosterRows,
-      excludedRoleRows,
+      excludedManagementRows: excludedManagementRows.length,
+      excludedManagementTeachers: excludedManagementTeachers.size,
       unknownSubmissionRows: activeRows.filter((row) => !["是", "否"].includes(row.submittedValue)).length,
     },
     sourceName: options.sourceName,
@@ -194,8 +264,14 @@ export function buildInspectionSelection(
     rosterSha256: options.rosterSha256,
     sourceColumns: options.sourceColumns || [],
     sampleLimit: sampleCount,
-    batchKind: options.batchKind || "formal",
+    priority,
   };
+}
+
+export function normalizeInspectionNumber(value: unknown) {
+  const number = Number(text(value));
+  if (!Number.isFinite(number) || number < 0) return 0;
+  return Math.floor(number);
 }
 
 export function historyItems(rows: InspectionSelectedRow[]): InspectionHistoryItem[] {
@@ -214,10 +290,4 @@ export function historyItems(rows: InspectionSelectedRow[]): InspectionHistoryIt
     projectGroup: row.projectGroup,
     selectionReason: row.selectionReason,
   }));
-}
-
-export function normalizeInspectionNumber(value: unknown) {
-  const number = Number(text(value));
-  if (!Number.isFinite(number) || number < 0) return 0;
-  return Math.floor(number);
 }
