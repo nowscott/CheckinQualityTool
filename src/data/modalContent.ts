@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.10.4",
+    date: "2026-09-23",
+    items: [
+      "教师覆盖优先导出在覆盖教师后，会将剩余名额优先分配给本月未反馈教师加频；导出说明列出加频课次。",
+    ],
+  },
+  {
     version: "v2.10.3",
     date: "2026-09-23",
     items: [

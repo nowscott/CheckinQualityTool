@@ -76,10 +76,16 @@ function teacherNameKeys(row: InspectionSourceRow) {
   ].filter(Boolean));
 }
 
-function selectionReason(row: InspectionSourceRow, coverage: boolean, fill: boolean, focus: boolean) {
+function selectionReason(
+  row: InspectionSourceRow,
+  coverage: boolean,
+  fill: boolean,
+  focus: boolean,
+  focusReason: string,
+) {
   const reasons: string[] = [];
   if (row.unsubmitted) reasons.push("报告未生成容量外加抽");
-  if (focus) reasons.push("本月未反馈教师优先");
+  if (focus) reasons.push(focusReason);
   if (coverage) reasons.push("教师覆盖");
   if (fill) reasons.push("补足抽检数");
   return reasons.join("；") || "稳定抽检排序";
@@ -153,13 +159,14 @@ export function buildInspectionSelection(
   const priorityMode = options.priorityMode || "coverage";
   const priority: InspectionSelection["priority"] = {
     mode: priorityMode,
-    focusTeacherCount: priorityMode === "unreported" ? focusNameKeys.size : 0,
-    matchedFocusTeacherCount: priorityMode === "unreported" ? matchedFocusTeacherKeys.size : 0,
-    unmatchedFocusTeacherCount: priorityMode === "unreported"
-      ? Math.max(0, focusNameKeys.size - matchedFocusNameCount - ambiguousFocusTeacherCount)
-      : 0,
-    ambiguousFocusTeacherCount: priorityMode === "unreported" ? ambiguousFocusTeacherCount : 0,
+    focusTeacherCount: focusNameKeys.size,
+    matchedFocusTeacherCount: matchedFocusTeacherKeys.size,
+    unmatchedFocusTeacherCount: Math.max(0, focusNameKeys.size - matchedFocusNameCount - ambiguousFocusTeacherCount),
+    ambiguousFocusTeacherCount,
   };
+  const focusReason = priorityMode === "coverage"
+    ? "未反馈教师剩余名额加频"
+    : "本月未反馈教师优先";
   const orderedGroups = priorityMode === "unreported"
     ? [
       ...teacherGroups.filter((group) => focusedGroupKeys.has(group.key)),
@@ -169,6 +176,7 @@ export function buildInspectionSelection(
 
   const selectedNormal = new Map<string, InspectionSelectedRow>();
   const selectedSourceRows = new Set<string>();
+  let focusTeacherExtraRows = 0;
   const rowKey = (row: InspectionSourceRow) => `${row.teacherEmail}\u0000${row.courseId}\u0000${row.sourceRowNumber}`;
   const add = (row: InspectionSourceRow, coverage: boolean, fill: boolean, focus: boolean) => {
     if (selectedNormal.size >= sampleCount) return false;
@@ -178,19 +186,24 @@ export function buildInspectionSelection(
     selectedNormal.set(key, {
       ...row,
       selectionOrder: selectedNormal.size + 1,
-      selectionReason: selectionReason(row, coverage, fill, focus),
+      selectionReason: selectionReason(row, coverage, fill, focus, focusReason),
     });
+    if (fill && focus) focusTeacherExtraRows += 1;
     return true;
   };
 
   for (const group of orderedGroups) {
     if (selectedNormal.size >= sampleCount) break;
-    add(chooseRow(group.rows), true, false, focusedGroupKeys.has(group.key));
+    add(chooseRow(group.rows), true, false, priorityMode === "unreported" && focusedGroupKeys.has(group.key));
   }
 
   const remaining = normalRows
     .filter((row) => !selectedSourceRows.has(rowKey(row)))
-    .sort(compareRows);
+    .sort((left, right) => {
+      const leftFocused = focusedGroupKeys.has(uniqueTeacherKey(left));
+      const rightFocused = focusedGroupKeys.has(uniqueTeacherKey(right));
+      return Number(rightFocused) - Number(leftFocused) || compareRows(left, right);
+    });
   for (const row of remaining) {
     if (selectedNormal.size >= sampleCount) break;
     add(row, false, true, focusedGroupKeys.has(uniqueTeacherKey(row)));
@@ -202,7 +215,13 @@ export function buildInspectionSelection(
     .map((row, index) => ({
       ...row,
       selectionOrder: selectedNormal.size + index + 1,
-      selectionReason: selectionReason(row, false, false, focusedGroupKeys.has(uniqueTeacherKey(row))),
+      selectionReason: selectionReason(
+        row,
+        false,
+        false,
+        priorityMode === "unreported" && focusedGroupKeys.has(uniqueTeacherKey(row)),
+        focusReason,
+      ),
     }));
   const unorderedRows = [...selectedNormal.values(), ...selectedExtra];
   const teacherOrder = new Map<string, number>();
@@ -245,6 +264,7 @@ export function buildInspectionSelection(
       normalSelectedRows: selectedNormal.size,
       extraSelectedRows: finalizedRiskRows.length,
       selectedTeachers: selectedTeachers.size,
+      focusTeacherExtraRows,
       unsubmittedRows: finalizedRiskRows.length,
       unsubmittedSelectedRows: finalizedRiskRows.filter((row) => row.inspected).length,
       excludedRows: sourceRows.length - activeRows.length,

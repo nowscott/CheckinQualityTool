@@ -1,6 +1,6 @@
 import type { CellValue, DataRow, SheetDefinition } from "./types";
 
-export const INSPECTION_RULE_VERSION = "inspection-v6-priority-options";
+export const INSPECTION_RULE_VERSION = "inspection-v7-focus-leftover-frequency";
 
 export type InspectionPriorityMode = "coverage" | "unreported";
 
@@ -79,6 +79,7 @@ export interface InspectionStats {
   normalSelectedRows: number;
   extraSelectedRows: number;
   selectedTeachers: number;
+  focusTeacherExtraRows: number;
   unsubmittedRows: number;
   unsubmittedSelectedRows: number;
   excludedRows: number;
