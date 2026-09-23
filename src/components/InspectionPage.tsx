@@ -45,7 +45,7 @@ async function loadUnreportedTeacherNames() {
 export function InspectionPage() {
   const [feedbackFile, setFeedbackFile] = useState<File | null>(null);
   const [rosterFile, setRosterFile] = useState<File | null>(null);
-  const [sampleCount, setSampleCount] = useState("200");
+  const [sampleCount, setSampleCount] = useState("1000");
   const [processing, setProcessing] = useState(false);
   const [status, setStatus] = useState<ProcessingStatus>(INITIAL_STATUS);
   const workerRef = useRef<Worker | null>(null);
