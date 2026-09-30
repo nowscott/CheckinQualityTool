@@ -12,6 +12,7 @@ vm.runInContext(fs.readFileSync(path.resolve(process.cwd(), "public/vendor/xlsx.
 const XLSX = sandbox.XLSX;
 
 const columns = [
+  "教师姓名", "学员姓名", "课次日期", "课次时间",
   "抽检序号", "抽检类型", "入选原因", "业务周", "抽取尝试次数", "源表行号", "课次ID", "教师邮箱", "报告链接H5",
   "系统是否生成报告", "报告生成时间", "产品分组", "项目组", "校区", "科目",
 ];
@@ -29,6 +30,10 @@ function workbookFrom(chunks) {
 
 const selection = {
   selectedRows: [{
+    teacherName: "教师甲",
+    studentName: "学员甲",
+    lessonStart: "2026-09-08 10:00:00",
+    lessonEnd: "2026-09-08 12:00:00",
     selectionOrder: 1,
     unsubmitted: false,
     selectionReason: "教师覆盖",
@@ -69,7 +74,7 @@ test("抽检名单仅含约定的15列，不导出未生成报告页", () => {
   const rows = XLSX.utils.sheet_to_json(workbook.Sheets["抽检名单"], { header: 1, defval: "" });
   assert.deepEqual(Array.from(rows[0]), columns);
   assert.deepEqual(Array.from(rows[1]), [
-    1, "普通抽检", "教师覆盖", "2026-09-07~2026-09-13", 1, 8, "COURSE-1", "teacher@example.com",
+    "教师甲", "学员甲", "2026/9/8", "10:00-12:00", 1, "普通抽检", "教师覆盖", "2026-09-07~2026-09-13", 1, 8, "COURSE-1", "teacher@example.com",
     "https://example.com/report", "是", "2026-09-08 10:00", "高中一对一", "项目甲", "校区甲", "数学",
   ]);
 });

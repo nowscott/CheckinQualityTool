@@ -1,14 +1,31 @@
 import { buildWorkbook } from "./excelWriter";
+import { displayTeacherName } from "../lib/teacherDisplay.js";
 import type { DataRow, SheetDefinition } from "./types";
 import type { InspectionOutput, InspectionSelection } from "./inspectionTypes";
 
 const INSPECTION_COLUMNS = [
+  "教师姓名", "学员姓名", "课次日期", "课次时间",
   "抽检序号", "抽检类型", "入选原因", "业务周", "抽取尝试次数", "源表行号", "课次ID", "教师邮箱", "报告链接H5",
   "系统是否生成报告", "报告生成时间", "产品分组", "项目组", "校区", "科目",
 ] as const;
 
+function manualDate(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/u);
+  return match ? `${match[1]}/${Number(match[2])}/${Number(match[3])}` : value;
+}
+
+function manualTime(start: string, end: string) {
+  const first = start.match(/\b(\d{2}:\d{2})/u)?.[1] || "";
+  const last = end.match(/\b(\d{2}:\d{2})/u)?.[1] || "";
+  return first && last ? `${first}-${last}` : `${first}${last}`;
+}
+
 function selectedRows(selection: InspectionSelection) {
   return selection.selectedRows.map((row) => ({
+    教师姓名: displayTeacherName(row.teacherName, row.teacherEmail),
+    学员姓名: row.studentName,
+    课次日期: manualDate(row.lessonStart),
+    课次时间: manualTime(row.lessonStart, row.lessonEnd),
     抽检序号: row.selectionOrder,
     抽检类型: row.unsubmitted ? "容量外加抽" : "普通抽检",
     入选原因: row.selectionReason,
@@ -37,6 +54,10 @@ export function buildInspectionOutput(selection: InspectionSelection, includeExp
     freezeRows: 1,
     dataRowHeight: 22,
     widths: {
+      教师姓名: 22,
+      学员姓名: 20,
+      课次日期: 18,
+      课次时间: 18,
       抽检序号: 10,
       抽检类型: 16,
       入选原因: 28,

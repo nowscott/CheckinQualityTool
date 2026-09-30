@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.10.10",
+    date: "2026-09-30",
+    items: [
+      "恢复抽检名单基础信息列：教师姓名、学员姓名、课次日期、课次时间；保留现有15个抽检追溯字段。",
+    ],
+  },
+  {
     version: "v2.10.9",
     date: "2026-09-30",
     items: [
