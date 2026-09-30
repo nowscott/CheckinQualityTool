@@ -156,10 +156,13 @@ export function InspectionPage() {
         const focusExtraMessage = complete.summary.focusTeacherExtraRows
           ? `；未反馈教师加频 ${complete.summary.focusTeacherExtraRows} 条`
           : "";
+        const supervisorUnsubmittedMessage = complete.summary.excludedSupervisorUnsubmittedRows
+          ? `；主管及助理主管未生成报告未加抽 ${complete.summary.excludedSupervisorUnsubmittedRows} 条`
+          : "";
         const scoreMessage = `；评分 ${prioritySummary.matchedScoreTeacherCount}/${prioritySummary.scoreSourceTeacherCount} 位教师匹配，缺分 ${prioritySummary.missingScoreTeacherCount} 位，身份歧义 ${prioritySummary.ambiguousScoreTeacherCount} 位`;
         updateStatus(
           "处理完成，结果已下载",
-          `候选 ${complete.summary.eligibleTeachers.toLocaleString()} 位教师、${complete.summary.eligibleRows.toLocaleString()} 条课程；排除管理岗位 ${complete.summary.excludedManagementTeachers.toLocaleString()} 位教师、${complete.summary.excludedManagementRows.toLocaleString()} 条课程；抽检 ${complete.summary.selectedRows.toLocaleString()} 条，命中 ${complete.summary.selectedTeachers.toLocaleString()} 位教师${focusMessage}${focusExtraMessage}${scoreMessage}。${focusSourceSummary}`,
+          `候选 ${complete.summary.eligibleTeachers.toLocaleString()} 位教师、${complete.summary.eligibleRows.toLocaleString()} 条课程；排除经理 ${complete.summary.excludedManagementTeachers.toLocaleString()} 位教师、${complete.summary.excludedManagementRows.toLocaleString()} 条课程；抽检 ${complete.summary.selectedRows.toLocaleString()} 条，命中 ${complete.summary.selectedTeachers.toLocaleString()} 位教师${focusMessage}${focusExtraMessage}${supervisorUnsubmittedMessage}${scoreMessage}。${focusSourceSummary}`,
           100,
           "done",
         );
@@ -209,7 +212,7 @@ export function InspectionPage() {
             name="inspection_roster_file"
             step="02 / 可选"
             title="上传最新在职教师明细"
-            description="不上传时使用 2026-09-22 内置名单；上传表需含岗位描述字段。经理岗位排除，主管仍参与抽检。"
+            description="不上传时使用 2026-09-22 内置名单；上传表需含岗位描述字段。经理完全排除；主管、助理主管可参加普通抽检，但未生成报告不加抽。"
             file={rosterFile}
             required={false}
             onChange={setRosterFile}
@@ -252,7 +255,7 @@ export function InspectionPage() {
           </button>
         </div>
         <p className="inspection-local-note">
-          名单默认包含教师姓名、学员姓名、课次日期和课次时间；“入选原因”可选附带。仅排除岗位描述含“经理”的教师，主管仍参与抽检。两种优先方式均从腾讯文档读取本月未反馈名单和教学服务赋分排序；按教师姓名匹配，重名时使用教研组、师训组长消歧。课程与教师文件只在当前浏览器处理，不上传到服务器。
+          名单默认包含教师姓名、学员姓名、课次日期和课次时间；“入选原因”可选附带。经理完全排除；主管、助理主管可参加普通抽检，但其未生成报告课程不做容量外加抽。两种优先方式均从腾讯文档读取本月未反馈名单和教学服务赋分排序；按教师姓名匹配，重名时使用教研组、师训组长消歧。课程与教师文件只在当前浏览器处理，不上传到服务器。
         </p>
       </section>
       <StatusCard status={status} />

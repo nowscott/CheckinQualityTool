@@ -48,19 +48,18 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     const response = await fetch("/data/inspection-roster.json", { cache: "no-store" });
     if (!response.ok) throw new Error("内置在职明细读取失败，请上传一份最新在职明细。 ");
     const asset = (await response.json()) as DefaultRosterAsset;
-    let roleExcludedEmails = asset.roleExcludedEmails || [];
-    if (!roleExcludedEmails.length) {
-      const roleResponse = await fetch("/data/inspection-role-exclusions.json", { cache: "no-store" });
-      if (!roleResponse.ok) throw new Error("内置经理岗位排除名单读取失败，请稍后重试。");
-      const roleAsset = (await roleResponse.json()) as DefaultRosterRoleExclusionAsset;
-      if (!Array.isArray(roleAsset.emails) || roleAsset.emails.some((email) => typeof email !== "string")) {
-        throw new Error("内置经理岗位排除名单格式无效，请更新页面后重试。");
-      }
-      roleExcludedEmails = roleAsset.emails;
+    const roleResponse = await fetch("/data/inspection-role-exclusions.json", { cache: "no-store" });
+    if (!roleResponse.ok) throw new Error("内置岗位规则读取失败，请稍后重试。");
+    const roleAsset = (await roleResponse.json()) as DefaultRosterRoleExclusionAsset;
+    if (!Array.isArray(roleAsset.emails) || roleAsset.emails.some((email) => typeof email !== "string")
+      || !Array.isArray(roleAsset.unsubmittedEmails) || roleAsset.unsubmittedEmails.some((email) => typeof email !== "string")) {
+      throw new Error("内置岗位规则格式无效，请更新页面后重试。");
     }
+    const roleExcludedEmails = roleAsset.emails.length ? roleAsset.emails : asset.roleExcludedEmails || [];
     roster = {
       emails: new Set(asset.emails),
       roleExcludedEmails: normalizedRoleExcludedEmails(roleExcludedEmails),
+      unsubmittedExtraExcludedEmails: normalizedRoleExcludedEmails(roleAsset.unsubmittedEmails),
       sourceName: `${asset.sourceFile}（项目内置）`,
       snapshotDate: asset.snapshotDate,
       rowCount: asset.rowCount,
@@ -69,9 +68,11 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     rosterSha256 = asset.sourceSha256;
   }
   const excludedRosterRoleCount = [...roster.roleExcludedEmails].filter((email) => roster.emails.has(email)).length;
+  const excludedSupervisorUnsubmittedCount = [...roster.unsubmittedExtraExcludedEmails]
+    .filter((email) => roster.emails.has(email) && !roster.roleExcludedEmails.has(email)).length;
   progress(
     "正在核对在职教师",
-    `在职明细识别到 ${roster.emails.size.toLocaleString()} 个有效邮箱；岗位含“经理”的 ${excludedRosterRoleCount.toLocaleString()} 人已排除抽检，主管仍参与抽检。`,
+    `在职明细识别到 ${roster.emails.size.toLocaleString()} 个有效邮箱；岗位含“经理”的 ${excludedRosterRoleCount.toLocaleString()} 人已排除抽检；主管及助理主管 ${excludedSupervisorUnsubmittedCount.toLocaleString()} 人仍参与普通抽检，但未生成报告不加抽。`,
     52,
   );
 

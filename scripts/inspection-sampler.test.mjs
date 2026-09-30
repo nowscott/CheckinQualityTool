@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 const { buildInspectionSelection, historyItems } = await import("../worker/inspectionSampler.js");
-const { hasExcludedInspectionRole } = await import("../worker/inspectionRoleRules.js");
+const { hasExcludedInspectionRole, hasExcludedUnsubmittedExtraRole } = await import("../worker/inspectionRoleRules.js");
 const { displayTeacherName } = await import("../lib/teacherDisplay.js");
 const { parseTeacherScoreCsv } = await import("../server/teacherScores.js");
 
 const roster = {
   emails: new Set(["a@xdf.cn", "b@xdf.cn", "c@xdf.cn", "d@xdf.cn"]),
   roleExcludedEmails: new Set(),
+  unsubmittedExtraExcludedEmails: new Set(),
   sourceName: "在职教师明细20260915.xlsx",
   snapshotDate: "2026-09-15",
   rowCount: 4,
@@ -343,6 +344,44 @@ test("只排除经理岗位；主管岗位继续参与抽检", () => {
   assert.equal(hasExcludedInspectionRole("主管"), false);
   assert.equal(hasExcludedInspectionRole("助理主管"), false);
   assert.equal(hasExcludedInspectionRole("师训主管"), false);
+  assert.equal(hasExcludedUnsubmittedExtraRole("主管"), true);
+  assert.equal(hasExcludedUnsubmittedExtraRole("助理主管"), true);
+  assert.equal(hasExcludedUnsubmittedExtraRole("师训主管"), true);
+  assert.equal(hasExcludedUnsubmittedExtraRole("组长"), false);
+});
+
+test("主管和助理主管仍可普通抽检，但未生成报告的课程不容量外加抽", () => {
+  const supervisorRoster = {
+    ...roster,
+    unsubmittedExtraExcludedEmails: new Set(["a@xdf.cn", "b@xdf.cn"]),
+  };
+  const supervisorRows = [
+    row(10, "a@xdf.cn", "是"),
+    row(11, "a@xdf.cn", "否"),
+    row(12, "b@xdf.cn", "否"),
+    row(13, "c@xdf.cn", "否"),
+  ];
+  const result = buildInspectionSelection(supervisorRows, supervisorRoster, {
+    sampleCount: 1,
+    attempt: 1,
+    sourceSha256: "a".repeat(64),
+    rosterSha256: "b".repeat(64),
+    sourceName: "课程反馈.xlsx",
+  });
+  assert.equal(result.stats.normalSelectedRows, 1);
+  assert.equal(result.selectedRows.filter((selected) => !selected.unsubmitted).length, 1);
+  assert.ok(result.selectedRows.some((selected) => selected.teacherEmail === "a@xdf.cn" && !selected.unsubmitted));
+  assert.equal(result.stats.unsubmittedRows, 3);
+  assert.equal(result.stats.unsubmittedSelectedRows, 1);
+  assert.equal(result.stats.extraSelectedRows, 1);
+  assert.equal(result.stats.excludedSupervisorUnsubmittedRows, 2);
+  assert.ok(!result.selectedRows.some((selected) => selected.teacherEmail === "a@xdf.cn" && selected.unsubmitted));
+  assert.ok(!result.selectedRows.some((selected) => selected.teacherEmail === "b@xdf.cn"));
+  assert.ok(result.selectedRows.some((selected) => selected.teacherEmail === "c@xdf.cn" && selected.unsubmitted));
+  const excludedSupervisorRisks = result.riskRows.filter((risk) => risk.teacherEmail !== "c@xdf.cn");
+  assert.equal(excludedSupervisorRisks.length, 2);
+  assert.ok(excludedSupervisorRisks.every((risk) => !risk.inspected && risk.inspectionOrder === ""));
+  assert.ok(excludedSupervisorRisks.every((risk) => risk.inspectionReason === "主管/助理主管未生成报告不加抽"));
 });
 
 test("经理邮箱名单中的教师从普通抽检和容量外加抽中全部排除", () => {
