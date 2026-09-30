@@ -28,6 +28,7 @@ export interface InspectionRequest {
   sampleCount: number;
   attempt: number;
   includeExplanation: boolean;
+  includeReason: boolean;
   priorityMode: InspectionPriorityMode;
   focusTeacherNames: string[];
   teacherScoreRows: InspectionTeacherScore[];

@@ -68,6 +68,7 @@ export function InspectionPage() {
   const [rosterFile, setRosterFile] = useState<File | null>(null);
   const [sampleCount, setSampleCount] = useState("1000");
   const [includeExplanation, setIncludeExplanation] = useState(false);
+  const [includeReason, setIncludeReason] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [status, setStatus] = useState<ProcessingStatus>(INITIAL_STATUS);
   const workerRef = useRef<Worker | null>(null);
@@ -183,6 +184,7 @@ export function InspectionPage() {
       sampleCount: count,
       attempt: 1,
       includeExplanation,
+      includeReason,
       priorityMode,
       focusTeacherNames,
       teacherScoreRows,
@@ -228,6 +230,14 @@ export function InspectionPage() {
         <label className="inspection-explanation-option">
           <input
             type="checkbox"
+            checked={includeReason}
+            onChange={(event) => setIncludeReason(event.target.checked)}
+          />
+          附带入选原因列
+        </label>
+        <label className="inspection-explanation-option">
+          <input
+            type="checkbox"
             checked={includeExplanation}
             onChange={(event) => setIncludeExplanation(event.target.checked)}
           />
@@ -242,7 +252,7 @@ export function InspectionPage() {
           </button>
         </div>
         <p className="inspection-local-note">
-          仅排除岗位描述含“经理”的教师，主管仍参与抽检。两种优先方式均从腾讯文档读取本月未反馈名单和教学服务赋分排序；按教师姓名匹配，重名时使用教研组、师训组长消歧。课程与教师文件只在当前浏览器处理，不上传到服务器。
+          名单默认包含教师姓名、学员姓名、课次日期和课次时间；“入选原因”可选附带。仅排除岗位描述含“经理”的教师，主管仍参与抽检。两种优先方式均从腾讯文档读取本月未反馈名单和教学服务赋分排序；按教师姓名匹配，重名时使用教研组、师训组长消歧。课程与教师文件只在当前浏览器处理，不上传到服务器。
         </p>
       </section>
       <StatusCard status={status} />
