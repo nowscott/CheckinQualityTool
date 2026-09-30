@@ -93,7 +93,7 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     `候选 ${selection.stats.eligibleRows.toLocaleString()} 条，覆盖 ${selection.stats.eligibleTeachers.toLocaleString()} 位教师，抽检 ${selection.stats.selectedRows.toLocaleString()} 条。`,
     72,
   );
-  const output = buildInspectionOutput(selection, request.includeExplanation);
+  const output = buildInspectionOutput(selection, request.includeExplanation, request.includeReason);
   progress("Excel 已生成", "正在准备下载抽检名单。", 90);
   postInspectionComplete(scope, output);
 }
