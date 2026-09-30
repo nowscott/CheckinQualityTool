@@ -11,10 +11,7 @@ vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.resolve(process.cwd(), "public/vendor/xlsx.full.min.js"), "utf8"), sandbox);
 const XLSX = sandbox.XLSX;
 
-const columns = [
-  "抽检序号", "抽检类型", "入选原因", "业务周", "抽取尝试次数", "源表行号", "课次ID", "教师邮箱", "报告链接H5",
-  "系统是否生成报告", "报告生成时间", "产品分组", "项目组", "校区", "科目",
-];
+const columns = ["入选原因"];
 
 function workbookFrom(chunks) {
   const byteLength = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
@@ -47,7 +44,7 @@ const selection = {
   businessWeekStart: "2026-09-07",
   businessWeekEnd: "2026-09-13",
   attempt: 1,
-  ruleVersion: "inspection-v9-live-score-source",
+  ruleVersion: "inspection-v10-unique-score-name-match",
   sampleLimit: 1000,
   priority: {
     mode: "coverage",
@@ -62,16 +59,13 @@ const selection = {
   },
 };
 
-test("抽检名单仅含约定的15列，不导出未生成报告页", () => {
+test("抽检名单只保留入选原因列，不导出未生成报告页", () => {
   const output = buildInspectionOutput(selection, false);
   const workbook = workbookFrom(output.chunks);
   assert.deepEqual(Array.from(workbook.SheetNames), ["抽检名单"]);
   const rows = XLSX.utils.sheet_to_json(workbook.Sheets["抽检名单"], { header: 1, defval: "" });
   assert.deepEqual(Array.from(rows[0]), columns);
-  assert.deepEqual(Array.from(rows[1]), [
-    1, "普通抽检", "教师覆盖", "2026-09-07~2026-09-13", 1, 8, "COURSE-1", "teacher@example.com",
-    "https://example.com/report", "是", "2026-09-08 10:00", "高中一对一", "项目甲", "校区甲", "数学",
-  ]);
+  assert.deepEqual(Array.from(rows[1]), ["教师覆盖"]);
 });
 
 test("处理说明页通过可选参数添加", () => {
