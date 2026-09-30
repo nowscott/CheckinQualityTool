@@ -2,29 +2,10 @@ import { buildWorkbook } from "./excelWriter";
 import type { DataRow, SheetDefinition } from "./types";
 import type { InspectionOutput, InspectionSelection } from "./inspectionTypes";
 
-const INSPECTION_COLUMNS = [
-  "抽检序号", "抽检类型", "入选原因", "业务周", "抽取尝试次数", "源表行号", "课次ID", "教师邮箱", "报告链接H5",
-  "系统是否生成报告", "报告生成时间", "产品分组", "项目组", "校区", "科目",
-] as const;
+const INSPECTION_COLUMNS = ["入选原因"] as const;
 
 function selectedRows(selection: InspectionSelection) {
-  return selection.selectedRows.map((row) => ({
-    抽检序号: row.selectionOrder,
-    抽检类型: row.unsubmitted ? "容量外加抽" : "普通抽检",
-    入选原因: row.selectionReason,
-    业务周: `${selection.businessWeekStart}~${selection.businessWeekEnd}`,
-    抽取尝试次数: selection.attempt,
-    源表行号: row.sourceRowNumber,
-    课次ID: row.courseId,
-    教师邮箱: row.teacherEmail,
-    报告链接H5: row.source.报告链接H5 || "",
-    系统是否生成报告: row.submittedValue,
-    报告生成时间: row.source.报告生成时间 || "",
-    产品分组: row.productGroup,
-    项目组: row.projectGroup,
-    校区: row.campus,
-    科目: row.source.科目 || "",
-  })) as DataRow[];
+  return selection.selectedRows.map((row) => ({ 入选原因: row.selectionReason })) as DataRow[];
 }
 
 export function buildInspectionOutput(selection: InspectionSelection, includeExplanation: boolean): InspectionOutput {
@@ -33,26 +14,10 @@ export function buildInspectionOutput(selection: InspectionSelection, includeExp
     rows: selectedRows(selection),
     columns: INSPECTION_COLUMNS,
     headerStyle: 31,
-    headerHeight: 42,
+    headerHeight: 34,
     freezeRows: 1,
     dataRowHeight: 22,
-    widths: {
-      抽检序号: 10,
-      抽检类型: 16,
-      入选原因: 28,
-      业务周: 24,
-      抽取尝试次数: 12,
-      源表行号: 10,
-      课次ID: 20,
-      教师邮箱: 30,
-      报告链接H5: 38,
-      系统是否生成报告: 18,
-      报告生成时间: 22,
-      产品分组: 30,
-      项目组: 28,
-      校区: 24,
-      科目: 12,
-    },
+    widths: { 入选原因: 42 },
   }];
 
   if (includeExplanation) {
