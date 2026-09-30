@@ -280,6 +280,7 @@ export function buildInspectionSelection(
     selectionKey: hashScore(`${seed}|${row.teacherEmail}|${row.courseId}|${row.sourceRowNumber}`),
   }));
   const roleExcludedEmails = roster.roleExcludedEmails || new Set<string>();
+  const unsubmittedExtraExcludedEmails = roster.unsubmittedExtraExcludedEmails || new Set<string>();
   const inRosterRows = sourceRows.filter((row) => row.teacherEmail && roster.emails.has(row.teacherEmail));
   const excludedManagementRows = inRosterRows.filter((row) => roleExcludedEmails.has(row.teacherEmail));
   const activeRows = inRosterRows.filter((row) => !roleExcludedEmails.has(row.teacherEmail));
@@ -422,8 +423,12 @@ export function buildInspectionSelection(
     add(row, false, true, focusReasonForCoverage, scoreReason, isFocused);
   }
 
-  const selectedExtra: InspectionSelectedRow[] = activeRows
-    .filter((row) => row.unsubmitted)
+  const activeUnsubmittedRows = activeRows.filter((row) => row.unsubmitted);
+  const excludedSupervisorUnsubmittedRows = activeUnsubmittedRows.filter((row) =>
+    unsubmittedExtraExcludedEmails.has(row.teacherEmail),
+  );
+  const selectedExtra: InspectionSelectedRow[] = activeUnsubmittedRows
+    .filter((row) => !unsubmittedExtraExcludedEmails.has(row.teacherEmail))
     .sort(compareDisplayRows)
     .map((row, index) => ({
       ...row,
@@ -444,13 +449,16 @@ export function buildInspectionSelection(
     )
     .map((row, index) => ({ ...row, selectionOrder: index + 1 }));
   const selectedOrders = new Map(selectedRows.map((row) => [rowKey(row), row]));
-  const finalizedRiskRows: InspectionRiskRow[] = selectedExtra.map((row) => {
+  const finalizedRiskRows: InspectionRiskRow[] = activeUnsubmittedRows.map((row) => {
     const picked = selectedOrders.get(rowKey(row));
+    const excludedFromExtra = unsubmittedExtraExcludedEmails.has(row.teacherEmail);
     return {
       ...row,
       inspected: Boolean(picked),
       inspectionOrder: picked?.selectionOrder ?? "",
-      inspectionReason: picked?.selectionReason || "报告未生成容量外加抽",
+      inspectionReason: excludedFromExtra
+        ? "主管/助理主管未生成报告不加抽"
+        : picked?.selectionReason || "报告未生成容量外加抽",
     };
   });
 
@@ -469,11 +477,12 @@ export function buildInspectionSelection(
       eligibleTeachers: eligibleTeachers.size,
       selectedRows: selectedRows.length,
       normalSelectedRows: selectedNormal.size,
-      extraSelectedRows: finalizedRiskRows.length,
+      extraSelectedRows: selectedExtra.length,
       selectedTeachers: selectedTeachers.size,
       focusTeacherExtraRows,
-      unsubmittedRows: finalizedRiskRows.length,
-      unsubmittedSelectedRows: finalizedRiskRows.filter((row) => row.inspected).length,
+      unsubmittedRows: activeUnsubmittedRows.length,
+      unsubmittedSelectedRows: selectedExtra.length,
+      excludedSupervisorUnsubmittedRows: excludedSupervisorUnsubmittedRows.length,
       excludedRows: sourceRows.length - activeRows.length,
       excludedNoEmailRows,
       excludedNotInRosterRows,

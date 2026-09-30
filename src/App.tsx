@@ -146,7 +146,7 @@ export default function App() {
       <main className="shell">
         <Header
           title={activePage === "inspection" ? "课堂反馈抽检" : undefined}
-          subtitle={activePage === "inspection" ? "仅排除经理岗位，主管仍参与抽检；按教师覆盖、未反馈名单和教学服务赋分安排抽检顺序。" : undefined}
+          subtitle={activePage === "inspection" ? "经理完全排除；主管和助理主管参与普通抽检，但未生成报告不加抽。抽检顺序结合教师覆盖、未反馈名单和教学服务赋分。" : undefined}
           showGuide={activePage === "checkin"}
           theme={theme}
           usesSystemTheme={usesSystemTheme}

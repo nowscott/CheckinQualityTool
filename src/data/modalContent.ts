@@ -1,5 +1,12 @@
 export const CHANGELOG_ENTRIES = [
   {
+    version: "v2.10.12",
+    date: "2026-09-30",
+    items: [
+      "主管和助理主管仍参与普通抽检，但未生成报告的课程不再容量外加抽；经理仍完全排除。",
+    ],
+  },
+  {
     version: "v2.10.11",
     date: "2026-09-30",
     items: [

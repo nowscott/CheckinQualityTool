@@ -1,6 +1,6 @@
 import type { CellValue, DataRow, SheetDefinition } from "./types";
 
-export const INSPECTION_RULE_VERSION = "inspection-v10-unique-score-name-match";
+export const INSPECTION_RULE_VERSION = "inspection-v11-supervisor-unsubmitted-extra";
 
 export type InspectionPriorityMode = "coverage" | "unreported";
 
@@ -44,6 +44,7 @@ export interface InspectionSourceRow {
 export interface RosterInfo {
   emails: Set<string>;
   roleExcludedEmails: Set<string>;
+  unsubmittedExtraExcludedEmails: Set<string>;
   sourceName: string;
   snapshotDate: string;
   rowCount: number;
@@ -64,6 +65,7 @@ export interface DefaultRosterRoleExclusionAsset {
   snapshotDate: string;
   sourceFile: string;
   emails: string[];
+  unsubmittedEmails: string[];
 }
 
 export interface InspectionCandidateRow extends InspectionSourceRow {
@@ -93,6 +95,7 @@ export interface InspectionStats {
   focusTeacherExtraRows: number;
   unsubmittedRows: number;
   unsubmittedSelectedRows: number;
+  excludedSupervisorUnsubmittedRows: number;
   excludedRows: number;
   excludedNoEmailRows: number;
   excludedNotInRosterRows: number;

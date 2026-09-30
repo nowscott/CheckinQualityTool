@@ -1,6 +1,6 @@
 import { headerMap, sheetCandidates } from "./excelReader";
 import { emailValue, excelDate, excelTime, text } from "./utils";
-import { inspectionRoleExcludedEmails } from "./inspectionRoleRules";
+import { inspectionRoleExcludedEmails, inspectionUnsubmittedExtraExcludedEmails } from "./inspectionRoleRules";
 import type { CellValue, DataRow } from "./types";
 import type { InspectionSourceRow, RosterInfo } from "./inspectionTypes";
 
@@ -111,9 +111,11 @@ export function parseInspectionRoster(workbook: SheetJsWorkbook, fileName: strin
   }
   if (!emails.size) throw new Error("在职明细的邮箱列没有有效邮箱，无法进行在职教师过滤。");
   const roleExcludedEmails = inspectionRoleExcludedEmails(roleRows);
+  const unsubmittedExtraExcludedEmails = inspectionUnsubmittedExtraExcludedEmails(roleRows);
   return {
     emails,
     roleExcludedEmails,
+    unsubmittedExtraExcludedEmails,
     sourceName: fileName,
     snapshotDate: rosterDate(fileName),
     rowCount: Math.max(0, found.candidate.rows.length - 1),

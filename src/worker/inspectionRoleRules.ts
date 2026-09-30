@@ -4,6 +4,10 @@ export function hasExcludedInspectionRole(roleDescription: unknown) {
   return /经理/u.test(text(roleDescription));
 }
 
+export function hasExcludedUnsubmittedExtraRole(roleDescription: unknown) {
+  return /主管/u.test(text(roleDescription));
+}
+
 export function inspectionRoleExcludedEmails(
   rows: Iterable<{ email: unknown; roleDescription?: unknown }>,
 ) {
@@ -11,6 +15,17 @@ export function inspectionRoleExcludedEmails(
   for (const row of rows) {
     const email = emailValue(row.email);
     if (email && hasExcludedInspectionRole(row.roleDescription)) excluded.add(email);
+  }
+  return excluded;
+}
+
+export function inspectionUnsubmittedExtraExcludedEmails(
+  rows: Iterable<{ email: unknown; roleDescription?: unknown }>,
+) {
+  const excluded = new Set<string>();
+  for (const row of rows) {
+    const email = emailValue(row.email);
+    if (email && hasExcludedUnsubmittedExtraRole(row.roleDescription)) excluded.add(email);
   }
   return excluded;
 }
