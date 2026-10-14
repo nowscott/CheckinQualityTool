@@ -6,6 +6,10 @@ import os from "node:os";
 const output = await fs.mkdtemp(path.join(os.tmpdir(), "checkin-roster-tests-"));
 try {
   execFileSync("node_modules/.bin/tsc", ["--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler", "--outDir", output, "--skipLibCheck", "--strict", "api/roster.ts", "src/worker/inspectionProcess.ts", "src/worker/sheetjs.d.ts"], { stdio: "inherit" });
+  await fs.writeFile(path.join(output, "package.json"), JSON.stringify({ type: "module" }));
+  // Import the server graph exactly as emitted, before the browser-only import rewrites.
+  // This catches Node ESM failures that a successful Vite build does not detect.
+  execFileSync(process.execPath, ["--input-type=module", "-e", `await import(${JSON.stringify(path.join(output, "api/roster.js"))});`], { stdio: "inherit" });
   async function fixImports(dir) {
     for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
       const file = path.join(dir, entry.name);

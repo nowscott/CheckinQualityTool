@@ -1,4 +1,4 @@
-import { emailValue, text } from "./utils";
+import { emailValue, text } from "./utils.js";
 
 export function hasExcludedInspectionRole(roleDescription: unknown) {
   return /经理/u.test(text(roleDescription));
