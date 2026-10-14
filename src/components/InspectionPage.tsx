@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { downloadResult } from "../lib/download";
+import { loadInspectionWorkerUrl } from "../lib/inspectionWorker";
+import inspectionWorkerUrl from "../worker/inspectionEntry.ts?worker&url";
 import { UploadCard } from "./UploadCard";
 import { StatusCard } from "./StatusCard";
 import type { InspectionPriorityMode, InspectionTeacherScore } from "../worker/inspectionTypes";
@@ -29,8 +31,9 @@ const INITIAL_STATUS: ProcessingStatus = {
   mode: "working",
 };
 
-function createProcessingWorker() {
-  return new Worker(new URL("../worker/index.ts", import.meta.url), { type: "module" });
+async function createProcessingWorker() {
+  const url = await loadInspectionWorkerUrl(import.meta.env.DEV ? inspectionWorkerUrl : undefined);
+  return new Worker(url, { type: "module" });
 }
 
 function errorMessage(error: unknown) {
@@ -139,7 +142,14 @@ export function InspectionPage() {
       return;
     }
 
-    const worker = createProcessingWorker();
+    let worker: Worker;
+    try {
+      worker = await createProcessingWorker();
+    } catch (error) {
+      updateStatus("加载抽检程序失败", errorMessage(error), 100, "error");
+      setProcessing(false);
+      return;
+    }
     workerRef.current = worker;
     worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
       if (data.type === "progress") {
