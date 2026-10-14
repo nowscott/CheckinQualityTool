@@ -2,18 +2,19 @@
 
 import { buildInspectionOutput } from "./inspectionWriter";
 import { buildInspectionSelection, normalizeInspectionNumber } from "./inspectionSampler";
-import { normalizedRoleExcludedEmails } from "./inspectionRoleRules";
+import { rosterFromSnapshot } from "../lib/rosterSnapshot.js";
 import { parseInspectionRoster, parseInspectionRows, sha256File } from "./inspectionParser";
 import { progress } from "./progress";
 import { readWorkbook } from "./excelReader";
 import type { InspectionRequest, WorkerResponse } from "../types/worker";
-import type { DefaultRosterAsset, DefaultRosterRoleExclusionAsset, RosterInfo } from "./inspectionTypes";
+import type { RosterInfo } from "./inspectionTypes";
+import type { RosterSnapshotMeta } from "../lib/rosterSnapshot.js";
 
 interface WorkerScope {
   postMessage(message: unknown, transfer?: Transferable[]): void;
 }
 
-function postInspectionComplete(scope: WorkerScope, output: ReturnType<typeof buildInspectionOutput>) {
+function postInspectionComplete(scope: WorkerScope, output: ReturnType<typeof buildInspectionOutput>, rosterSnapshot: RosterSnapshotMeta) {
   const byteLength = output.chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
   const transfer = [...new Set(output.chunks.map((chunk) => chunk.buffer))] as ArrayBuffer[];
   scope.postMessage({
@@ -23,6 +24,7 @@ function postInspectionComplete(scope: WorkerScope, output: ReturnType<typeof bu
     filename: output.filename,
     summary: output.summary,
     priority: output.priority,
+    rosterSnapshot,
   } satisfies WorkerResponse, transfer);
 }
 
@@ -38,34 +40,19 @@ export async function processInspection(request: InspectionRequest, scope: Worke
   if (!rows.length) throw new Error("课堂反馈明细没有可处理的课程记录。");
   let roster: RosterInfo;
   let rosterSha256: string;
+  let rosterSourceFile: string;
   if (request.rosterFile) {
     progress("正在读取最新在职明细", `${request.rosterFile.name} · ${(request.rosterFile.size / 1024 / 1024).toFixed(1)} MB`, 30);
     const rosterWorkbook = await readWorkbook(request.rosterFile, 30, 46, "最新在职明细");
     roster = parseInspectionRoster(rosterWorkbook, request.rosterFile.name);
     rosterSha256 = await sha256File(request.rosterFile);
+    rosterSourceFile = request.rosterFile.name;
   } else {
-    progress("正在读取内置在职明细", "未上传在职明细，使用项目内置的最新快照。", 38);
-    const response = await fetch("/data/inspection-roster.json", { cache: "no-store" });
-    if (!response.ok) throw new Error("内置在职明细读取失败，请上传一份最新在职明细。 ");
-    const asset = (await response.json()) as DefaultRosterAsset;
-    const roleResponse = await fetch("/data/inspection-role-exclusions.json", { cache: "no-store" });
-    if (!roleResponse.ok) throw new Error("内置岗位规则读取失败，请稍后重试。");
-    const roleAsset = (await roleResponse.json()) as DefaultRosterRoleExclusionAsset;
-    if (!Array.isArray(roleAsset.emails) || roleAsset.emails.some((email) => typeof email !== "string")
-      || !Array.isArray(roleAsset.unsubmittedEmails) || roleAsset.unsubmittedEmails.some((email) => typeof email !== "string")) {
-      throw new Error("内置岗位规则格式无效，请更新页面后重试。");
-    }
-    const roleExcludedEmails = roleAsset.emails.length ? roleAsset.emails : asset.roleExcludedEmails || [];
-    roster = {
-      emails: new Set(asset.emails),
-      roleExcludedEmails: normalizedRoleExcludedEmails(roleExcludedEmails),
-      unsubmittedExtraExcludedEmails: normalizedRoleExcludedEmails(roleAsset.unsubmittedEmails),
-      sourceName: `${asset.sourceFile}（项目内置）`,
-      snapshotDate: asset.snapshotDate,
-      rowCount: asset.rowCount,
-      matchedEmailRows: asset.matchedEmailRows,
-    };
-    rosterSha256 = asset.sourceSha256;
+    if (!request.defaultRoster) throw new Error("本次处理没有取得最新在职名单，请重新开始或手动上传指定版本。");
+    roster = rosterFromSnapshot(request.defaultRoster);
+    rosterSha256 = request.defaultRoster.sourceSha256;
+    rosterSourceFile = request.defaultRoster.sourceFile;
+    progress("正在使用本次在职快照", `${roster.snapshotDate} · 同一次处理固定使用此版本。`, 38);
   }
   const excludedRosterRoleCount = [...roster.roleExcludedEmails].filter((email) => roster.emails.has(email)).length;
   const excludedSupervisorUnsubmittedCount = [...roster.unsubmittedExtraExcludedEmails]
@@ -96,5 +83,5 @@ export async function processInspection(request: InspectionRequest, scope: Worke
   );
   const output = buildInspectionOutput(selection, request.includeExplanation, request.includeReason);
   progress("Excel 已生成", "正在准备下载抽检名单。", 90);
-  postInspectionComplete(scope, output);
+  postInspectionComplete(scope, output, { snapshotDate: roster.snapshotDate, sourceFile: rosterSourceFile, sourceSha256: rosterSha256, rowCount: roster.rowCount });
 }
