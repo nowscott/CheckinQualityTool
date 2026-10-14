@@ -57,6 +57,7 @@ export function buildInspectionOutput(
       { 项目: "课程反馈文件", 值: selection.sourceName },
       { 项目: "在职明细文件", 值: selection.roster.sourceName },
       { 项目: "在职快照日期", 值: selection.roster.snapshotDate || "文件名未识别日期" },
+      { 项目: "在职源文件 SHA-256", 值: selection.rosterSha256 },
       { 项目: "业务周", 值: `${selection.businessWeekStart}~${selection.businessWeekEnd}` },
       { 项目: "导出优先级", 值: selection.priority.mode === "unreported" ? "优先本月未反馈教师，再覆盖其他教师" : "优先覆盖不同教师，剩余名额用于未反馈教师加频" },
       { 项目: "重点关注表未反馈教师", 值: selection.priority.focusTeacherCount },

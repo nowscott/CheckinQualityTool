@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { downloadResult } from "../lib/download";
 import { loadInspectionWorkerUrl } from "../lib/inspectionWorker";
+import { loadLatestInspectionRoster, type InspectionRosterSnapshot, type RosterSnapshotMeta } from "../lib/rosterSnapshot";
 import inspectionWorkerUrl from "../worker/inspectionEntry.ts?worker&url";
 import { UploadCard } from "./UploadCard";
 import { StatusCard } from "./StatusCard";
@@ -73,6 +74,7 @@ export function InspectionPage() {
   const [includeExplanation, setIncludeExplanation] = useState(false);
   const [includeReason, setIncludeReason] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [usedRoster, setUsedRoster] = useState<RosterSnapshotMeta | null>(null);
   const [status, setStatus] = useState<ProcessingStatus>(INITIAL_STATUS);
   const workerRef = useRef<Worker | null>(null);
 
@@ -103,6 +105,22 @@ export function InspectionPage() {
       ? "优先覆盖本月未反馈教师"
       : "优先全覆盖教师，剩余名额为未反馈教师加频";
     updateStatus(priorityLabel, "正在准备抽检数据。", 2);
+
+    // Capture the user-selected file and service version before any other asynchronous work.
+    const selectedRosterFile = rosterFile;
+    let defaultRoster: InspectionRosterSnapshot | undefined;
+    setUsedRoster(null);
+    if (!selectedRosterFile) {
+      try {
+        updateStatus("正在读取最新在职名单", "本次处理固定使用读取到的快照；读取失败会停止。", 3);
+        defaultRoster = await loadLatestInspectionRoster();
+        setUsedRoster(defaultRoster);
+      } catch (error) {
+        updateStatus("读取最新在职名单失败", errorMessage(error), 100, "error");
+        setProcessing(false);
+        return;
+      }
+    }
 
     let focusTeacherNames: string[] = [];
     let teacherScoreRows: InspectionTeacherScore[];
@@ -158,6 +176,7 @@ export function InspectionPage() {
       }
       if (data.type === "inspectionComplete") {
         const complete = data as InspectionWorkerComplete;
+        setUsedRoster(complete.rosterSnapshot);
         downloadResult(complete.chunks, complete.filename);
         const prioritySummary = complete.priority;
         const focusMessage = prioritySummary.focusTeacherCount
@@ -172,7 +191,7 @@ export function InspectionPage() {
         const scoreMessage = `；评分 ${prioritySummary.matchedScoreTeacherCount}/${prioritySummary.scoreSourceTeacherCount} 位教师匹配，缺分 ${prioritySummary.missingScoreTeacherCount} 位，身份歧义 ${prioritySummary.ambiguousScoreTeacherCount} 位`;
         updateStatus(
           "处理完成，结果已下载",
-          `候选 ${complete.summary.eligibleTeachers.toLocaleString()} 位教师、${complete.summary.eligibleRows.toLocaleString()} 条课程；排除经理 ${complete.summary.excludedManagementTeachers.toLocaleString()} 位教师、${complete.summary.excludedManagementRows.toLocaleString()} 条课程；抽检 ${complete.summary.selectedRows.toLocaleString()} 条，命中 ${complete.summary.selectedTeachers.toLocaleString()} 位教师${focusMessage}${focusExtraMessage}${supervisorUnsubmittedMessage}${scoreMessage}。${focusSourceSummary}`,
+          `在职快照 ${complete.rosterSnapshot.snapshotDate || "上传文件未识别日期"}；候选 ${complete.summary.eligibleTeachers.toLocaleString()} 位教师、${complete.summary.eligibleRows.toLocaleString()} 条课程；排除经理 ${complete.summary.excludedManagementTeachers.toLocaleString()} 位教师、${complete.summary.excludedManagementRows.toLocaleString()} 条课程；抽检 ${complete.summary.selectedRows.toLocaleString()} 条，命中 ${complete.summary.selectedTeachers.toLocaleString()} 位教师${focusMessage}${focusExtraMessage}${supervisorUnsubmittedMessage}${scoreMessage}。${focusSourceSummary}`,
           100,
           "done",
         );
@@ -193,7 +212,8 @@ export function InspectionPage() {
       type: "process",
       mode: "inspection",
       feedbackFile,
-      rosterFile: rosterFile || undefined,
+      rosterFile: selectedRosterFile || undefined,
+      defaultRoster,
       sampleCount: count,
       attempt: 1,
       includeExplanation,
@@ -221,8 +241,8 @@ export function InspectionPage() {
             id="inspection-roster-file"
             name="inspection_roster_file"
             step="02 / 可选"
-            title="上传最新在职教师明细"
-            description="不上传时使用 2026-09-22 内置名单；上传表需含岗位描述字段。经理完全排除；主管、助理主管可参加普通抽检，但未生成报告不加抽。"
+            title="上传指定版本在职教师明细"
+            description="不上传时，每次处理读取统一接口最新名单；历史报告可上传对应日期的明细。上传表需含岗位描述字段。经理完全排除；主管、助理主管可参加普通抽检，但未生成报告不加抽。"
             file={rosterFile}
             required={false}
             onChange={setRosterFile}
@@ -268,6 +288,9 @@ export function InspectionPage() {
           名单默认包含教师姓名、学员姓名、课次日期和课次时间；“入选原因”可选附带。经理完全排除；主管、助理主管可参加普通抽检，但其未生成报告课程不做容量外加抽。两种优先方式均从腾讯文档读取本月未反馈名单和教学服务赋分排序；按教师姓名匹配，重名时使用教研组、师训组长消歧。课程与教师文件只在当前浏览器处理，不上传到服务器。
         </p>
       </section>
+      {usedRoster ? <p className="inspection-local-note" title={`源文件 SHA-256：${usedRoster.sourceSha256}`}>
+        本次在职快照：{usedRoster.snapshotDate || "上传文件未识别日期"} · {usedRoster.rowCount.toLocaleString()} 行 · {usedRoster.sourceFile}
+      </p> : null}
       <StatusCard status={status} />
     </>
   );

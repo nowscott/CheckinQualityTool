@@ -3,6 +3,7 @@ export type WeekLabel = "auto" | "第一周" | "第二周" | "第三周" | "第�
 export type StatusMode = "working" | "done" | "error";
 
 import type { InspectionPriorityMode, InspectionPrioritySummary, InspectionStats, InspectionTeacherScore } from "../worker/inspectionTypes";
+import type { InspectionRosterSnapshot, RosterSnapshotMeta } from "../lib/rosterSnapshot";
 
 export interface ProcessingStatus {
   visible: boolean;
@@ -25,6 +26,7 @@ export interface InspectionRequest {
   mode: "inspection";
   feedbackFile: File;
   rosterFile?: File;
+  defaultRoster?: InspectionRosterSnapshot;
   sampleCount: number;
   attempt: number;
   includeExplanation: boolean;
@@ -43,6 +45,7 @@ export interface InspectionWorkerComplete {
   filename: string;
   summary: InspectionStats;
   priority: InspectionPrioritySummary;
+  rosterSnapshot: RosterSnapshotMeta;
 }
 
 export type WorkerResponse =
