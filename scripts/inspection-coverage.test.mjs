@@ -32,3 +32,8 @@ test("拒绝缺表头、残缺粘贴和错误月份", () => {
 test("月份以北京时间为准", () => {
   assert.equal(shanghaiMonth(new Date("2026-09-30T16:00:00Z")), "2026-10");
 });
+
+ test("腾讯文档补齐的空白范围不计入上限，满范围实际数据仍阻止静默截断", () => {
+  assert.equal(parseInspectionCoverage(header + ",,,,,\n".repeat(9999), "2026-10").teachers.length, 0);
+  assert.throws(() => parseInspectionCoverage(header + ",,,,,\n".repeat(9998) + "甲,学员,2026/10/1,10:00,,2026-10-21\n", "2026-10"), /超过读取范围/);
+});

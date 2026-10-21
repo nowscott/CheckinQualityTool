@@ -28,6 +28,8 @@ const HEADERS = ["教师姓名", "学员姓名", "课次日期", "课次时间"]
 export function parseInspectionCoverage(csv: string, month: string) {
   validateCoverageMonth(month);
   const rows = parseTencentCsv(csv);
+  // Tencent returns the full requested rectangle, including trailing empty rows.
+  while (rows.length && rows[rows.length - 1].every((cell) => !cell.trim())) rows.pop();
   if (rows.length >= 10000) throw new Error("抽检登记超过读取范围，请扩展读取范围后重试。");
   const headers = rows[0]?.map((v) => v.trim()) || [];
   const indexes = HEADERS.map((name) => headers.indexOf(name));
