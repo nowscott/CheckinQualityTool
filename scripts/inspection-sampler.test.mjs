@@ -455,3 +455,31 @@ test("评分源按语义表头解析，跳过缺姓名或缺赋分行", () => {
   assert.equal(parsed.missingNameRows, 1);
   assert.equal(parsed.missingScoreRows, 1);
 });
+
+test("月度覆盖：已登记低分重点教师排在未覆盖教师之后，覆盖后仍补足名额", () => {
+  const input = [row(1, "a@xdf.cn"), row(2, "a@xdf.cn"), row(3, "b@xdf.cn"), row(4, "c@xdf.cn")];
+  const options = { sampleCount: 2, attempt: 1, sourceSha256: "x", rosterSha256: "y", sourceName: "test", priorityMode: "monthly", coverageMonth: "2026-10", inspectedTeachers: [{ teacherEmail: "A@XDF.CN", teacherName: "a" }], focusTeacherNames: ["a"], teacherScoresByEmail: { "a@xdf.cn": 1, "b@xdf.cn": 99, "c@xdf.cn": 100 } };
+  const result = buildInspectionSelection(input, roster, options);
+  assert.deepEqual(new Set(result.selectedRows.map(r => r.teacherEmail)), new Set(["b@xdf.cn", "c@xdf.cn"]));
+  assert.equal(result.priority.uncoveredTeacherCount, 2);
+  assert.equal(buildInspectionSelection(input, roster, { ...options, sampleCount: 4 }).selectedRows.length, 4);
+});
+
+test("月度覆盖：无邮箱只匹配唯一姓名，同名登记阻止生成", () => {
+  const options = { sampleCount: 1, attempt: 1, sourceSha256: "x", rosterSha256: "y", sourceName: "test", priorityMode: "monthly", inspectedTeachers: [{ teacherEmail: "", teacherName: "a" }] };
+  assert.equal(buildInspectionSelection([row(1, "a@xdf.cn"), row(2, "b@xdf.cn")], roster, options).selectedRows[0].teacherEmail, "b@xdf.cn");
+  assert.throws(() => buildInspectionSelection([row(1, "a@xdf.cn"), { ...row(2, "b@xdf.cn"), teacherName: "a" }], roster, options), /同名/);
+});
+
+test("月度覆盖：空台账和全部已覆盖仍能生成，岗位及容量外加抽规则保留", () => {
+  const input = [row(1, "a@xdf.cn"), row(2, "a@xdf.cn", "否"), row(3, "b@xdf.cn"), row(4, "c@xdf.cn", "否"), row(5, "d@xdf.cn")];
+  const roleRoster = { ...roster, roleExcludedEmails: new Set(["d@xdf.cn"]), unsubmittedExtraExcludedEmails: new Set(["c@xdf.cn"]) };
+  const options = { sampleCount: 2, attempt: 1, sourceSha256: "x", rosterSha256: "y", sourceName: "test", priorityMode: "monthly" };
+  const empty = buildInspectionSelection(input, roleRoster, options);
+  const covered = buildInspectionSelection(input, roleRoster, { ...options, inspectedTeachers: ["a", "b", "c"].map(x => ({ teacherEmail: `${x}@xdf.cn`, teacherName: x })) });
+  for (const result of [empty, covered]) {
+    assert.equal(result.stats.normalSelectedRows, 2);
+    assert.equal(result.stats.extraSelectedRows, 1);
+    assert.ok(result.selectedRows.every(r => r.teacherEmail !== "d@xdf.cn" && r.teacherEmail !== "c@xdf.cn"));
+  }
+});

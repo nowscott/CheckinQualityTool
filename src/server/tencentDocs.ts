@@ -63,7 +63,7 @@ export function parseTencentCsv(value: string) {
   return rows;
 }
 
-export async function readTencentSheetCsv(sheetId: string, endColumn: number) {
+export async function readTencentSheetCsv(sheetId: string, endColumn: number, endRow = 999) {
   const token = process.env.TENCENT_DOCS_TOKEN;
   if (!token) throw new Error("服务器未配置腾讯文档读取凭证。");
 
@@ -86,7 +86,7 @@ export async function readTencentSheetCsv(sheetId: string, endColumn: number) {
             file_id: process.env.TENCENT_DOC_FILE_ID || "DUGFUT3dOckJVeXFm",
             sheet_id: sheetId,
             start_row: 0,
-            end_row: 999,
+            end_row: endRow,
             start_col: 0,
             end_col: endColumn,
             return_csv: true,

@@ -1,11 +1,15 @@
 import type { CellValue, DataRow, SheetDefinition } from "./types";
 
-export const INSPECTION_RULE_VERSION = "inspection-v12-online-role-corrections";
+export const INSPECTION_RULE_VERSION = "inspection-v13-monthly-date-coverage";
 
-export type InspectionPriorityMode = "coverage" | "unreported";
+export type InspectionPriorityMode = "coverage" | "unreported" | "monthly";
 
 export interface InspectionPrioritySummary {
   mode: InspectionPriorityMode;
+  coverageMonth?: string;
+  registeredTeacherCount?: number;
+  matchedCoveredTeacherCount?: number;
+  uncoveredTeacherCount?: number;
   focusTeacherCount: number;
   matchedFocusTeacherCount: number;
   unmatchedFocusTeacherCount: number;

@@ -33,6 +33,8 @@ export interface InspectionRequest {
   includeReason: boolean;
   priorityMode: InspectionPriorityMode;
   focusTeacherNames: string[];
+  coverageMonth?: string;
+  inspectedTeachers?: { teacherEmail: string; teacherName: string }[];
   teacherScoreRows: InspectionTeacherScore[];
   /** Optional direct score map, reserved for deterministic internal fixtures. */
   teacherScoresByEmail?: Record<string, number>;
