@@ -5,12 +5,13 @@ import os from "node:os";
 
 const output = await fs.mkdtemp(path.join(os.tmpdir(), "checkin-roster-tests-"));
 try {
-  execFileSync("node_modules/.bin/tsc", ["--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler", "--outDir", output, "--skipLibCheck", "--strict", "api/roster.ts", "api/role-corrections.ts", "src/worker/inspectionProcess.ts", "src/worker/sheetjs.d.ts"], { stdio: "inherit" });
+  execFileSync("node_modules/.bin/tsc", ["--ignoreConfig", "--target", "ES2022", "--module", "ESNext", "--moduleResolution", "Bundler", "--outDir", output, "--skipLibCheck", "--strict", "api/roster.ts", "api/role-corrections.ts", "api/inspection-coverage.ts", "src/worker/inspectionProcess.ts", "src/worker/sheetjs.d.ts"], { stdio: "inherit" });
   await fs.writeFile(path.join(output, "package.json"), JSON.stringify({ type: "module" }));
   // Import the server graph exactly as emitted, before the browser-only import rewrites.
   // This catches Node ESM failures that a successful Vite build does not detect.
   execFileSync(process.execPath, ["--input-type=module", "-e", `await import(${JSON.stringify(path.join(output, "api/roster.js"))});`], { stdio: "inherit" });
   execFileSync(process.execPath, ["--input-type=module", "-e", `await import(${JSON.stringify(path.join(output, "api/role-corrections.js"))});`], { stdio: "inherit" });
+  execFileSync(process.execPath, ["--input-type=module", "-e", `await import(${JSON.stringify(path.join(output, "api/inspection-coverage.js"))});`], { stdio: "inherit" });
   async function fixImports(dir) {
     for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
       const file = path.join(dir, entry.name);
@@ -28,7 +29,8 @@ try {
   await fs.symlink(path.resolve("node_modules/fflate"), path.join(output, "node_modules/fflate"));
   await fs.copyFile("scripts/roster-service.test.mjs", path.join(output, "scripts/roster-service.test.mjs"));
   await fs.copyFile("scripts/inspection-role-corrections.test.mjs", path.join(output, "scripts/inspection-role-corrections.test.mjs"));
-  execFileSync(process.execPath, ["--test", path.join(output, "scripts/roster-service.test.mjs"), path.join(output, "scripts/inspection-role-corrections.test.mjs")], { stdio: "inherit" });
+  await fs.copyFile("scripts/inspection-coverage-api.test.mjs", path.join(output, "scripts/inspection-coverage-api.test.mjs"));
+  execFileSync(process.execPath, ["--test", path.join(output, "scripts/inspection-coverage-api.test.mjs"), path.join(output, "scripts/roster-service.test.mjs"), path.join(output, "scripts/inspection-role-corrections.test.mjs")], { stdio: "inherit" });
 } finally {
   await fs.rm(output, { recursive: true, force: true });
 }

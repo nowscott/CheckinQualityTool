@@ -59,7 +59,8 @@ export function buildInspectionOutput(
       { 项目: "在职快照日期", 值: selection.roster.snapshotDate || "文件名未识别日期" },
       { 项目: "在职源文件 SHA-256", 值: selection.rosterSha256 },
       { 项目: "业务周", 值: `${selection.businessWeekStart}~${selection.businessWeekEnd}` },
-      { 项目: "导出优先级", 值: selection.priority.mode === "unreported" ? "优先本月未反馈教师，再覆盖其他教师" : "优先覆盖不同教师，剩余名额用于未反馈教师加频" },
+      ...(selection.priority.mode === "monthly" ? [{ 项目: "覆盖月份", 值: selection.priority.coverageMonth || "" }, { 项目: "台账登记教师数", 值: selection.priority.registeredTeacherCount || 0 }] : []),
+      { 项目: "导出优先级", 值: selection.priority.mode === "monthly" ? "优先本月未覆盖教师，再覆盖已登记教师" : selection.priority.mode === "unreported" ? "优先本月未反馈教师，再覆盖其他教师" : "优先覆盖不同教师，剩余名额用于未反馈教师加频" },
       { 项目: "重点关注表未反馈教师", 值: selection.priority.focusTeacherCount },
       { 项目: "匹配到的未反馈教师", 值: selection.priority.matchedFocusTeacherCount },
       { 项目: "未匹配的未反馈教师", 值: selection.priority.unmatchedFocusTeacherCount },
@@ -106,7 +107,7 @@ export function buildInspectionOutput(
   const chunks = buildWorkbook(sheets, 6);
   return {
     chunks,
-    filename: `课堂反馈抽检_${selection.businessWeekStart.replaceAll("-", "")}_${selection.priority.mode === "unreported" ? "未反馈优先" : "教师覆盖优先"}.xlsx`,
+    filename: `课堂反馈抽检_${selection.businessWeekStart.replaceAll("-", "")}_${selection.priority.mode === "monthly" ? `${selection.priority.coverageMonth || ""}_本月未覆盖优先` : selection.priority.mode === "unreported" ? "未反馈优先" : "教师覆盖优先"}.xlsx`,
     summary: selection.stats,
     priority: selection.priority,
   };

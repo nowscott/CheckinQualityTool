@@ -269,6 +269,8 @@ export function buildInspectionSelection(
     sourceColumns?: string[];
     priorityMode?: InspectionPriorityMode;
     focusTeacherNames?: string[];
+    coverageMonth?: string;
+    inspectedTeachers?: { teacherEmail: string; teacherName: string }[];
     teacherScoreRows?: InspectionTeacherScore[];
     teacherScoresByEmail?: Record<string, number>;
   },
@@ -360,6 +362,25 @@ export function buildInspectionSelection(
       ? [...focusedGroups, ...groupsForPruning]
       : teacherGroups;
 
+  const coveredKeys = new Set<string>();
+  for (const teacher of options.inspectedTeachers || []) {
+    const email = teacher.teacherEmail.trim().toLowerCase();
+    if (email) {
+      coveredKeys.add(email);
+    } else {
+      const matches = groupsByName.get(normalizeTeacherName(teacher.teacherName));
+      if (matches?.size === 1) coveredKeys.add([...matches][0]);
+      else if (matches && matches.size > 1) throw new Error(`抽检登记存在同名教师，请保留导出文件中带数字后缀的教师姓名或核对身份：${teacher.teacherName}`);
+    }
+  }
+  if (priorityMode === "monthly") {
+    priority.coverageMonth = options.coverageMonth;
+    priority.registeredTeacherCount = options.inspectedTeachers?.length || 0;
+    priority.matchedCoveredTeacherCount = [...activeTeacherEmails].filter((key) => coveredKeys.has(key)).length;
+    priority.uncoveredTeacherCount = activeTeacherEmails.size - priority.matchedCoveredTeacherCount;
+    orderedGroups.sort((left, right) => Number(coveredKeys.has(left.key)) - Number(coveredKeys.has(right.key)));
+  }
+
   const selectedNormal = new Map<string, InspectionSelectedRow>();
   const selectedSourceRows = new Set<string>();
   let focusTeacherExtraRows = 0;
@@ -398,7 +419,9 @@ export function buildInspectionSelection(
     const scoreReason = !isFocused && coverageShortage && teacherScore(group.rows[0], teacherScoresByEmail) !== undefined
       ? "低分优先保留"
       : undefined;
-    add(chooseRow(group.rows), true, false, focusReasonForCoverage, scoreReason);
+    add(chooseRow(group.rows), true, false,
+      priorityMode === "monthly" ? coveredKeys.has(group.key) ? "本月已覆盖教师补充" : "本月未覆盖教师优先" : focusReasonForCoverage,
+      scoreReason);
   }
 
   const remaining = normalRows

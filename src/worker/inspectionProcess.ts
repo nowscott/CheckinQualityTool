@@ -76,6 +76,8 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     sourceColumns: parsed.columns,
     priorityMode: request.priorityMode,
     focusTeacherNames: request.focusTeacherNames,
+    coverageMonth: request.coverageMonth,
+    inspectedTeachers: request.inspectedTeachers,
     teacherScoreRows: request.teacherScoreRows,
     teacherScoresByEmail: request.teacherScoresByEmail,
   });
