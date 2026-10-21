@@ -107,8 +107,11 @@ const feedbackFile = () => fileFromRows("课堂反馈.xlsx", [
 ]);
 const request = () => ({ type: "process", mode: "inspection", feedbackFile: feedbackFile(), sampleCount: 1, attempt: 1, includeExplanation: true, includeReason: false, priorityMode: "coverage", focusTeacherNames: [], teacherScoreRows: [] });
 
-test("Worker 固定本次快照，完全不再次请求；导出记录日期与哈希", async (context) => {
-  context.mock.method(globalThis, "fetch", () => { throw new Error("Worker 不应重新读取名单"); });
+test("Worker 固定本次在职快照，独立读取岗位纠偏；导出记录日期与哈希", async (context) => {
+  context.mock.method(globalThis, "fetch", async (url) => {
+    assert.equal(url, "/api/role-corrections");
+    return response({ managerEmails: [], supervisorEmails: [], teacherEmails: [] });
+  });
   const messages = [];
   await processInspection({ ...request(), defaultRoster: snapshot }, { postMessage: (m) => messages.push(m) });
   const result = messages.at(-1);
@@ -122,7 +125,10 @@ test("Worker 固定本次快照，完全不再次请求；导出记录日期与�
 });
 
 test("手动上传指定历史版本独立于接口，覆盖默认名单并记录文件哈希", async (context) => {
-  context.mock.method(globalThis, "fetch", () => { throw new Error("接口故障"); });
+  context.mock.method(globalThis, "fetch", async (url) => {
+    assert.equal(url, "/api/role-corrections");
+    return response({ managerEmails: [], supervisorEmails: [], teacherEmails: [] });
+  });
   const rosterFile = fileFromRows("在职教师明细20240203.xlsx", [["岗位短描述", "邮箱"], ["教师", "teacher@xdf.cn"]]);
   const messages = [];
   await processInspection({ ...request(), rosterFile }, { postMessage: (m) => messages.push(m) });

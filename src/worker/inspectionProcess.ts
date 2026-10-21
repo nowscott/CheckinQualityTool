@@ -3,6 +3,7 @@
 import { buildInspectionOutput } from "./inspectionWriter";
 import { buildInspectionSelection, normalizeInspectionNumber } from "./inspectionSampler";
 import { rosterFromSnapshot } from "../lib/rosterSnapshot.js";
+import { applyInspectionRoleCorrections, loadInspectionRoleCorrections } from "../lib/inspectionRoleCorrections.js";
 import { parseInspectionRoster, parseInspectionRows, sha256File } from "./inspectionParser";
 import { progress } from "./progress";
 import { readWorkbook } from "./excelReader";
@@ -54,6 +55,8 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     rosterSourceFile = request.defaultRoster.sourceFile;
     progress("正在使用本次在职快照", `${roster.snapshotDate} · 同一次处理固定使用此版本。`, 38);
   }
+  progress("正在读取岗位纠偏", "按腾讯文档中的已启用邮箱记录纠正岗位后再抽取。", 48);
+  roster = applyInspectionRoleCorrections(roster, await loadInspectionRoleCorrections());
   const excludedRosterRoleCount = [...roster.roleExcludedEmails].filter((email) => roster.emails.has(email)).length;
   const excludedSupervisorUnsubmittedCount = [...roster.unsubmittedExtraExcludedEmails]
     .filter((email) => roster.emails.has(email) && !roster.roleExcludedEmails.has(email)).length;

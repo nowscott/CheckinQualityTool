@@ -1,6 +1,6 @@
 import type { CellValue, DataRow, SheetDefinition } from "./types";
 
-export const INSPECTION_RULE_VERSION = "inspection-v11-supervisor-unsubmitted-extra";
+export const INSPECTION_RULE_VERSION = "inspection-v12-online-role-corrections";
 
 export type InspectionPriorityMode = "coverage" | "unreported";
 

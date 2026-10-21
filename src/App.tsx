@@ -6,6 +6,7 @@ import { OutputGrid } from "./components/OutputGrid";
 import { StatusCard } from "./components/StatusCard";
 import { UploadForm } from "./components/UploadForm";
 import { InspectionPage } from "./components/InspectionPage";
+import { ROLE_CORRECTIONS_URL } from "./lib/inspectionRoleCorrections.js";
 import { downloadResult } from "./lib/download";
 import { inferWeekFromFilename } from "./lib/week";
 import { useTheme } from "./hooks/useTheme";
@@ -176,6 +177,9 @@ export default function App() {
                 rel="noopener noreferrer"
               >
                 教学服务赋分
+              </a>
+              <a className="page-resource-link" href={ROLE_CORRECTIONS_URL} target="_blank" rel="noreferrer">
+                岗位纠偏
               </a>
             </>
           ) : (
