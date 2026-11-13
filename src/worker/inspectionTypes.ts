@@ -1,6 +1,8 @@
 import type { CellValue, DataRow, SheetDefinition } from "./types";
 
-export const INSPECTION_RULE_VERSION = "inspection-v13-monthly-date-coverage";
+export const INSPECTION_RULE_VERSION = "inspection-v14-supervisor-sample-cap";
+
+export const INSPECTION_SUPERVISOR_SAMPLE_LIMIT = 3;
 
 export type InspectionPriorityMode = "coverage" | "unreported" | "monthly";
 

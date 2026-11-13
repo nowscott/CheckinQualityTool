@@ -298,7 +298,7 @@ export function InspectionPage() {
             name="inspection_roster_file"
             step="02 / 可选"
             title="上传指定版本在职教师明细"
-            description="不上传时，每次处理读取统一接口最新名单；历史报告可上传对应日期的明细。上传表需含岗位描述字段。经理完全排除；主管、助理主管可参加普通抽检，但未生成报告不加抽。"
+            description="不上传时，每次处理读取统一接口最新名单；历史报告可上传对应日期的明细。上传表需含岗位描述字段。经理完全排除；主管、助理主管每批每人最多3条，未生成报告不加抽。"
             file={rosterFile}
             required={false}
             onChange={setRosterFile}
@@ -310,7 +310,7 @@ export function InspectionPage() {
           <label>抽检月份 <input type="month" value={coverageMonth} disabled={processing} onChange={(event) => { setCoverageMonth(event.target.value); setCoverageSummary(""); setCoverageUrl("https://docs.qq.com/sheet/DUGFUT3dOckJVeXFm?tab=ih60c3"); }} /></label>
           <button type="button" className="secondary" disabled={processing || !coverageMonth} onClick={() => { void loadCoverage().catch((error) => setCoverageSummary(errorMessage(error))); }}>读取已抽检人数</button>
           {coverageSummary ? <p role="status">{coverageSummary}</p> : null}
-          <p>未覆盖优先：先抽当月未登记的教师，再覆盖已登记教师，剩余名额按评分排序补足。仅针对本次课程明细中的在职教师；生成名单后仍需人工登记实际完成情况。未生成报告的容量外加抽规则继续保留。</p>
+          <p>未覆盖优先：先抽当月未登记的教师，再覆盖已登记教师，剩余名额按评分排序补足。仅针对本次课程明细中的在职教师；生成名单后仍需人工登记实际完成情况。主管及助理主管每批每人最多3条；合规候选不足时按实际条数导出。未生成报告的容量外加抽规则继续保留。</p>
         </div>
         <label className="inspection-count-field" htmlFor="inspection-sample-count">
           抽检课程条数
@@ -352,7 +352,7 @@ export function InspectionPage() {
           </button>
         </div>
         <p className="inspection-local-note">
-          名单默认包含教师姓名、学员姓名、课次日期和课次时间；“入选原因”可选附带。经理完全排除；主管、助理主管可参加普通抽检，但其未生成报告课程不做容量外加抽。三种优先方式均读取教学服务赋分排序及未反馈名单；月度覆盖模式另读取所选月份的抽检登记。按教师姓名匹配，重名时使用教研组、师训组长消歧。课程与教师文件只在当前浏览器处理，不上传到服务器。
+          名单默认包含教师姓名、学员姓名、课次日期和课次时间；“入选原因”可选附带。经理完全排除；主管、助理主管每批每人最多3条，含基础覆盖与补抽；未生成报告课程不做容量外加抽。三种优先方式均读取教学服务赋分排序及未反馈名单；月度覆盖模式另读取所选月份的抽检登记。按教师姓名匹配，重名时使用教研组、师训组长消歧。课程与教师文件只在当前浏览器处理，不上传到服务器。
         </p>
       </section>
       {usedRoster ? <p className="inspection-local-note" title={`源文件 SHA-256：${usedRoster.sourceSha256}`}>

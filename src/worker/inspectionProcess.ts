@@ -62,7 +62,7 @@ export async function processInspection(request: InspectionRequest, scope: Worke
     .filter((email) => roster.emails.has(email) && !roster.roleExcludedEmails.has(email)).length;
   progress(
     "正在核对在职教师",
-    `在职明细识别到 ${roster.emails.size.toLocaleString()} 个有效邮箱；岗位含“经理”的 ${excludedRosterRoleCount.toLocaleString()} 人已排除抽检；主管及助理主管 ${excludedSupervisorUnsubmittedCount.toLocaleString()} 人仍参与普通抽检，但未生成报告不加抽。`,
+    `在职明细识别到 ${roster.emails.size.toLocaleString()} 个有效邮箱；岗位含“经理”的 ${excludedRosterRoleCount.toLocaleString()} 人已排除抽检；主管及助理主管 ${excludedSupervisorUnsubmittedCount.toLocaleString()} 人每批每人最多3条（含基础覆盖与补抽），未生成报告不加抽。`,
     52,
   );
 

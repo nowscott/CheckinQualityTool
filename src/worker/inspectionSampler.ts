@@ -1,6 +1,6 @@
 import { excelDate, text } from "./utils";
 import { displayTeacherName } from "../lib/teacherDisplay.js";
-import { INSPECTION_RULE_VERSION } from "./inspectionTypes";
+import { INSPECTION_RULE_VERSION, INSPECTION_SUPERVISOR_SAMPLE_LIMIT } from "./inspectionTypes";
 import type {
   InspectionCandidateRow,
   InspectionHistoryItem,
@@ -382,6 +382,7 @@ export function buildInspectionSelection(
   }
 
   const selectedNormal = new Map<string, InspectionSelectedRow>();
+  const supervisorSelectedCounts = new Map<string, number>();
   const selectedSourceRows = new Set<string>();
   let focusTeacherExtraRows = 0;
   const rowKey = (row: InspectionSourceRow) => `${row.teacherEmail}\u0000${row.courseId}\u0000${row.sourceRowNumber}`;
@@ -394,6 +395,9 @@ export function buildInspectionSelection(
     countAsFocusExtra = false,
   ) => {
     if (selectedNormal.size >= sampleCount) return false;
+    const isSupervisor = unsubmittedExtraExcludedEmails.has(row.teacherEmail);
+    const supervisorCount = supervisorSelectedCounts.get(row.teacherEmail) || 0;
+    if (isSupervisor && supervisorCount >= INSPECTION_SUPERVISOR_SAMPLE_LIMIT) return false;
     const key = rowKey(row);
     if (selectedSourceRows.has(key)) return false;
     selectedSourceRows.add(key);
@@ -402,6 +406,7 @@ export function buildInspectionSelection(
       selectionOrder: selectedNormal.size + 1,
       selectionReason: selectionReason(row, coverage, fill, focusReason, scoreReason),
     });
+    if (isSupervisor) supervisorSelectedCounts.set(row.teacherEmail, supervisorCount + 1);
     if (fill && countAsFocusExtra) focusTeacherExtraRows += 1;
     return true;
   };
