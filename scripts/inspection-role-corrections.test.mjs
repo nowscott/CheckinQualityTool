@@ -79,7 +79,7 @@ function fileFromRows(name, rows) {
   return new File([XLSX.write(wb, { type: "array", bookType: "xlsx" })], name);
 }
 
-test("两种优先模式、在线名单及手动上传均在抽取阶段排除祖万露加抽，普通抽检保留", async (context) => {
+test("三种优先模式、在线名单及手动上传纠偏后主管最多3条，未生成报告不加抽", async (context) => {
   context.mock.method(globalThis, "fetch", async (url) => {
     assert.equal(url, "/api/role-corrections");
     return response(corrections());
@@ -87,24 +87,25 @@ test("两种优先模式、在线名单及手动上传均在抽取阶段排除�
   const feedbackFile = fileFromRows("反馈.xlsx", [
     ["老师姓名", "学员姓名", "学员号", "课次ID", "课次开始时间", "课次结束时间", "老师邮箱", "是否生成报告"],
     ["祖万露", "学员甲", "1", "NORMAL", "2026-10-19 10:00", "2026-10-19 12:00", "zuwanlu@xdf.cn", "是"],
+    ...Array.from({ length: 10 }, (_, index) => ["祖万露", `普通学员${index}`, `N${index}`, `NORMAL${index}`, "2026-10-19 10:00", "2026-10-19 12:00", "zuwanlu@xdf.cn", "是"]),
     ["祖万露", "学员乙", "2", "EXTRA", "2026-10-19 14:00", "2026-10-19 16:00", "zuwanlu@xdf.cn", "否"],
     ["普通教师", "学员丙", "3", "TEACHER", "2026-10-19 10:00", "2026-10-19 12:00", "teacher@xdf.cn", "否"],
   ]);
   const rosterFile = fileFromRows("在职教师明细20261019.xlsx", [["邮箱", "岗位短描述"], ["zuwanlu@xdf.cn", "益智新师师训助理"], ["teacher@xdf.cn", "教师"]]);
   const defaultRoster = { snapshotDate: "2026-10-19", sourceFile: "在职教师明细20261019.xlsx", sourceSha256: "a".repeat(64), rowCount: 2, matchedEmailRows: 2, emails: ["zuwanlu@xdf.cn", "teacher@xdf.cn"], roleExcludedEmails: [], unsubmittedExtraExcludedEmails: [] };
-  for (const priorityMode of ["coverage", "unreported"]) {
+  for (const priorityMode of ["coverage", "unreported", "monthly"]) {
     for (const source of [{ rosterFile }, { defaultRoster }]) {
       const messages = [];
       await processInspection({ type: "process", mode: "inspection", feedbackFile, ...source, sampleCount: 10, attempt: 1, includeExplanation: true, includeReason: true, priorityMode, focusTeacherNames: ["祖万露"], teacherScoreRows: [] }, { postMessage: message => messages.push(message) });
       const result = messages.at(-1);
       assert.equal(result.summary.excludedSupervisorUnsubmittedRows, 1);
       assert.equal(result.summary.extraSelectedRows, 1);
-      assert.equal(result.summary.normalSelectedRows, 1);
+      assert.equal(result.summary.normalSelectedRows, 3);
       const wb = XLSX.read(Buffer.concat(result.chunks.map(chunk => Buffer.from(chunk))), { type: "buffer" });
       const rows = XLSX.utils.sheet_to_json(wb.Sheets["抽检名单"], { header: 1 });
-      assert.equal(rows.length, 3);
+      assert.equal(rows.length, 5);
       assert.equal(rows.some(row => row[0] === "祖万露" && row[4] === "报告未生成容量外加抽"), false);
-      assert.equal(rows.some(row => row[0] === "祖万露"), true);
+      assert.equal(rows.filter(row => row[0] === "祖万露").length, 3);
     }
   }
 });

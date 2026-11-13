@@ -85,7 +85,7 @@ export function buildInspectionOutput(
       { 项目: "未生成报告且被抽检数", 值: selection.stats.unsubmittedSelectedRows },
       { 项目: "主管及助理主管未生成报告未加抽数", 值: selection.stats.excludedSupervisorUnsubmittedRows },
       { 项目: "排除课程数", 值: selection.stats.excludedRows },
-      { 项目: "排除原因", 值: `无邮箱 ${selection.stats.excludedNoEmailRows} 条；邮箱不在职 ${selection.stats.excludedNotInRosterRows} 条；岗位含“经理” ${selection.stats.excludedManagementRows} 条，不参与抽检；主管及助理主管仍参与普通抽检，但未生成报告的课程不做容量外加抽` },
+      { 项目: "排除原因", 值: `无邮箱 ${selection.stats.excludedNoEmailRows} 条；邮箱不在职 ${selection.stats.excludedNotInRosterRows} 条；岗位含“经理” ${selection.stats.excludedManagementRows} 条，不参与抽检；主管及助理主管每批每人最多3条（含基础覆盖及补抽），未生成报告的课程不做容量外加抽` },
       { 项目: "提交字段未知值", 值: selection.stats.unknownSubmissionRows },
       { 项目: "数据保存范围", 值: "上传的 Excel 只在当前浏览器处理；应用不保存课程明细或抽检历史" },
     ];

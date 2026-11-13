@@ -483,3 +483,38 @@ test("月度覆盖：空台账和全部已覆盖仍能生成，岗位及容量�
     assert.ok(result.selectedRows.every(r => r.teacherEmail !== "d@xdf.cn" && r.teacherEmail !== "c@xdf.cn"));
   }
 });
+
+for (const priorityMode of ["coverage", "unreported", "monthly"]) {
+  for (const focused of [false, true]) {
+    test(`${priorityMode}：主管及助理主管每批最多3条，${focused ? "未反馈加频" : "低分补抽"}不突破上限，普通教师继续补足`, () => {
+      let index = 0;
+      const input = [];
+      for (const email of ["a@xdf.cn", "b@xdf.cn"]) {
+        for (let i = 0; i < 11; i++) input.push(row(++index, email));
+        input.push(row(++index, email, "否"));
+      }
+      for (let i = 0; i < 40; i++) input.push(row(++index, "c@xdf.cn"));
+      input.push(row(++index, "c@xdf.cn", "否"));
+      const result = buildInspectionSelection(input, { ...roster, unsubmittedExtraExcludedEmails: new Set(["a@xdf.cn", "b@xdf.cn"]) }, {
+        sampleCount: 30, attempt: 1, sourceSha256: "cap", rosterSha256: "cap", sourceName: "课程.xlsx", priorityMode,
+        focusTeacherNames: focused ? ["a", "b"] : [], teacherScoresByEmail: { "a@xdf.cn": 1, "b@xdf.cn": 2, "c@xdf.cn": 99 },
+        coverageMonth: "2026-11", inspectedTeachers: [{ teacherEmail: "a@xdf.cn", teacherName: "a" }],
+      });
+      for (const email of ["a@xdf.cn", "b@xdf.cn"]) {
+        assert.equal(result.selectedRows.filter(r => r.teacherEmail === email).length, 3);
+        assert.ok(result.selectedRows.filter(r => r.teacherEmail === email).every(r => !r.unsubmitted));
+      }
+      assert.equal(result.stats.normalSelectedRows, 30);
+      assert.equal(result.selectedRows.filter(r => r.teacherEmail === "c@xdf.cn" && !r.unsubmitted).length, 24);
+      assert.equal(result.stats.extraSelectedRows, 1);
+    });
+  }
+}
+test("仅有主管且名额远超合规课程时，最多3条，不为凑数重复加抽", () => {
+  const input = Array.from({ length: 11 }, (_, index) => row(index + 1, "a@xdf.cn"));
+  const result = buildInspectionSelection(input, { ...roster, unsubmittedExtraExcludedEmails: new Set(["a@xdf.cn"]) }, {
+    sampleCount: 1000, attempt: 1, sourceSha256: "cap", rosterSha256: "cap", sourceName: "课程.xlsx",
+  });
+  assert.equal(result.stats.normalSelectedRows, 3);
+  assert.equal(new Set(result.selectedRows.map(r => r.courseId)).size, 3);
+});
